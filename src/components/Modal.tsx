@@ -1,0 +1,41 @@
+'use client';
+import { X } from 'lucide-react';
+import { ReactNode } from 'react';
+import { useApp } from './AppContext';
+
+interface Props {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  onClose?: () => void;
+}
+
+export default function Modal({ title, subtitle, children, footer, size = 'md', onClose }: Props) {
+  const { closeModal } = useApp();
+  const handleClose = onClose ?? closeModal;
+
+  return (
+    <div className="modal-backdrop" onClick={handleClose}>
+      <div className={`modal modal-${size}`} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{title}</div>
+            {subtitle && <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '3px' }}>{subtitle}</div>}
+          </div>
+          <button
+            onClick={handleClose}
+            style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-2)', cursor: 'pointer', transition: 'var(--transition)', flexShrink: 0 }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--danger-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--danger)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'; }}
+          >
+            <X size={15} />
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-footer">{footer}</div>}
+      </div>
+    </div>
+  );
+}

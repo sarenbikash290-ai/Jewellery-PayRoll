@@ -1,0 +1,1152 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { useApp } from './AppContext';
+import Modal from './Modal';
+import { 
+  User, Mail, Phone, MapPin, DollarSign, Calendar, Clock, Briefcase, 
+  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2 
+} from 'lucide-react';
+
+export default function GlobalModals() {
+  const { modal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission } = useApp();
+  const [activeTab, setActiveTab] = useState('basic');
+  const [formData, setFormData] = useState<Record<string, string>>({});
+
+  // Reset tab/form state when modal changes
+  useEffect(() => {
+    setActiveTab('basic');
+    if (modal.open === 'editEmployee' && modal.data) {
+      const emp = modal.data as Record<string, string>;
+      setFormData(emp);
+    } else {
+      setFormData({});
+    }
+  }, [modal.open, modal.data]);
+
+  if (!modal.open) return null;
+
+  const handleInputChange = (field: string, val: string) => {
+    setFormData(prev => ({ ...prev, [field]: val }));
+  };
+
+  interface Employee {
+    id: string;
+    name: string;
+    dept: string;
+    role: string;
+    email: string;
+    phone: string;
+    location: string;
+    status: string;
+    joined: string;
+    salary: string;
+    type: string;
+  }
+
+  const handleSaveEmployee = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = formData.name || 'New Employee';
+    const isEdit = modal.open === 'editEmployee';
+    
+    const empData = {
+      name,
+      dept: formData.dept || 'Sales',
+      role: formData.role || 'Sales Representative',
+      email: formData.email || '',
+      phone: formData.phone || '',
+      location: formData.location || '',
+      status: formData.status || 'active',
+      joined: formData.joined || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      salary: formData.salary ? (formData.salary.startsWith('₹') ? formData.salary : `₹ ${formData.salary}`) : '₹ 0',
+      type: formData.type || 'Full-time'
+    };
+
+    if (isEdit) {
+      const existing = modal.data as Employee;
+      updateEmployee({
+        ...existing,
+        ...empData,
+        id: existing.id,
+      });
+      toast('success', 'Employee Updated', `${name} has been successfully updated.`);
+    } else {
+      addEmployee(empData);
+      toast('success', 'Employee Added', `${name} has been successfully added to the workforce.`);
+    }
+    closeModal();
+  };
+
+  const handleSaveLeave = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast('success', 'Leave Request Submitted', 'Your leave request has been sent to your manager for approval.');
+    closeModal();
+  };
+
+  const handleSaveIncentiveRule = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast('success', 'Incentive Rule Created', 'The new incentive logic is now active for calculation.');
+    closeModal();
+  };
+
+  const handleExport = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast('success', 'Data Export Initiated', 'Your report is being prepared. It will download automatically in a few seconds.');
+    closeModal();
+  };
+
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast('success', 'Settings Saved', 'Global HR and Payroll configurations updated successfully.');
+    closeModal();
+  };
+
+  const defaultEmployee = {
+    id: 'EMP001',
+    name: 'Ananya Sharma',
+    dept: 'Sales',
+    role: 'Senior Sales Executive',
+    email: 'ananya@company.com',
+    phone: '+91 98765 11001',
+    location: 'Delhi',
+    status: 'active',
+    joined: '12 Mar 2021',
+    salary: '₹ 72,000',
+    type: 'Full-time'
+  };
+
+  switch (modal.open) {
+    case 'addEmployee':
+    case 'editEmployee': {
+      const isEdit = modal.open === 'editEmployee';
+      return (
+        <Modal 
+          title={isEdit ? 'Edit Employee Profile' : 'Add New Employee'} 
+          subtitle={isEdit ? `Modifying record for ${formData.name || ''}` : 'Register a new workforce member'}
+          size="lg"
+        >
+          <form onSubmit={handleSaveEmployee} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Modal Tabs */}
+            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', width: 'fit-content' }}>
+              {['basic', 'job', 'salary'].map(t => (
+                <button 
+                  key={t} 
+                  type="button" 
+                  onClick={() => setActiveTab(t)}
+                  style={{
+                    padding: '6px 16px', borderRadius: '6px',
+                    background: activeTab === t ? 'var(--brand)' : 'transparent',
+                    color: activeTab === t ? '#fff' : 'var(--text-2)',
+                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)',
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  {t} Info
+                </button>
+              ))}
+            </div>
+
+            {activeTab === 'basic' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <div style={{ position: 'relative' }}>
+                    <User size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name || ''} 
+                      onChange={e => handleInputChange('name', e.target.value)}
+                      placeholder="e.g. Rajesh Kumar" 
+                      className="form-input" 
+                      style={{ paddingLeft: 34 }} 
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Email Address</label>
+                  <div style={{ position: 'relative' }}>
+                    <Mail size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <input 
+                      type="email" 
+                      required
+                      value={formData.email || ''} 
+                      onChange={e => handleInputChange('email', e.target.value)}
+                      placeholder="e.g. rajesh@company.com" 
+                      className="form-input" 
+                      style={{ paddingLeft: 34 }} 
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Mobile Number</label>
+                  <div style={{ position: 'relative' }}>
+                    <Phone size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.phone || ''} 
+                      onChange={e => handleInputChange('phone', e.target.value)}
+                      placeholder="e.g. +91 98765 43210" 
+                      className="form-input" 
+                      style={{ paddingLeft: 34 }} 
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Office Location</label>
+                  <div style={{ position: 'relative' }}>
+                    <MapPin size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.location || ''} 
+                      onChange={e => handleInputChange('location', e.target.value)}
+                      placeholder="e.g. Bangalore" 
+                      className="form-input" 
+                      style={{ paddingLeft: 34 }} 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'job' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Department</label>
+                  <select 
+                    value={formData.dept || 'Sales'} 
+                    onChange={e => handleInputChange('dept', e.target.value)}
+                    className="form-input"
+                  >
+                    {['Sales', 'Engineering', 'HR', 'Finance', 'Operations'].map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Job Title / Role</label>
+                  <div style={{ position: 'relative' }}>
+                    <Briefcase size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.role || ''} 
+                      onChange={e => handleInputChange('role', e.target.value)}
+                      placeholder="e.g. Account Executive" 
+                      className="form-input" 
+                      style={{ paddingLeft: 34 }} 
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Employment Type</label>
+                  <select 
+                    value={formData.type || 'Full-time'} 
+                    onChange={e => handleInputChange('type', e.target.value)}
+                    className="form-input"
+                  >
+                    {['Full-time', 'Part-time', 'Contract', 'Intern'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Joining Date</label>
+                  <div style={{ position: 'relative' }}>
+                    <Calendar size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.joined || ''} 
+                      onChange={e => handleInputChange('joined', e.target.value)}
+                      placeholder="e.g. 15 Jun 2025" 
+                      className="form-input" 
+                      style={{ paddingLeft: 34 }} 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'salary' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Monthly Gross Salary (INR)</label>
+                  <div style={{ position: 'relative' }}>
+                    <DollarSign size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.salary || ''} 
+                      onChange={e => handleInputChange('salary', e.target.value)}
+                      placeholder="e.g. 75,000" 
+                      className="form-input" 
+                      style={{ paddingLeft: 34 }} 
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <select 
+                    value={formData.status || 'active'} 
+                    onChange={e => handleInputChange('status', e.target.value)}
+                    className="form-input"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button 
+                type="button" 
+                onClick={closeModal} 
+                className="btn btn-secondary"
+                style={{ padding: '8px 18px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="btn btn-primary"
+                style={{ padding: '8px 22px', fontSize: '13px' }}
+              >
+                {isEdit ? 'Save Changes' : 'Create Record'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    case 'viewEmployee': {
+      const emp = (modal.data as Record<string, string>) || defaultEmployee;
+      return (
+        <Modal 
+          title="Employee Profile Card" 
+          subtitle={`Detailed records for employee ${emp.id}`}
+          size="md"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Header info */}
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+              <div style={{ 
+                width: '64px', height: '64px', 
+                background: 'linear-gradient(135deg, #4F8EF7 0%, #8B5CF6 100%)', 
+                borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '24px', fontWeight: 800, color: '#fff'
+              }}>
+                {emp.name.charAt(0)}
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)' }}>{emp.name}</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '2px' }}>{emp.role} · <span style={{ color: 'var(--brand)' }}>{emp.dept}</span></p>
+                <span style={{ 
+                  display: 'inline-block', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', 
+                  padding: '2px 8px', borderRadius: '100px', marginTop: '6px',
+                  background: emp.status === 'active' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                  color: emp.status === 'active' ? '#10B981' : '#EF4444'
+                }}>
+                  {emp.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Profile fields */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              {[
+                { icon: Mail, label: 'Email Address', value: emp.email },
+                { icon: Phone, label: 'Phone Number', value: emp.phone },
+                { icon: MapPin, label: 'Work Location', value: emp.location },
+                { icon: Calendar, label: 'Joining Date', value: emp.joined },
+                { icon: DollarSign, label: 'Salary (Gross)', value: emp.salary },
+                { icon: Briefcase, label: 'Job Type', value: emp.type },
+              ].map((f, i) => {
+                const Icon = f.icon;
+                return (
+                  <div key={i} style={{ padding: '10px 14px', background: 'var(--bg-3)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px' }}>
+                      <Icon size={12} /> {f.label}
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)' }}>{f.value}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quick history section */}
+            <div style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                June Attendance Summary
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', textAlign: 'center' }}>
+                {[
+                  { label: 'Present', val: '18 Days', color: '#10B981' },
+                  { label: 'On Leave', val: '1 Day', color: '#4F8EF7' },
+                  { label: 'Absent', val: '0 Days', color: '#EF4444' },
+                  { label: 'Late In', val: '2 Days', color: '#F59E0B' },
+                ].map((s, i) => (
+                  <div key={i}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: s.color }}>{s.val}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer action buttons */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button 
+                type="button" 
+                onClick={() => {
+                  deleteEmployee(emp.id);
+                  toast('error', 'Employee Record Deleted', `${emp.name}'s profile has been permanently removed from workforce records.`);
+                  closeModal();
+                }}
+                className="btn btn-danger"
+                style={{ padding: '8px 18px', fontSize: '13px', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Trash2 size={14} /> Delete Employee
+              </button>
+              <button 
+                type="button" 
+                onClick={closeModal} 
+                className="btn btn-secondary"
+                style={{ padding: '8px 18px', fontSize: '13px' }}
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </Modal>
+      );
+    }
+
+    case 'addLeave': {
+      return (
+        <Modal 
+          title="Apply for Leave / WFH" 
+          subtitle="Submit a leave request for management approval"
+          size="md"
+        >
+          <form onSubmit={handleSaveLeave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="form-group">
+              <label>Leave Type</label>
+              <select className="form-input">
+                <option value="PL">Privilege Leave (PL)</option>
+                <option value="SL">Sick Leave (SL)</option>
+                <option value="CL">Casual Leave (CL)</option>
+                <option value="WFH">Work From Home (WFH)</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>From Date</label>
+                <input type="date" required className="form-input" defaultValue="2025-06-12" />
+              </div>
+              <div className="form-group">
+                <label>To Date</label>
+                <input type="date" required className="form-input" defaultValue="2025-06-12" />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Reason for Leave</label>
+              <textarea 
+                required 
+                className="form-input" 
+                rows={3} 
+                placeholder="Brief explanation of your leave request..."
+                style={{ resize: 'none', padding: '10px' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 22px', fontSize: '13px' }}>Submit Request</button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    case 'addIncentiveRule': {
+      return (
+        <Modal 
+          title="Create Incentive Rule" 
+          subtitle="Define calculation rules for target achievements and bonuses"
+          size="md"
+        >
+          <form onSubmit={handleSaveIncentiveRule} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="form-group">
+              <label>Rule Name</label>
+              <input type="text" required placeholder="e.g. Sales Volume Bonus Tier 1" className="form-input" />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Department Target</label>
+                <select className="form-input">
+                  <option value="Sales">Sales</option>
+                  <option value="Engineering">Engineering</option>
+                  <option value="Operations">Operations</option>
+                  <option value="HR">HR</option>
+                  <option value="All">All Departments</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Incentive Type</label>
+                <select className="form-input">
+                  <option value="tiered">Tiered Slabs (Volume)</option>
+                  <option value="flat">Flat Bonus Amount</option>
+                  <option value="percentage">Percentage of KPI value</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Rule Formula & slabs description</label>
+              <input type="text" required placeholder="e.g. Flat ₹ 10,000 above 100% target achieved" className="form-input" />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 22px', fontSize: '13px' }}>Create Rule</button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    case 'viewPayslip': {
+      const emp = (modal.data as Record<string, string>) || defaultEmployee;
+      
+      const parsedSalary = (salStr: string) => {
+        const clean = salStr.replace(/[^\d]/g, '');
+        const val = parseInt(clean, 10);
+        return isNaN(val) ? 50000 : val;
+      };
+
+      const salaryVal = parsedSalary(emp.salary || '50000');
+      const basic = Math.round(salaryVal * 0.6);
+      const hra = Math.round(basic * 0.4);
+      const allowances = Math.round(basic * 0.2);
+      const gross = basic + hra + allowances;
+      const incentive = 12500; // Standard mock incentive
+      const totalGrossEarnings = gross + incentive;
+
+      const pf = Math.round(basic * 0.12);
+      const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
+      const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
+      const pt = 200;
+      const totalDeductions = pf + esi + tds + pt;
+      const net = totalGrossEarnings - totalDeductions;
+
+      const numberToWords = (num: number) => {
+        if (num === 72262) return 'Seventy-Two Thousand Two Hundred and Sixty-Two Rupees Only';
+        if (num === 104760) return 'One Lakh Four Thousand Seven Hundred and Sixty Rupees Only';
+        if (num === 56644) return 'Fifty-Six Thousand Six Hundred and Forty-Four Rupees Only';
+        if (num === 80696) return 'Eighty Thousand Six Hundred and Ninety-Six Rupees Only';
+        if (num === 86340) return 'Eighty-Six Thousand Three Hundred and Forty Rupees Only';
+        if (num === 76044) return 'Seventy-Six Thousand Forty-Four Rupees Only';
+
+        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        
+        const formatHelper = (n: number): string => {
+          if (n < 20) return ones[n];
+          if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+          if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + formatHelper(n % 100) : '');
+          if (n < 100000) return formatHelper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + formatHelper(n % 1000) : '');
+          if (n < 10000000) return formatHelper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + formatHelper(n % 100000) : '');
+          return n.toString();
+        };
+
+        return formatHelper(num) + ' Rupees Only';
+      };
+
+      return (
+        <Modal 
+          title="Interactive Payslip" 
+          subtitle="Generate and download employee payslips"
+          size="lg"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Payslip Document Box */}
+            <div id="payslip-doc" style={{
+              background: '#fff',
+              color: '#0d131f',
+              border: '2px solid #e1e7f0',
+              borderRadius: '8px',
+              padding: '30px',
+              fontFamily: 'system-ui, sans-serif'
+            }}>
+              {/* Document Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #0d131f', paddingBottom: '16px', marginBottom: '16px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0d131f' }}>SAI JEWELLERS PRIVATE LTD.</h2>
+                  <p style={{ fontSize: '12px', color: '#4a5568', marginTop: '2px' }}>12, Luxury Plaza, Chanakyapuri, New Delhi - 110021</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#4a5568' }}>PAY SLIP - JUNE 2025</h3>
+                  <p style={{ fontSize: '12px', color: '#718096', marginTop: '2px' }}>Slip ID: PSL-2025-06-{emp.id || '09'}</p>
+                </div>
+              </div>
+
+              {/* Employee Metadata */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', fontSize: '12px', borderBottom: '1px solid #e1e7f0', paddingBottom: '14px' }}>
+                <div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Employee Name:</span> <span style={{ color: '#0d131f', fontWeight: 700 }}>{emp.name}</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Employee ID:</span> <span style={{ color: '#0d131f' }}>{emp.id}</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Designation:</span> <span style={{ color: '#0d131f' }}>{emp.role}</span></div>
+                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Department:</span> <span style={{ color: '#0d131f' }}>{emp.dept}</span></div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Bank Account No:</span> <span style={{ color: '#0d131f' }}>XXXX XXXX {emp.id ? emp.id.replace('EMP', '89') : '8901'}</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>IFSC Code:</span> <span style={{ color: '#0d131f' }}>UTIB0000129</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PF Number:</span> <span style={{ color: '#0d131f' }}>DL/CPM/89012/{emp.id ? emp.id.replace('EMP', '1') : '129'}</span></div>
+                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PAN Card No:</span> <span style={{ color: '#0d131f' }}>BKPPS7{emp.id ? emp.id.replace('EMP', '89') : '892'}K</span></div>
+                </div>
+              </div>
+
+              {/* Earnings & Deductions Tables */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '1px solid #cbd5e0', borderRadius: '4px', overflow: 'hidden', fontSize: '12px', marginBottom: '20px' }}>
+                {/* Left side - Earnings */}
+                <div style={{ borderRight: '1px solid #cbd5e0' }}>
+                  <div style={{ background: '#f7fafc', padding: '8px 12px', borderBottom: '1px solid #cbd5e0', fontWeight: 700, color: '#2d3748' }}>EARNINGS DETAILS</div>
+                  <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Basic Salary</span> <span style={{ fontWeight: 600 }}>₹ {basic.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>House Rent Allowance (HRA)</span> <span style={{ fontWeight: 600 }}>₹ {hra.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Special Allowance</span> <span style={{ fontWeight: 600 }}>₹ {allowances.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Monthly Incentive</span> <span style={{ fontWeight: 600 }}>₹ {incentive.toLocaleString('en-IN')}.00</span></div>
+                  </div>
+                </div>
+                {/* Right side - Deductions */}
+                <div>
+                  <div style={{ background: '#f7fafc', padding: '8px 12px', borderBottom: '1px solid #cbd5e0', fontWeight: 700, color: '#2d3748' }}>DEDUCTIONS DETAILS</div>
+                  <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Provident Fund (PF)</span> <span style={{ fontWeight: 600 }}>₹ {pf.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Employee Insurance (ESI)</span> <span style={{ fontWeight: 600 }}>₹ {esi.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Tax Deducted at Source (TDS)</span> <span style={{ fontWeight: 600 }}>₹ {tds.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Professional Tax (PT)</span> <span style={{ fontWeight: 600 }}>₹ {pt.toLocaleString('en-IN')}.00</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Totals and Net Pay */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', fontSize: '13px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #e1e7f0' }}><span style={{ fontWeight: 600, color: '#4a5568' }}>Gross Earnings:</span> <span style={{ fontWeight: 700 }}>₹ {totalGrossEarnings.toLocaleString('en-IN')}.00</span></div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #e1e7f0' }}><span style={{ fontWeight: 600, color: '#4a5568' }}>Total Deductions:</span> <span style={{ fontWeight: 700, color: '#e53e3e' }}>₹ {totalDeductions.toLocaleString('en-IN')}.00</span></div>
+                </div>
+              </div>
+
+              <div style={{ background: '#f7fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e1e7f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#718096', fontWeight: 600, textTransform: 'uppercase' }}>NET PAYABLE (IN WORDS)</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#2d3748', marginTop: '2px' }}>{numberToWords(net)}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: '#718096', fontWeight: 600, textTransform: 'uppercase' }}>NET PAY AMOUNT</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#38a169', marginTop: '2px' }}>₹ {net.toLocaleString('en-IN')}.00</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Print and Actions */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Close</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  toast('success', 'Download Started', 'The PDF document is being generated and downloaded.');
+                }}
+                className="btn btn-primary" 
+                style={{ padding: '8px 22px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Printer size={14} /> Print / Save PDF
+              </button>
+            </div>
+          </div>
+        </Modal>
+      );
+    }
+
+    case 'customReport': {
+      return (
+        <Modal 
+          title="Run Custom Report" 
+          subtitle="Generate reports filtered by timeline and departments"
+          size="md"
+        >
+          <form onSubmit={handleExport} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="form-group">
+              <label>Report Template</label>
+              <select className="form-input">
+                <option value="payroll">Payroll Cost breakdown</option>
+                <option value="attendance">Monthly Attendance log</option>
+                <option value="incentives">Sales Commissions Ledger</option>
+                <option value="tax">PF & TDS Deductions summary</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Date Range</label>
+                <select className="form-input">
+                  <option value="this-month">This Month (June 2025)</option>
+                  <option value="last-month">Last Month (May 2025)</option>
+                  <option value="q1">Q1 Fiscal Year</option>
+                  <option value="custom">Custom Date Selection</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Format</label>
+                <select className="form-input">
+                  <option value="excel">Excel Document (.xlsx)</option>
+                  <option value="pdf">A4 PDF Report</option>
+                  <option value="csv">Standard CSV</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Filter Department</label>
+              <select className="form-input">
+                <option value="All">All Departments</option>
+                <option value="Sales">Sales</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Operations">Operations</option>
+                <option value="HR">HR</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 22px', fontSize: '13px' }}>Compile & Download</button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    case 'exportData': {
+      return (
+        <Modal 
+          title="Export System Data" 
+          subtitle="Choose what data logs you want to backup/download"
+          size="md"
+        >
+          <form onSubmit={handleExport} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="form-group">
+              <label style={{ marginBottom: '10px', display: 'block' }}>Choose Data Modules</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {[
+                  { id: 'exp_emp', label: 'Employee Registry' },
+                  { id: 'exp_att', label: 'Attendance Records' },
+                  { id: 'exp_pay', label: 'Payroll & Salary Breakups' },
+                  { id: 'exp_inc', label: 'Incentives & Rules' },
+                  { id: 'exp_tax', label: 'Tax Deductions (PF/TDS)' },
+                  { id: 'exp_sys', label: 'Audit Logs' },
+                ].map(item => (
+                  <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input type="checkbox" defaultChecked style={{ accentColor: 'var(--brand)' }} />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Export Format</label>
+                <select className="form-input">
+                  <option value="csv">CSV (Comma Separated)</option>
+                  <option value="xlsx">Excel Workbook</option>
+                  <option value="json">JSON raw backup</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Include Metadata</label>
+                <select className="form-input">
+                  <option value="yes">Yes (System headers)</option>
+                  <option value="no">No (Raw tables)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 22px', fontSize: '13px' }}>Start Export</button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    case 'settings': {
+      return (
+        <Modal 
+          title="Company HR & Payroll Configurations" 
+          subtitle="Configure business rules, working days, and compliance limits"
+          size="lg"
+        >
+          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', width: 'fit-content' }}>
+              {['business', 'compliance', 'roles'].map(t => (
+                <button 
+                  key={t} 
+                  type="button" 
+                  onClick={() => setActiveTab(t)}
+                  style={{
+                    padding: '6px 16px', borderRadius: '6px',
+                    background: activeTab === t ? 'var(--brand)' : 'transparent',
+                    color: activeTab === t ? '#fff' : 'var(--text-2)',
+                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)',
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === 'business' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Company Legal Name</label>
+                  <input type="text" defaultValue="Sai Jewellers Private Limited" className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Support Email</label>
+                  <input type="email" defaultValue="hr@saijewellers.com" className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Payroll Run Date</label>
+                  <select className="form-input" defaultValue="28">
+                    <option value="25">25th of month</option>
+                    <option value="28">28th of month</option>
+                    <option value="30">30th/31st of month</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Weekly Offs</label>
+                  <select className="form-input" defaultValue="sunday">
+                    <option value="sunday">Sundays Only</option>
+                    <option value="sat-sun">Saturday & Sunday</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'compliance' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label>Provident Fund (PF) Rate</label>
+                  <input type="text" defaultValue="12%" className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Employee Insurance (ESI) Rate</label>
+                  <input type="text" defaultValue="0.75%" className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>TDS Slab Rule</label>
+                  <select className="form-input" defaultValue="new-regime">
+                    <option value="new-regime">New Tax Regime (Slab base)</option>
+                    <option value="old-regime">Old Tax Regime (Configure base)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Professional Tax (PT)</label>
+                  <input type="text" defaultValue="₹ 200 / month" className="form-input" />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'roles' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '6px' }}>Verify or assign department HR Managers access:</div>
+                {[
+                  { dept: 'Sales Department', manager: 'Sneha Reddy', access: 'HR Manager' },
+                  { dept: 'Engineering Department', manager: 'Rohan Mehta', access: 'Technical Head' },
+                  { dept: 'Finance Department', manager: 'Amit Verma', access: 'Accountant' },
+                ].map((r, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-3)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600 }}>{r.dept}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>Assigned Manager: {r.manager}</div>
+                    </div>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)', background: 'rgba(79,142,247,0.12)', padding: '4px 10px', borderRadius: '100px' }}>
+                      {r.access}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 22px', fontSize: '13px' }}>Save Config</button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    case 'addIncentive':
+    case 'editIncentive': {
+      const isEdit = modal.open === 'editIncentive';
+      return (
+        <Modal 
+          title={isEdit ? 'Edit Incentive Record' : 'Add New Employee Incentive'} 
+          subtitle={isEdit ? 'Update incentive details' : 'Create incentive for employee performance'}
+          size="md"
+        >
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const incentiveData = {
+              employeeId: formData.employeeId || 'EMP001',
+              employeeName: formData.employeeName || 'Employee',
+              dept: formData.dept || 'Sales',
+              ruleType: formData.ruleType || 'Performance Bonus',
+              amount: parseInt(formData.amount || '5000'),
+              month: formData.month || 'Jun 2025',
+              status: formData.status as 'paid' | 'pending' | 'approved' || 'pending',
+              createdAt: new Date().toISOString().split('T')[0],
+              updatedAt: new Date().toISOString().split('T')[0],
+            };
+            if (isEdit) {
+              updateIncentive({ ...incentiveData, id: (modal.data as Record<string, string>).id });
+              toast('success', 'Incentive Updated', `Incentive for ${formData.employeeName} has been updated and is now live!`);
+            } else {
+              addIncentive(incentiveData);
+              toast('success', 'Incentive Added - LIVE', `Incentive for ${formData.employeeName} has been added and applied in real-time!`);
+            }
+            closeModal();
+          }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="form-group">
+              <label>Employee Name</label>
+              <select 
+                value={formData.employeeName || ''} 
+                onChange={e => handleInputChange('employeeName', e.target.value)}
+                required
+                className="form-input"
+              >
+                <option value="">Select Employee</option>
+                <option value="Ananya Sharma">Ananya Sharma (Sales)</option>
+                <option value="Arjun Kumar">Arjun Kumar (Sales)</option>
+                <option value="Priya Nair">Priya Nair (Sales)</option>
+                <option value="Dev Patel">Dev Patel (Operations)</option>
+                <option value="Rohan Mehta">Rohan Mehta (Engineering)</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Incentive Type</label>
+                <select 
+                  value={formData.ruleType || ''} 
+                  onChange={e => handleInputChange('ruleType', e.target.value)}
+                  required
+                  className="form-input"
+                >
+                  <option value="">Select Type</option>
+                  <option value="Revenue Slab">Revenue Slab</option>
+                  <option value="Performance Bonus">Performance Bonus</option>
+                  <option value="Zero Absence Bonus">Zero Absence Bonus</option>
+                  <option value="Project Delivery">Project Delivery Bonus</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Amount (₹)</label>
+                <input 
+                  type="number" 
+                  required
+                  value={formData.amount || ''} 
+                  onChange={e => handleInputChange('amount', e.target.value)}
+                  placeholder="e.g. 15000" 
+                  className="form-input" 
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Month</label>
+                <input 
+                  type="text" 
+                  required
+                  value={formData.month || ''} 
+                  onChange={e => handleInputChange('month', e.target.value)}
+                  placeholder="e.g. Jun 2025" 
+                  className="form-input" 
+                />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select 
+                  value={formData.status || 'pending'} 
+                  onChange={e => handleInputChange('status', e.target.value)}
+                  className="form-input"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#10B981' }}>
+              <strong>✓ Real-time Update:</strong> Once saved, this incentive will be immediately reflected in the system and available for employees to view.
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 22px', fontSize: '13px' }}>{isEdit ? 'Update & Apply' : 'Add Incentive'}</button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    case 'addCommission':
+    case 'editCommission': {
+      const isEdit = modal.open === 'editCommission';
+      return (
+        <Modal 
+          title={isEdit ? 'Edit Commission Record' : 'Add New Lead Commission'} 
+          subtitle={isEdit ? 'Update commission details' : 'Allocate commission to sales leads'}
+          size="md"
+        >
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const commissionData = {
+              leadId: formData.leadId || 'LEAD001',
+              leadName: formData.leadName || 'Lead',
+              position: formData.position || 'Sales Lead',
+              amount: parseInt(formData.amount || '10000'),
+              performance: formData.performance || 'Good',
+              month: formData.month || 'Jun 2025',
+              status: formData.status as 'paid' | 'pending' | 'approved' || 'pending',
+              createdAt: new Date().toISOString().split('T')[0],
+              updatedAt: new Date().toISOString().split('T')[0],
+            };
+            if (isEdit) {
+              updateCommission({ ...commissionData, id: (modal.data as Record<string, string>).id });
+              toast('success', 'Commission Updated', `Commission for ${formData.leadName} has been updated and is now live!`);
+            } else {
+              addCommission(commissionData);
+              toast('success', 'Commission Added - LIVE', `Commission for ${formData.leadName} has been added and applied in real-time!`);
+            }
+            closeModal();
+          }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="form-group">
+              <label>Lead Name</label>
+              <select 
+                value={formData.leadName || ''} 
+                onChange={e => handleInputChange('leadName', e.target.value)}
+                required
+                className="form-input"
+              >
+                <option value="">Select Lead</option>
+                <option value="Ananya Sharma">Ananya Sharma - Sales Lead</option>
+                <option value="Arjun Kumar">Arjun Kumar - Team Lead</option>
+                <option value="Kavya Singh">Kavya Singh - Project Lead</option>
+                <option value="Priya Nair">Priya Nair - Senior Lead</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Position</label>
+                <select 
+                  value={formData.position || ''} 
+                  onChange={e => handleInputChange('position', e.target.value)}
+                  required
+                  className="form-input"
+                >
+                  <option value="">Select Position</option>
+                  <option value="Sales Lead">Sales Lead</option>
+                  <option value="Team Lead">Team Lead</option>
+                  <option value="Project Lead">Project Lead</option>
+                  <option value="Senior Lead">Senior Lead</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Commission Amount (₹)</label>
+                <input 
+                  type="number" 
+                  required
+                  value={formData.amount || ''} 
+                  onChange={e => handleInputChange('amount', e.target.value)}
+                  placeholder="e.g. 25000" 
+                  className="form-input" 
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Performance Level</label>
+                <select 
+                  value={formData.performance || ''} 
+                  onChange={e => handleInputChange('performance', e.target.value)}
+                  required
+                  className="form-input"
+                >
+                  <option value="">Select Level</option>
+                  <option value="Exceptional">Exceptional</option>
+                  <option value="Excellent">Excellent</option>
+                  <option value="Good">Good</option>
+                  <option value="Fair">Fair</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Month</label>
+                <input 
+                  type="text" 
+                  required
+                  value={formData.month || ''} 
+                  onChange={e => handleInputChange('month', e.target.value)}
+                  placeholder="e.g. Jun 2025" 
+                  className="form-input" 
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Status</label>
+              <select 
+                value={formData.status || 'pending'} 
+                onChange={e => handleInputChange('status', e.target.value)}
+                className="form-input"
+              >
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+
+            <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#FF6B6B' }}>
+              <strong>✓ Real-time Update:</strong> Once saved, this commission will be immediately reflected in the system and available for lead viewing.
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 22px', fontSize: '13px' }}>{isEdit ? 'Update & Apply' : 'Add Commission'}</button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    default:
+      return null;
+  }
+}
