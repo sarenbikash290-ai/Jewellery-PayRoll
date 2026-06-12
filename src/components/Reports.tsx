@@ -121,7 +121,7 @@ export default function Reports() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="month" tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v}L`} />
-                <Tooltip {...tooltipStyle} formatter={(v: number) => [`₹${v}L`, 'Payroll Cost']} />
+                <Tooltip {...tooltipStyle} formatter={(v: any) => [`₹${v}L`, 'Payroll Cost']} />
                 <Area type="monotone" dataKey="cost" stroke="#10B981" strokeWidth={2.5} fill="url(#rptGrad)" dot={{ fill: '#10B981', r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
@@ -136,7 +136,7 @@ export default function Reports() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
                 <XAxis type="number" tick={{ fill: '#8B9AB5', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}L`} />
                 <YAxis type="category" dataKey="dept" tick={{ fill: '#8B9AB5', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
-                <Tooltip {...tooltipStyle} formatter={(v: number) => [`₹${v}L`, 'Cost']} />
+                <Tooltip {...tooltipStyle} formatter={(v: any) => [`₹${v}L`, 'Cost']} />
                 <Bar dataKey="cost" radius={[0,4,4,0]}>
                   {deptCosts.map((_, i) => (
                     <rect key={i} fill={['#4F8EF7','#10B981','#8B5CF6','#F59E0B','#06B6D4'][i]} />
@@ -163,7 +163,7 @@ export default function Reports() {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
               <XAxis dataKey="week" tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis domain={[80, 100]} tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-              <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v}%`, 'Attendance Rate']} />
+              <Tooltip {...tooltipStyle} formatter={(v: any) => [`${v}%`, 'Attendance Rate']} />
               <Line type="monotone" dataKey="rate" stroke="#4F8EF7" strokeWidth={2.5} dot={{ fill: '#4F8EF7', r: 5, strokeWidth: 2, stroke: '#fff' }} />
             </LineChart>
           </ResponsiveContainer>

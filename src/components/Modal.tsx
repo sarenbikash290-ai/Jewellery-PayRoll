@@ -1,5 +1,4 @@
 'use client';
-import { X } from 'lucide-react';
 import { ReactNode } from 'react';
 import { useApp } from './AppContext';
 
@@ -24,14 +23,6 @@ export default function Modal({ title, subtitle, children, footer, size = 'md', 
             <div className="modal-title">{title}</div>
             {subtitle && <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '3px' }}>{subtitle}</div>}
           </div>
-          <button
-            onClick={handleClose}
-            style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-2)', cursor: 'pointer', transition: 'var(--transition)', flexShrink: 0 }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--danger-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--danger)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-3)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'; }}
-          >
-            <X size={15} />
-          </button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
@@ -39,3 +30,4 @@ export default function Modal({ title, subtitle, children, footer, size = 'md', 
     </div>
   );
 }
+

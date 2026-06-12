@@ -167,8 +167,9 @@ export default function Dashboard() {
               borderRadius: 'var(--radius-lg)',
               padding: '20px',
               transition: 'var(--transition)',
-              cursor: 'default',
+              cursor: card.id === 'headcount' ? 'pointer' : 'default',
             }}
+              onClick={card.id === 'headcount' ? () => setActiveModule('employees') : undefined}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = card.color; (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 1px ${card.color}20, 0 8px 24px rgba(0,0,0,0.3)`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
             >
@@ -216,7 +217,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="month" tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v}L`} />
-                <Tooltip {...tooltipStyle} formatter={(v: number) => [`₹${v}L`, 'Payroll']} />
+                <Tooltip {...tooltipStyle} formatter={(v: any) => [`₹${v}L`, 'Payroll']} />
                 <Area type="monotone" dataKey="amount" stroke="#4F8EF7" strokeWidth={2.5} fill="url(#payrollGrad)" dot={{ fill: '#4F8EF7', strokeWidth: 2, r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
