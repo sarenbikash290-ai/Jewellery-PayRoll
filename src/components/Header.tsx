@@ -1,6 +1,6 @@
 'use client';
 import { Menu, Bell, Search, Sun, Moon, ChevronDown, Check } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from './AppContext';
 
 const moduleNames: Record<string, string> = {
@@ -29,9 +29,10 @@ interface HeaderProps {
 }
 
 export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
-  const { openModal, toast } = useApp();
+  const { openModal, toast, modal } = useApp();
   const [darkMode, setDarkMode] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const [notifications, setNotifications] = useState([
     { id: 1, type: 'warning', text: '3 employees have pending leave requests', time: '5m ago', read: false },
@@ -56,6 +57,25 @@ export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notifOpen]);
+
+  // Close notification dropdown when any modal opens
+  useEffect(() => {
+    if (modal.open) {
+      setNotifOpen(false);
+    }
+  }, [modal.open]);
+
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.remove('light-mode');
@@ -74,7 +94,7 @@ export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
       padding: '0 32px',
       gap: '20px',
       flexShrink: 0,
-      zIndex: 999,
+      position: 'relative',
     }}>
       {/* Sidebar Toggle */}
       <button
@@ -101,28 +121,9 @@ export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
         </div>
       </div>
 
-      {/* Search */}
-      <div style={{ position: 'relative' }}>
-        <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-        <input
-          placeholder="Search anything..."
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            padding: '8px 12px 8px 36px',
-            color: 'var(--text-primary)',
-            fontSize: '13px',
-            outline: 'none',
-            width: '220px',
-          }}
-          onFocus={e => { (e.target as HTMLElement).style.borderColor = 'var(--brand)'; (e.target as HTMLElement).style.boxShadow = '0 0 0 3px rgba(79,142,247,0.1)'; }}
-          onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border)'; (e.target as HTMLElement).style.boxShadow = 'none'; }}
-        />
-      </div>
-
+{/* Search removed */}
       {/* Notifications */}
-      <div style={{ position: 'relative' }}>
+      <div ref={notifRef} style={{ position: 'relative' }}>
         <button
           id="notif-btn"
           onClick={() => setNotifOpen(!notifOpen)}
@@ -218,7 +219,7 @@ export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
           background: 'var(--bg-card)',
           border: '1px solid var(--border)',
           borderRadius: '10px',
-          display: 'flex', alignItems: 'center', justifycontent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--text-secondary)',
           transition: 'var(--transition)',
         }}

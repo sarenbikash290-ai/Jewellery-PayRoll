@@ -32,12 +32,12 @@ function AppShell() {
         onNavigate={(m) => setActiveModule(m)}
         open={sidebarOpen}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, willChange: 'width' }}>
         <Header
           activeModule={activeModule}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
-        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', contain: 'layout style' }}>
           {renderModule()}
         </main>
       </div>

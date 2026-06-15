@@ -251,7 +251,7 @@ export default function Payroll() {
                 <td colSpan={3}></td>
                 <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: 'var(--brand)', whiteSpace: 'nowrap' }}>{totalGross.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalPF.toLocaleString('en-IN')}</td>
-                <td></td>
+                <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{payrollEmployees.reduce((s, e) => s + e.esi, 0).toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalTDS.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 800, color: '#10B981', whiteSpace: 'nowrap' }}>{totalNet.toLocaleString('en-IN')}</td>
                 <td></td>

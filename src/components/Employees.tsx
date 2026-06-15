@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from './AppContext';
-import { Search, Filter, Plus, Download, MoreHorizontal, Mail, Phone, MapPin, ChevronDown, Users, UserCheck, UserX, TrendingUp } from 'lucide-react';
+import { Search, Filter, Plus, Download, Mail, Phone, MapPin, ChevronDown, Users, UserCheck, UserX, TrendingUp } from 'lucide-react';
 
 const deptColors: Record<string, string> = {
   Sales: '#10B981', Engineering: '#4F8EF7', HR: '#8B5CF6',
@@ -9,9 +9,9 @@ const deptColors: Record<string, string> = {
 };
 const avatarColors = ['#4F8EF7', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#EF4444'];
 
-interface CardProps { children: React.ReactNode; style?: React.CSSProperties; }
-const Card = ({ children, style = {} }: CardProps) => (
-  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', ...style }}>{children}</div>
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> { children: React.ReactNode; style?: React.CSSProperties; }
+const Card = ({ children, style = {}, ...rest }: CardProps) => (
+  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', ...style }} {...rest}>{children}</div>
 );
 
 export default function Employees() {
@@ -36,7 +36,7 @@ export default function Employees() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Employee Directory</h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{employees.length} employees across 5 departments</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{employees.length} employees across {new Set(employees.map(e => e.dept)).size} departments</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
@@ -143,7 +143,7 @@ export default function Employees() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  {['Employee', 'Department', 'Role', 'Location', 'Salary', 'Joined', 'Status', ''].map(h => (
+                  {['Employee', 'Department', 'Role', 'Location', 'Salary', 'Joined', 'Status'].map(h => (
                     <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -179,14 +179,7 @@ export default function Employees() {
                         {emp.status}
                       </span>
                     </td>
-                    <td style={{ padding: '16px 20px' }} onClick={(e) => e.stopPropagation()}>
-                       <button 
-                         onClick={() => openModal('editEmployee', emp)}
-                         style={{ color: 'var(--text-muted)', padding: '4px', borderRadius: '6px', transition: 'var(--transition)', cursor: 'pointer', border: 'none', background: 'transparent' }}
-                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-elevated)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
-                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-                       ><MoreHorizontal size={16} /></button>
-                    </td>
+
                   </tr>
                 ))}
               </tbody>

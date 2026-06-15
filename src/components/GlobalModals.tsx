@@ -2,13 +2,15 @@
 import { useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import Modal from './Modal';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { 
   User, Mail, Phone, MapPin, DollarSign, Calendar, Clock, Briefcase, 
-  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2 
+  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil 
 } from 'lucide-react';
 
 export default function GlobalModals() {
-  const { modal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
 
@@ -126,17 +128,31 @@ export default function GlobalModals() {
         >
           <form onSubmit={handleSaveEmployee} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Modal Tabs */}
-            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', width: 'fit-content' }}>
+            <div style={{
+                display: 'flex',
+                gap: '6px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(6px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '10px',
+                padding: '6px',
+                width: 'fit-content',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}>
               {['basic', 'job', 'salary'].map(t => (
-                <button 
-                  key={t} 
-                  type="button" 
+                <button
+                  key={t}
+                  type="button"
                   onClick={() => setActiveTab(t)}
                   style={{
-                    padding: '6px 16px', borderRadius: '6px',
+                    padding: '8px 20px',
+                    borderRadius: '8px',
                     background: activeTab === t ? 'var(--brand)' : 'transparent',
                     color: activeTab === t ? '#fff' : 'var(--text-2)',
-                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
                     textTransform: 'capitalize'
                   }}
                 >
@@ -329,6 +345,7 @@ export default function GlobalModals() {
           title="Employee Profile Card" 
           subtitle={`Detailed records for employee ${emp.id}`}
           size="md"
+          hideClose
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Header info */}
@@ -410,6 +427,17 @@ export default function GlobalModals() {
                 style={{ padding: '8px 18px', fontSize: '13px', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 <Trash2 size={14} /> Delete Employee
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  closeModal();
+                  setTimeout(() => openModal('editEmployee', emp), 150);
+                }}
+                className="btn btn-primary"
+                style={{ padding: '8px 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)', border: 'none' }}
+              >
+                <Pencil size={14} /> Edit Profile
               </button>
               <button 
                 type="button" 
@@ -910,12 +938,17 @@ export default function GlobalModals() {
         >
           <form onSubmit={(e) => {
             e.preventDefault();
+            const employeeName = formData.employeeName || 'Employee';
+            // Look up the actual employee to get the correct ID and dept
+            const matchedEmp = modal.data ? undefined : undefined; // placeholder for context reference
+            const empLookup = employeeName;
             const incentiveData = {
               employeeId: formData.employeeId || 'EMP001',
-              employeeName: formData.employeeName || 'Employee',
+              employeeName: employeeName,
               dept: formData.dept || 'Sales',
               ruleType: formData.ruleType || 'Performance Bonus',
               amount: parseInt(formData.amount || '5000'),
+              target: parseInt(formData.target || '500000'),
               month: formData.month || 'Jun 2025',
               status: formData.status as 'paid' | 'pending' | 'approved' || 'pending',
               createdAt: new Date().toISOString().split('T')[0],
@@ -979,14 +1012,21 @@ export default function GlobalModals() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Month</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.month || ''} 
-                  onChange={e => handleInputChange('month', e.target.value)}
-                  placeholder="e.g. Jun 2025" 
-                  className="form-input" 
-                />
+                  <DatePicker
+                    selected={formData.month ? new Date(formData.month + '-01') : null}
+                    onChange={(date: Date | null) => {
+                      if (date) {
+                        const monthStr = date.toISOString().slice(0, 7); // YYYY-MM
+                        handleInputChange('month', monthStr);
+                      } else {
+                        handleInputChange('month', '');
+                      }
+                    }}
+                    dateFormat="MMM yyyy"
+                    showMonthYearPicker
+                    placeholderText="Select month"
+                    className="form-input"
+                  />
               </div>
               <div className="form-group">
                 <label>Status</label>
@@ -1047,20 +1087,16 @@ export default function GlobalModals() {
             closeModal();
           }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group">
-              <label>Lead Name</label>
-              <select 
-                value={formData.leadName || ''} 
-                onChange={e => handleInputChange('leadName', e.target.value)}
-                required
-                className="form-input"
-              >
-                <option value="">Select Lead</option>
-                <option value="Ananya Sharma">Ananya Sharma - Sales Lead</option>
-                <option value="Arjun Kumar">Arjun Kumar - Team Lead</option>
-                <option value="Kavya Singh">Kavya Singh - Project Lead</option>
-                <option value="Priya Nair">Priya Nair - Senior Lead</option>
-              </select>
-            </div>
+  <label>Lead Name</label>
+  <input
+    type="text"
+    required
+    value={formData.leadName || ''}
+    onChange={e => handleInputChange('leadName', e.target.value)}
+    placeholder="e.g. John Doe"
+    className="form-input"
+  />
+</div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
@@ -1110,11 +1146,10 @@ export default function GlobalModals() {
               <div className="form-group">
                 <label>Month</label>
                 <input 
-                  type="text" 
+                  type="month" 
                   required
                   value={formData.month || ''} 
                   onChange={e => handleInputChange('month', e.target.value)}
-                  placeholder="e.g. Jun 2025" 
                   className="form-input" 
                 />
               </div>

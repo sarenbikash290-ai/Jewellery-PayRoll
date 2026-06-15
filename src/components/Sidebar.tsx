@@ -1,9 +1,8 @@
 'use client';
-import { useState } from 'react';
 import {
   LayoutDashboard, Users, Clock, DollarSign, TrendingUp,
-  BarChart3, Settings, ChevronRight, Zap, Bell, LogOut,
-  Shield, Menu
+  BarChart3, Settings, ChevronRight, Zap, LogOut,
+  Shield
 } from 'lucide-react';
 
 const navItems = [
@@ -24,6 +23,16 @@ interface SidebarProps {
 
 import { useApp } from './AppContext';
 
+// Fade style helper — GPU-accelerated opacity + transform only (no layout)
+const fadeStyle = (visible: boolean): React.CSSProperties => ({
+  opacity: visible ? 1 : 0,
+  transform: visible ? 'translateX(0)' : 'translateX(-8px)',
+  transition: 'opacity 0.15s ease, transform 0.15s ease',
+  pointerEvents: visible ? 'auto' : 'none',
+  overflow: 'hidden',
+  whiteSpace: 'nowrap' as const,
+});
+
 export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
   const { employees, openModal } = useApp();
 
@@ -34,7 +43,6 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
       borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
-      transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
       flexShrink: 0,
       overflow: 'hidden',
     }}>
@@ -46,6 +54,7 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
         alignItems: 'center',
         gap: '12px',
         minHeight: '72px',
+        transition: 'padding 0.15s ease',
       }}>
         <div style={{
           width: '38px', height: '38px',
@@ -57,44 +66,48 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
         }}>
           <Zap size={18} color="#fff" />
         </div>
-        {open && (
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>HRPulse</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Enterprise Suite</div>
-          </div>
-        )}
+        <div style={fadeStyle(open)}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>HRPulse</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Enterprise Suite</div>
+        </div>
       </div>
 
       {/* User profile mini */}
-      {open && (
+      <div style={{
+        padding: open ? '16px 20px' : '0 20px',
+        borderBottom: open ? '1px solid var(--border)' : '1px solid transparent',
+        display: 'flex', alignItems: 'center', gap: '12px',
+        maxHeight: open ? '80px' : '0px',
+        opacity: open ? 1 : 0,
+        transition: 'max-height 0.15s ease, opacity 0.12s ease, padding 0.15s ease',
+        overflow: 'hidden',
+      }}>
         <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: '12px',
-        }}>
-          <div style={{
-            width: '36px', height: '36px',
-            background: 'linear-gradient(135deg, #4F8EF7 0%, #8B5CF6 100%)',
-            borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0,
-          }}>AD</div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>Admin User</div>
-            <div style={{ fontSize: '11px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Shield size={10} /> Super Admin
-            </div>
+          width: '36px', height: '36px',
+          background: 'linear-gradient(135deg, #4F8EF7 0%, #8B5CF6 100%)',
+          borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0,
+        }}>AD</div>
+        <div style={{ overflow: 'hidden' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>Admin User</div>
+          <div style={{ fontSize: '11px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Shield size={10} /> Super Admin
           </div>
         </div>
-      )}
+      </div>
 
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
-        {open && (
-          <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '8px 10px 4px' }}>
-            Main Menu
-          </div>
-        )}
+        <div style={{
+          ...fadeStyle(open),
+          fontSize: '10px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase',
+          color: 'var(--text-muted)', padding: '8px 10px 4px',
+          height: open ? '28px' : '0px',
+          marginBottom: open ? '0' : '-2px',
+        }}>
+          Main Menu
+        </div>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = active === item.id;
@@ -116,38 +129,33 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                padding: open ? '10px 12px' : '10px',
+                padding: open ? '10px 16px' : '10px',
                 justifyContent: open ? 'flex-start' : 'center',
-                borderRadius: '8px',
-                background: isActive ? 'rgba(79,142,247,0.12)' : 'transparent',
-                border: isActive ? '1px solid rgba(79,142,247,0.2)' : '1px solid transparent',
+                borderRadius: '12px',
+                background: isActive ? 'var(--bg-active)' : 'transparent',
+                border: 'none',
                 color: isActive ? 'var(--brand)' : 'var(--text-secondary)',
-                fontSize: '13.5px',
-                fontWeight: isActive ? 600 : 400,
+                fontSize: '14px',
+                fontWeight: isActive ? 600 : 500,
                 cursor: 'pointer',
-                transition: 'var(--transition)',
+                transition: 'all 0.2s ease',
                 textAlign: 'left',
-                position: 'relative',
               }}
-              onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
-              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hover-bg)'; }}
+              onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
             >
-              <Icon size={17} style={{ flexShrink: 0 }} />
-              {open && (
-                <>
-                  <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{item.label}</span>
-                  {displayBadge && (
-                    <span style={{
-                      background: displayBadge === 'New' ? 'var(--success)' : 'var(--brand-dark)',
-                      color: '#fff',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      padding: '2px 7px',
-                      borderRadius: '100px',
-                    }}>{displayBadge}</span>
-                  )}
-                  {isActive && <ChevronRight size={14} style={{ opacity: 0.6 }} />}
-                </>
+              <Icon size={20} style={{ flexShrink: 0 }} />
+              {open && (<span style={{ ...fadeStyle(open), flex: 1 }}>{item.label}</span>)}
+              {open && displayBadge && (
+                <span style={{
+                  background: displayBadge === 'New' ? 'var(--success)' : 'var(--brand)',
+                  color: '#fff',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  marginLeft: 'auto',
+                }}>{displayBadge}</span>
               )}
             </button>
           );
@@ -161,13 +169,13 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
           padding: open ? '10px 12px' : '10px',
           justifyContent: open ? 'flex-start' : 'center',
           borderRadius: '8px', color: 'var(--text-muted)',
-          fontSize: '13.5px', transition: 'var(--transition)',
+          fontSize: '13.5px', transition: 'background 0.18s ease, color 0.18s ease, padding 0.15s ease',
         }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--danger)'; (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         >
           <LogOut size={17} />
-          {open && <span>Sign Out</span>}
+          <span style={fadeStyle(open)}>Sign Out</span>
         </button>
       </div>
     </aside>
