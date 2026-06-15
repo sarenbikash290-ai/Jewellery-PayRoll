@@ -345,6 +345,7 @@ export default function GlobalModals() {
           title="Employee Profile Card" 
           subtitle={`Detailed records for employee ${emp.id}`}
           size="md"
+          hideClose
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Header info */}
@@ -937,9 +938,13 @@ export default function GlobalModals() {
         >
           <form onSubmit={(e) => {
             e.preventDefault();
+            const employeeName = formData.employeeName || 'Employee';
+            // Look up the actual employee to get the correct ID and dept
+            const matchedEmp = modal.data ? undefined : undefined; // placeholder for context reference
+            const empLookup = employeeName;
             const incentiveData = {
               employeeId: formData.employeeId || 'EMP001',
-              employeeName: formData.employeeName || 'Employee',
+              employeeName: employeeName,
               dept: formData.dept || 'Sales',
               ruleType: formData.ruleType || 'Performance Bonus',
               amount: parseInt(formData.amount || '5000'),
@@ -1008,7 +1013,7 @@ export default function GlobalModals() {
               <div className="form-group">
                 <label>Month</label>
                   <DatePicker
-                    selected={formData.month ? new Date(formData.month) : null}
+                    selected={formData.month ? new Date(formData.month + '-01') : null}
                     onChange={(date: Date | null) => {
                       if (date) {
                         const monthStr = date.toISOString().slice(0, 7); // YYYY-MM

@@ -167,9 +167,14 @@ export default function Dashboard() {
               borderRadius: 'var(--radius-lg)',
               padding: '20px',
               transition: 'var(--transition)',
-              cursor: card.id === 'headcount' ? 'pointer' : 'default',
+              cursor: 'pointer',
             }}
-              onClick={card.id === 'headcount' ? () => setActiveModule('employees') : undefined}
+              onClick={() => {
+                if (card.id === 'headcount') setActiveModule('employees');
+                else if (card.id === 'payroll') setActiveModule('payroll');
+                else if (card.id === 'attendance') setActiveModule('attendance');
+                else if (card.id === 'pending') setActiveModule('payroll');
+              }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = card.color; (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 1px ${card.color}20, 0 8px 24px rgba(0,0,0,0.3)`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
             >
@@ -200,7 +205,7 @@ export default function Dashboard() {
           <CardHeader title="Payroll Cost Trend" subtitle="Monthly payroll in Lakhs (₹)" action={
             <button 
               onClick={() => setActiveModule('payroll')}
-              style={{ fontSize: '12px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+              style={{ fontSize: '12px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: 'transparent', border: 'none' }}
             >
               View All <ArrowUpRight size={12} />
             </button>
@@ -352,19 +357,26 @@ export default function Dashboard() {
                   </td>
                   <td style={{ padding: '16px 24px' }}>
                     <button 
-                      onClick={() => openModal('viewEmployee', { 
-                        id: `EMP0${10 + i}`, 
-                        name: emp.name, 
-                        dept: emp.dept, 
-                        role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Engineering' ? 'Senior Engineer' : 'Operations Coordinator',
-                        email: emp.name.toLowerCase().replace(' ', '') + '@company.com', 
-                        phone: '+91 98765 1100' + i, 
-                        location: 'Delhi', 
-                        status: 'active', 
-                        joined: '12 Mar 2021', 
-                        salary: '₹ 72,000', 
-                        type: 'Full-time' 
-                      })}
+                      onClick={() => {
+                        const matchedEmp = employees.find(e => e.name === emp.name);
+                        if (matchedEmp) {
+                          openModal('viewEmployee', matchedEmp);
+                        } else {
+                          openModal('viewEmployee', { 
+                            id: `EMP0${10 + i}`, 
+                            name: emp.name, 
+                            dept: emp.dept, 
+                            role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Engineering' ? 'Senior Engineer' : 'Operations Coordinator',
+                            email: emp.name.toLowerCase().replace(' ', '') + '@company.com', 
+                            phone: '+91 98765 1100' + i, 
+                            location: 'Delhi', 
+                            status: 'active', 
+                            joined: '12 Mar 2021', 
+                            salary: '₹ 72,000', 
+                            type: 'Full-time' 
+                          });
+                        }
+                      }}
                       style={{ fontSize: '12px', color: 'var(--brand)', background: 'rgba(79,142,247,0.1)', padding: '6px 14px', borderRadius: '6px', fontWeight: 600, transition: 'var(--transition)', border: 'none', cursor: 'pointer' }}
                     >
                       View Profile

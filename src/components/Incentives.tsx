@@ -72,7 +72,7 @@ function EmployeeDetailPanel({
   const monthlySummary = useMemo(() => {
     const map: Record<string, { month: string; total: number; products: Record<string, number>; count: number }> = {};
     mySales.forEach(s => {
-      const d = new Date(s.date);
+      const d = new Date(s.date + 'T00:00:00');
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
       if (!map[key]) map[key] = { month: label, total: 0, products: {}, count: 0 };
@@ -83,9 +83,9 @@ function EmployeeDetailPanel({
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0])).map(([, v]) => v);
   }, [mySales]);
 
-  // Current month sales (Jun 2025)
-  const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // Current month sales — detect the latest month from actual data so it works regardless of year
+  const latestSaleDate = mySales.length > 0 ? mySales[0].date : new Date().toISOString().split('T')[0];
+  const currentMonthKey = latestSaleDate.substring(0, 7); // e.g. '2025-06'
   const currentMonthSales = mySales.filter(s => s.date.startsWith(currentMonthKey));
   const currentMonthTotal = currentMonthSales.reduce((sum, s) => sum + s.amount, 0);
 
@@ -126,7 +126,7 @@ function EmployeeDetailPanel({
   background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)'
 }}>
   <div style={{
-    width: '100%', maxWidth: '720px',
+    width: '100%', maxWidth: '860px',
     background: 'var(--bg-card)', border: '1px solid var(--border)',
     borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
     overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh'
@@ -230,11 +230,11 @@ function EmployeeDetailPanel({
               ].map((f, i) => {
                 const Icon = f.icon;
                 return (
-                  <div key={i} style={{ padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px' }}>
-                      <Icon size={11} /> {f.label}
+                  <div key={i} style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px' }}>
+                      <Icon size={12} /> {f.label}
                     </div>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{f.value}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{f.value}</div>
                   </div>
                 );
               })}
@@ -375,7 +375,7 @@ function EmployeeDetailPanel({
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px', border: '1px solid var(--border)' }}>
                     <div>
                       <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{s.product}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(s.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                     </div>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: '#10B981' }}>₹{fmt(s.amount)}</div>
                   </div>
@@ -454,7 +454,7 @@ function EmployeeDetailPanel({
             ) : (
                               <div>
                 {mySales.map((s, i) => {
-                  const d = new Date(s.date);
+                  const d = new Date(s.date + 'T00:00:00');
                   return (
                     <div key={i} style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -660,7 +660,7 @@ export default function Incentives() {
                     key={emp.empId}
                     onClick={() => setSelectedEmp(isSelected ? null : emp)}
                     style={{
-                      padding: '14px 24px', display: 'flex', gap: '16px', alignItems: 'center',
+                      padding: '16px 24px', display: 'flex', gap: '20px', alignItems: 'center',
                       borderBottom: idx < sortedData.length - 1 ? '1px solid var(--border)' : 'none',
                       background: isSelected ? 'rgba(79,142,247,0.06)' : 'transparent',
                       cursor: 'pointer', transition: 'background 0.15s',
@@ -669,45 +669,45 @@ export default function Incentives() {
                     onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-secondary)'; }}
                     onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                   >
-                    <div style={{ minWidth: '20px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>{idx + 1}</div>
+                    <div style={{ minWidth: '24px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>{idx + 1}</div>
 
-                    <div style={{ minWidth: '190px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '34px', height: '34px', background: avatarColors[idx % 8], borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                    <div style={{ flex: '2', minWidth: '200px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <div style={{ width: '38px', height: '38px', background: avatarColors[idx % 8], borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
                         {emp.name.charAt(0)}
                       </div>
                       <div>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{emp.name}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{emp.dept}</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{emp.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{emp.dept} · {emp.role}</div>
                       </div>
                     </div>
 
-                    <div style={{ minWidth: '110px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700 }}>₹{(emp.monthlySales / 100000).toFixed(2)}L</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Monthly Sales</div>
+                    <div style={{ flex: '1', minWidth: '120px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700 }}>₹{(emp.monthlySales / 100000).toFixed(2)}L</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Monthly Sales</div>
                     </div>
 
-                    <div style={{ minWidth: '100px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: perfColor }}>
+                    <div style={{ flex: '1', minWidth: '120px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: perfColor }}>
                         {achievement >= 100 ? `↑ ${achievement.toFixed(0)}%` : `↓ ${achievement.toFixed(0)}%`}
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Target: ₹{(emp.target / 100000).toFixed(1)}L</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Target: ₹{(emp.target / 100000).toFixed(1)}L</div>
                     </div>
 
-                    <div style={{ minWidth: '100px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700 }}>₹{(emp.salary / 1000).toFixed(0)}K</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Salary</div>
+                    <div style={{ flex: '1', minWidth: '100px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700 }}>₹{(emp.salary / 1000).toFixed(0)}K</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Salary</div>
                     </div>
 
-                    <div style={{ minWidth: '90px', textAlign: 'right' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#10B981' }}>₹{fmt(emp.incentive)}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Incentive</div>
+                    <div style={{ flex: '1', minWidth: '100px', textAlign: 'right' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#10B981' }}>₹{fmt(emp.incentive)}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Incentive</div>
                     </div>
 
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '100px', minWidth: '70px', textAlign: 'center', background: emp.incStatus === 'paid' ? 'rgba(16,185,129,0.12)' : emp.incStatus === 'approved' ? 'rgba(79,142,247,0.12)' : 'rgba(245,158,11,0.12)', color: emp.incStatus === 'paid' ? '#10B981' : emp.incStatus === 'approved' ? '#4F8EF7' : '#F59E0B' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', minWidth: '80px', textAlign: 'center', background: emp.incStatus === 'paid' ? 'rgba(16,185,129,0.12)' : emp.incStatus === 'approved' ? 'rgba(79,142,247,0.12)' : 'rgba(245,158,11,0.12)', color: emp.incStatus === 'paid' ? '#10B981' : emp.incStatus === 'approved' ? '#4F8EF7' : '#F59E0B' }}>
                       {emp.incStatus === 'paid' ? '✓ Paid' : emp.incStatus === 'approved' ? '✓ Approved' : '⏳ Pending'}
                     </span>
 
-                    <ChevronRight size={14} color="var(--text-muted)" style={{ transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+                    <ChevronRight size={16} color="var(--text-muted)" style={{ transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
                   </div>
                 );
               })}
@@ -797,11 +797,6 @@ export default function Incentives() {
       {/* Employee Detail Side Panel */}
       {selectedEmpLive && (
         <>
-          {/* Backdrop */}
-          <div
-            onClick={() => setSelectedEmp(null)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 199 }}
-          />
           <EmployeeDetailPanel emp={selectedEmpLive} onClose={() => setSelectedEmp(null)} />
         </>
       )}

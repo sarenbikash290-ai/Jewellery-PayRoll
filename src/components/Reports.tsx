@@ -4,7 +4,7 @@ import { useApp } from './AppContext';
 import { Download, FileText, Filter, BarChart2, TrendingUp, Users, DollarSign } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
 
 const monthlyPayroll = [
@@ -139,7 +139,7 @@ export default function Reports() {
                 <Tooltip {...tooltipStyle} formatter={(v: any) => [`₹${v}L`, 'Cost']} />
                 <Bar dataKey="cost" radius={[0,4,4,0]}>
                   {deptCosts.map((_, i) => (
-                    <rect key={i} fill={['#4F8EF7','#10B981','#8B5CF6','#F59E0B','#06B6D4'][i]} />
+                    <Cell key={i} fill={['#4F8EF7','#10B981','#8B5CF6','#F59E0B','#06B6D4'][i]} />
                   ))}
                 </Bar>
               </BarChart>

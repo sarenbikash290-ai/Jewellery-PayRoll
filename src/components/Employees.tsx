@@ -36,7 +36,7 @@ export default function Employees() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Employee Directory</h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{employees.length} employees across 5 departments</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{employees.length} employees across {new Set(employees.map(e => e.dept)).size} departments</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 

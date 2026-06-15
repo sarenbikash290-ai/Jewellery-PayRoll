@@ -132,7 +132,7 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
                 padding: open ? '10px 16px' : '10px',
                 justifyContent: open ? 'flex-start' : 'center',
                 borderRadius: '12px',
-                background: isActive ? 'var(--brand-faded)' : 'transparent',
+                background: isActive ? 'var(--bg-active)' : 'transparent',
                 border: 'none',
                 color: isActive ? 'var(--brand)' : 'var(--text-secondary)',
                 fontSize: '14px',

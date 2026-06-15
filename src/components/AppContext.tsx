@@ -196,7 +196,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // CRUD helpers
   const addEmployee = useCallback((emp: Omit<Employee, 'id'>) => {
     setEmployees(prev => {
-      const nextId = `EMP${String(prev.length + 1).padStart(3, '0')}`;
+      const maxNum = prev.reduce((max, e) => {
+        const num = parseInt(e.id.replace('EMP', ''), 10);
+        return isNaN(num) ? max : Math.max(max, num);
+      }, 0);
+      const nextId = `EMP${String(maxNum + 1).padStart(3, '0')}`;
       return [...prev, { ...emp, id: nextId }];
     });
   }, []);
@@ -269,7 +273,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     >
       {children}
       {/* Toast Container */}
-      <div className="toast-container" style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 1000 }}>
+      <div className="toast-container" style={{ position: 'fixed', bottom: '28px', right: '28px', zIndex: 200, display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {toasts.map(t => (
           <Toast key={t.id} item={t} onDismiss={() => dismiss(t.id)} />
         ))}
