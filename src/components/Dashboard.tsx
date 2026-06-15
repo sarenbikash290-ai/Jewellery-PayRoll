@@ -34,18 +34,18 @@ const deptData = [
 ];
 
 const topPerformers = [
-  { name: 'Ananya Sharma',   dept: 'Sales',       incentive: '₹ 24,500', badge: 'Top Closer' },
-  { name: 'Rohan Mehta',     dept: 'Engineering',  incentive: '₹ 18,200', badge: 'Sprint Hero' },
-  { name: 'Priya Nair',      dept: 'Sales',       incentive: '₹ 16,800', badge: '3x Target' },
-  { name: 'Dev Patel',       dept: 'Operations',   incentive: '₹ 14,400', badge: 'Zero Absent' },
+  { name: 'Arjun Soni',    dept: 'Sales',         incentive: '₹ 8,500', badge: 'Top Closer' },
+  { name: 'Anita Tiwari', dept: 'Sales',         incentive: '₹ 7,800', badge: '3x Target' },
+  { name: 'Ramesh Sonar', dept: 'Gold Crafting', incentive: '₹ 3,000', badge: 'Zero Absent' },
+  { name: 'Priya Mehta',  dept: 'Sales',         incentive: '₹ 5,200', badge: 'Rising Star' },
 ];
 
 const recentActivity = [
-  { icon: UserCheck, color: '#10B981', text: 'Arjun Kumar marked Present',           time: '2 min ago' },
-  { icon: DollarSign, color: '#4F8EF7', text: 'May payroll approved by Finance',     time: '15 min ago' },
-  { icon: Clock,      color: '#F59E0B', text: 'Priya Singh requested 3-day PL leave', time: '32 min ago' },
-  { icon: UserX,      color: '#EF4444', text: 'Vijay Rao marked Absent today',       time: '1 hr ago' },
-  { icon: TrendingUp, color: '#8B5CF6', text: 'Q1 Incentive payouts processed',      time: '2 hr ago' },
+  { icon: UserCheck,  color: '#10B981', text: 'Arjun Soni marked Present',              time: '2 min ago' },
+  { icon: DollarSign, color: '#4F8EF7', text: 'Jun payroll approved by Accounts',       time: '15 min ago' },
+  { icon: Clock,      color: '#F59E0B', text: 'Priya Mehta requested 2-day CL leave',  time: '32 min ago' },
+  { icon: UserX,      color: '#EF4444', text: 'Sanjay Agarwal marked Absent today',     time: '1 hr ago' },
+  { icon: TrendingUp, color: '#8B5CF6', text: 'Jun Incentive payouts processed',        time: '2 hr ago' },
 ];
 
 const statCards = [
