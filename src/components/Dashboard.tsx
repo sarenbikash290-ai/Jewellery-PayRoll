@@ -119,6 +119,15 @@ export default function Dashboard() {
   const [period, setPeriod] = useState('monthly');
   const { employees, setActiveModule, openModal } = useApp();
 
+  // Dynamic date — always shows the real current date
+  const todayStr = (() => {
+    const now = new Date();
+    return now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  })();
+
+  const greetingHour = new Date().getHours();
+  const greeting = greetingHour < 12 ? 'Good morning' : greetingHour < 17 ? 'Good afternoon' : 'Good evening';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
@@ -126,10 +135,10 @@ export default function Dashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-            Good morning, Admin 👋
+            {greeting}, Admin 👋
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Wednesday, 11 June 2025 · Here's what's happening today
+            {todayStr} · Here's what's happening today
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>

@@ -128,14 +128,18 @@ export const useApp = () => useContext(Ctx);
 
 // ---- Sample Data ----
 const initialEmployees: Employee[] = [
-  { id: 'EMP001', name: 'Ananya Sharma',   dept: 'Sales',       role: 'Senior Sales Executive', email: 'ananya@company.com', phone: '+91 98765 11001', location: 'Delhi', status: 'active',  joined: '12 Mar 2021', salary: '₹ 72,000', type: 'Full-time' },
-  { id: 'EMP002', name: 'Rohan Mehta',     dept: 'Engineering', role: 'Senior Engineer',          email: 'rohan@company.com',  phone: '+91 98765 11002', location: 'Bangalore', status: 'active',  joined: '05 Jul 2019', salary: '₹ 1,15,000', type: 'Full-time' },
-  { id: 'EMP003', name: 'Priya Nair',      dept: 'Sales',       role: 'Sales Executive',           email: 'priya@company.com',  phone: '+91 98765 11003', location: 'Mumbai',    status: 'active',  joined: '22 Nov 2022', salary: '₹ 55,000', type: 'Full-time' },
-  { id: 'EMP004', name: 'Dev Patel',       dept: 'Operations',  role: 'Operations Manager',        email: 'dev@company.com',    phone: '+91 98765 11004', location: 'Ahmedabad', status: 'active',  joined: '10 Feb 2020', salary: '₹ 88,000', type: 'Full-time' },
-  { id: 'EMP005', name: 'Sneha Reddy',     dept: 'HR',          role: 'HR Manager',                email: 'sneha@company.com',  phone: '+91 98765 11005', location: 'Hyderabad', status: 'active',  joined: '18 Apr 2018', salary: '₹ 95,000', type: 'Full-time' },
-  { id: 'EMP006', name: 'Amit Verma',      dept: 'Finance',     role: 'Financial Analyst',         email: 'amit@company.com',   phone: '+91 98765 11006', location: 'Delhi',     status: 'inactive', joined: '30 Aug 2020', salary: '₹ 82,000', type: 'Full-time' },
-  { id: 'EMP007', name: 'Kavya Singh',     dept: 'Engineering', role: 'Frontend Developer',        email: 'kavya@company.com',  phone: '+91 98765 11007', location: 'Pune',      status: 'active',  joined: '14 Jan 2023', salary: '₹ 78,000', type: 'Full-time' },
-  { id: 'EMP008', name: 'Arjun Kumar',     dept: 'Sales',       role: 'Sales Manager',             email: 'arjun@company.com',  phone: '+91 98765 11008', location: 'Chennai',   status: 'active',  joined: '03 May 2017', salary: '₹ 1,02,000', type: 'Full-time' },
+  { id: 'EMP001', name: 'Arjun Soni',       dept: 'Sales',          role: 'Senior Sales Executive',  email: 'arjun@saijewellers.com',   phone: '+91 98765 11001', location: 'Main Store',   status: 'active',   joined: '12 Mar 2021', salary: '₹ 38,000', type: 'Full-time' },
+  { id: 'EMP002', name: 'Priya Mehta',      dept: 'Sales',          role: 'Sales Executive',          email: 'priya@saijewellers.com',   phone: '+91 98765 11002', location: 'Main Store',   status: 'active',   joined: '05 Jul 2022', salary: '₹ 28,000', type: 'Full-time' },
+  { id: 'EMP003', name: 'Ramesh Sonar',     dept: 'Gold Crafting',  role: 'Head Goldsmith',           email: 'ramesh@saijewellers.com',  phone: '+91 98765 11003', location: 'Workshop',     status: 'active',   joined: '22 Jan 2018', salary: '₹ 52,000', type: 'Full-time' },
+  { id: 'EMP004', name: 'Geeta Pawar',      dept: 'Gold Crafting',  role: 'Goldsmith',                email: 'geeta@saijewellers.com',   phone: '+91 98765 11004', location: 'Workshop',     status: 'active',   joined: '10 Feb 2020', salary: '₹ 35,000', type: 'Full-time' },
+  { id: 'EMP005', name: 'Suresh Jain',      dept: 'Store Ops',      role: 'Store Manager',            email: 'suresh@saijewellers.com',  phone: '+91 98765 11005', location: 'Main Store',   status: 'active',   joined: '18 Apr 2017', salary: '₹ 65,000', type: 'Full-time' },
+  { id: 'EMP006', name: 'Kavita Shah',      dept: 'Accounts',       role: 'Accountant',               email: 'kavita@saijewellers.com',  phone: '+91 98765 11006', location: 'Back Office',  status: 'active',   joined: '30 Aug 2019', salary: '₹ 42,000', type: 'Full-time' },
+  { id: 'EMP007', name: 'Deepak Yadav',     dept: 'Sales',          role: 'Sales Executive',          email: 'deepak@saijewellers.com',  phone: '+91 98765 11007', location: 'Main Store',   status: 'active',   joined: '14 Jun 2023', salary: '₹ 26,000', type: 'Full-time' },
+  { id: 'EMP008', name: 'Meena Gupta',      dept: 'Gold Crafting',  role: 'Stone Setter',             email: 'meena@saijewellers.com',   phone: '+91 98765 11008', location: 'Workshop',     status: 'active',   joined: '03 May 2021', salary: '₹ 30,000', type: 'Full-time' },
+  { id: 'EMP009', name: 'Vikram Desai',     dept: 'Store Ops',      role: 'Cashier',                  email: 'vikram@saijewellers.com',  phone: '+91 98765 11009', location: 'Main Store',   status: 'active',   joined: '11 Sep 2022', salary: '₹ 22,000', type: 'Full-time' },
+  { id: 'EMP010', name: 'Anita Tiwari',     dept: 'Sales',          role: 'Senior Sales Executive',  email: 'anita@saijewellers.com',   phone: '+91 98765 11010', location: 'Main Store',   status: 'active',   joined: '07 Jan 2020', salary: '₹ 35,000', type: 'Full-time' },
+  { id: 'EMP011', name: 'Sanjay Agarwal',   dept: 'Gold Crafting',  role: 'Goldsmith',                email: 'sanjay@saijewellers.com',  phone: '+91 98765 11011', location: 'Workshop',     status: 'inactive', joined: '25 Mar 2019', salary: '₹ 33,000', type: 'Full-time' },
+  { id: 'EMP012', name: 'Ritu Sharma',      dept: 'Store Ops',      role: 'Security Guard',           email: 'ritu@saijewellers.com',    phone: '+91 98765 11012', location: 'Main Store',   status: 'active',   joined: '01 Aug 2021', salary: '₹ 18,000', type: 'Full-time' },
 ];
 
 // ---- Provider ----
@@ -163,34 +167,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Core data stores
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [incentives, setIncentives] = useState<Incentive[]>([
-    { id: 'INC001', employeeId: 'EMP001', employeeName: 'Ananya Sharma', dept: 'Sales', ruleType: 'Revenue Slab', amount: 24500, target: 200000, month: 'Jun 2025', status: 'paid', createdAt: '2025-06-01', updatedAt: '2025-06-10' },
-    { id: 'INC002', employeeId: 'EMP003', employeeName: 'Priya Nair', dept: 'Sales', ruleType: 'Revenue Slab', amount: 16800, target: 150000, month: 'Jun 2025', status: 'pending', createdAt: '2025-06-02', updatedAt: '2025-06-08' },
-    { id: 'INC003', employeeId: 'EMP004', employeeName: 'Dev Patel', dept: 'Operations', ruleType: 'Zero Absence Bonus', amount: 5000, target: 0, month: 'Jun 2025', status: 'paid', createdAt: '2025-06-01', updatedAt: '2025-06-10' },
+    { id: 'INC001', employeeId: 'EMP001', employeeName: 'Arjun Soni',   dept: 'Sales',         ruleType: 'Revenue Slab', amount: 8500,  target: 150000, month: 'Jun 2025', status: 'paid',    createdAt: '2025-06-01', updatedAt: '2025-06-10' },
+    { id: 'INC002', employeeId: 'EMP002', employeeName: 'Priya Mehta',  dept: 'Sales',         ruleType: 'Revenue Slab', amount: 5200,  target: 100000, month: 'Jun 2025', status: 'pending', createdAt: '2025-06-02', updatedAt: '2025-06-08' },
+    { id: 'INC003', employeeId: 'EMP010', employeeName: 'Anita Tiwari', dept: 'Sales',         ruleType: 'Revenue Slab', amount: 7800,  target: 120000, month: 'Jun 2025', status: 'approved', createdAt: '2025-06-01', updatedAt: '2025-06-09' },
+    { id: 'INC004', employeeId: 'EMP003', employeeName: 'Ramesh Sonar', dept: 'Gold Crafting', ruleType: 'Zero Absence Bonus', amount: 3000, target: 0, month: 'Jun 2025', status: 'paid', createdAt: '2025-06-01', updatedAt: '2025-06-10' },
   ]);
   const [commissions, setCommissions] = useState<Commission[]>([
-    { id: 'COM001', leadId: 'LEAD001', leadName: 'Ananya Sharma', position: 'Sales Lead', amount: 35000, performance: 'Exceptional', month: 'Jun 2025', status: 'paid', createdAt: '2025-06-01', updatedAt: '2025-06-10' },
-    { id: 'COM002', leadId: 'LEAD002', leadName: 'Arjun Kumar', position: 'Team Lead', amount: 28000, performance: 'Excellent', month: 'Jun 2025', status: 'approved', createdAt: '2025-06-03', updatedAt: '2025-06-09' },
-    { id: 'COM003', leadId: 'LEAD003', leadName: 'Kavya Singh', position: 'Project Lead', amount: 15000, performance: 'Good', month: 'Jun 2025', status: 'pending', createdAt: '2025-06-05', updatedAt: '2025-06-06' },
+    { id: 'COM001', leadId: 'LEAD001', leadName: 'Arjun Soni',   position: 'Sales Lead',  amount: 12000, performance: 'Exceptional', month: 'Jun 2025', status: 'paid',     createdAt: '2025-06-01', updatedAt: '2025-06-10' },
+    { id: 'COM002', leadId: 'LEAD002', leadName: 'Anita Tiwari', position: 'Senior Lead', amount: 9500,  performance: 'Excellent',   month: 'Jun 2025', status: 'approved', createdAt: '2025-06-03', updatedAt: '2025-06-09' },
+    { id: 'COM003', leadId: 'LEAD003', leadName: 'Suresh Jain',  position: 'Store Head',  amount: 15000, performance: 'Good',        month: 'Jun 2025', status: 'pending',  createdAt: '2025-06-05', updatedAt: '2025-06-06' },
   ]);
   const [employeeSales, setEmployeeSales] = useState<Sale[]>([
-    // Ananya Sharma (EMP001) — Sales
-    { id: 'SALE001', employeeId: 'EMP001', date: '2025-06-03', product: 'Gold Ring', amount: 45000 },
-    { id: 'SALE002', employeeId: 'EMP001', date: '2025-06-07', product: 'Diamond Necklace', amount: 92000 },
-    { id: 'SALE003', employeeId: 'EMP001', date: '2025-06-11', product: 'Gold Bangle', amount: 38000 },
-    { id: 'SALE004', employeeId: 'EMP001', date: '2025-05-05', product: 'Platinum Ring', amount: 65000 },
-    { id: 'SALE005', employeeId: 'EMP001', date: '2025-05-18', product: 'Diamond Bracelet', amount: 88000 },
-    { id: 'SALE006', employeeId: 'EMP001', date: '2025-04-12', product: 'Ruby Pendant', amount: 55000 },
-    // Priya Nair (EMP003) — Sales
-    { id: 'SALE007', employeeId: 'EMP003', date: '2025-06-04', product: 'Silver Earring', amount: 18000 },
-    { id: 'SALE008', employeeId: 'EMP003', date: '2025-06-09', product: 'Gold Chain', amount: 42000 },
-    { id: 'SALE009', employeeId: 'EMP003', date: '2025-05-20', product: 'Sapphire Ring', amount: 72000 },
-    { id: 'SALE010', employeeId: 'EMP003', date: '2025-05-28', product: 'Emerald Set', amount: 95000 },
-    // Arjun Kumar (EMP008) — Sales
-    { id: 'SALE011', employeeId: 'EMP008', date: '2025-06-02', product: 'Diamond Necklace', amount: 120000 },
-    { id: 'SALE012', employeeId: 'EMP008', date: '2025-06-08', product: 'Platinum Ring', amount: 85000 },
-    { id: 'SALE013', employeeId: 'EMP008', date: '2025-06-14', product: 'Gold Bangle', amount: 48000 },
-    { id: 'SALE014', employeeId: 'EMP008', date: '2025-05-10', product: 'Ruby Pendant', amount: 60000 },
-    { id: 'SALE015', employeeId: 'EMP008', date: '2025-04-22', product: 'Diamond Bracelet', amount: 95000 },
+    // Arjun Soni (EMP001) — Senior Sales Executive
+    { id: 'SALE001', employeeId: 'EMP001', date: '2025-06-03', product: 'Gold Ring',          amount: 45000 },
+    { id: 'SALE002', employeeId: 'EMP001', date: '2025-06-07', product: 'Diamond Necklace',   amount: 92000 },
+    { id: 'SALE003', employeeId: 'EMP001', date: '2025-06-11', product: 'Gold Bangle',        amount: 38000 },
+    { id: 'SALE004', employeeId: 'EMP001', date: '2025-05-05', product: 'Platinum Ring',      amount: 65000 },
+    { id: 'SALE005', employeeId: 'EMP001', date: '2025-05-18', product: 'Diamond Bracelet',   amount: 88000 },
+    { id: 'SALE006', employeeId: 'EMP001', date: '2025-04-12', product: 'Ruby Pendant',       amount: 55000 },
+    // Priya Mehta (EMP002) — Sales Executive
+    { id: 'SALE007', employeeId: 'EMP002', date: '2025-06-04', product: 'Silver Earrings',    amount: 18000 },
+    { id: 'SALE008', employeeId: 'EMP002', date: '2025-06-09', product: 'Gold Chain',         amount: 42000 },
+    { id: 'SALE009', employeeId: 'EMP002', date: '2025-05-20', product: 'Sapphire Ring',      amount: 72000 },
+    { id: 'SALE010', employeeId: 'EMP002', date: '2025-05-28', product: 'Emerald Set',        amount: 95000 },
+    // Anita Tiwari (EMP010) — Senior Sales Executive
+    { id: 'SALE011', employeeId: 'EMP010', date: '2025-06-02', product: 'Diamond Necklace',   amount: 120000 },
+    { id: 'SALE012', employeeId: 'EMP010', date: '2025-06-08', product: 'Platinum Ring',      amount: 85000 },
+    { id: 'SALE013', employeeId: 'EMP010', date: '2025-06-14', product: 'Gold Bangle Set',    amount: 48000 },
+    { id: 'SALE014', employeeId: 'EMP010', date: '2025-05-10', product: 'Ruby Pendant',       amount: 60000 },
+    { id: 'SALE015', employeeId: 'EMP010', date: '2025-04-22', product: 'Diamond Bracelet',   amount: 95000 },
   ]);
 
   // CRUD helpers
