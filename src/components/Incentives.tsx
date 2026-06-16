@@ -120,17 +120,24 @@ function EmployeeDetailPanel({
   const perfColor = emp.performance === 'Exceeding' ? '#10B981' : '#F59E0B';
 
   return (
-    <div style={{
-  position: 'fixed', inset: 0, zIndex: 200,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)'
-}}>
-  <div style={{
-    width: '100%', maxWidth: '860px',
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-    overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh'
-  }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
+        cursor: 'default'
+      }}
+    >
+  <div
+    onClick={e => e.stopPropagation()}
+    style={{
+      width: '100%', maxWidth: '860px',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh'
+    }}
+  >
       {/* Header */}
       <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', background: 'linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%)', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

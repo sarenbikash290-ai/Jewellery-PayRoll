@@ -9,8 +9,10 @@ import Payroll from '@/components/Payroll';
 import Incentives from '@/components/Incentives';
 import Reports from '@/components/Reports';
 import GlobalModals from '@/components/GlobalModals';
+import LoginScreen, { isAuthenticated, setAuthenticated } from '@/components/LoginScreen';
+import { useState, useEffect } from 'react';
 
-function AppShell() {
+function AppShell({ onLogout }: { onLogout: () => void }) {
   const { activeModule, setActiveModule, sidebarOpen, setSidebarOpen } = useApp();
 
   const renderModule = () => {
@@ -32,12 +34,13 @@ function AppShell() {
         onNavigate={(m) => setActiveModule(m)}
         open={sidebarOpen}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, willChange: 'width' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Header
           activeModule={activeModule}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onLogout={onLogout}
         />
-        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', contain: 'layout style' }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           {renderModule()}
         </main>
       </div>
@@ -47,9 +50,29 @@ function AppShell() {
 }
 
 export default function Home() {
+  const [authed, setAuthed] = useState<boolean | null>(null); // null = checking
+
+  useEffect(() => {
+    setAuthed(isAuthenticated());
+  }, []);
+
+  const handleLogin = () => setAuthed(true);
+
+  const handleLogout = () => {
+    setAuthenticated(false);
+    setAuthed(false);
+  };
+
+  // Still checking localStorage — show nothing to prevent flash
+  if (authed === null) return null;
+
+  if (!authed) {
+    return <LoginScreen onSuccess={handleLogin} />;
+  }
+
   return (
     <AppProvider>
-      <AppShell />
+      <AppShell onLogout={handleLogout} />
     </AppProvider>
   );
 }

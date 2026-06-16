@@ -1,6 +1,6 @@
 'use client';
-import { Menu, Bell, Search, Sun, Moon, ChevronDown, Check } from 'lucide-react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { Menu, Bell, Sun, Moon, ChevronDown, Check, LogOut } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from './AppContext';
 
 const moduleNames: Record<string, string> = {
@@ -26,20 +26,87 @@ const breadcrumbs: Record<string, string[]> = {
 interface HeaderProps {
   activeModule: string;
   onToggleSidebar: () => void;
+  onLogout: () => void;
 }
 
-export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
+// ── Notification helpers ──────────────────────────────────────────────────────
+
+interface StoredNotif {
+  id: number;
+  type: 'warning' | 'info' | 'success' | 'danger';
+  text: string;
+  ts: number;   // Unix ms timestamp
+  read: boolean;
+}
+
+const STORAGE_KEY = 'hrpulse_notifications';
+
+/** Seed data: offsets in minutes from now */
+const SEED: Omit<StoredNotif, 'ts' | 'read'>[] = [
+  { id: 1, type: 'warning', text: '3 employees have pending leave requests' },
+  { id: 2, type: 'info',    text: 'May payroll processing complete' },
+  { id: 3, type: 'success', text: 'Rajesh Kumar approved overtime' },
+  { id: 4, type: 'danger',  text: 'TDS filing due in 3 days' },
+];
+const SEED_OFFSETS_MIN = [5, 60, 120, 180]; // minutes ago at first load
+
+function loadOrSeedNotifs(): StoredNotif[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as StoredNotif[];
+  } catch { /* ignore */ }
+  // First visit — seed with real timestamps
+  const now = Date.now();
+  return SEED.map((s, i) => ({
+    ...s,
+    ts: now - SEED_OFFSETS_MIN[i] * 60 * 1000,
+    read: false,
+  }));
+}
+
+function saveNotifs(notifs: StoredNotif[]) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notifs)); } catch { /* ignore */ }
+}
+
+function timeAgo(ts: number): string {
+  const diff = Math.max(0, Date.now() - ts);
+  const mins  = Math.floor(diff / 60_000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function Header({ activeModule, onToggleSidebar, onLogout }: HeaderProps) {
   const { openModal, toast, modal } = useApp();
   const [darkMode, setDarkMode] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: 'warning', text: '3 employees have pending leave requests', time: '5m ago', read: false },
-    { id: 2, type: 'info',    text: 'May payroll processing complete', time: '1h ago', read: false },
-    { id: 3, type: 'success', text: 'Rajesh Kumar approved overtime', time: '2h ago', read: false },
-    { id: 4, type: 'danger',  text: 'TDS filing due in 3 days', time: '3h ago', read: false },
-  ]);
+  const [notifications, setNotifications] = useState<StoredNotif[]>([]);
+  const [, setTick] = useState(0); // force re-render every minute for live timestamps
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const loaded = loadOrSeedNotifs();
+    setNotifications(loaded);
+    saveNotifs(loaded);
+  }, []);
+
+  // Persist to localStorage whenever notifications change
+  useEffect(() => {
+    if (notifications.length > 0) saveNotifs(notifications);
+  }, [notifications]);
+
+  // Tick every 60 seconds to refresh "X ago" labels
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const notifColors: Record<string, string> = {
     warning: '#F59E0B', info: '#4F8EF7', success: '#10B981', danger: '#EF4444'
@@ -196,7 +263,7 @@ export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: notifColors[n.type], flexShrink: 0, marginTop: '6px' }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: isUnread ? 600 : 400, lineHeight: 1.4 }}>{n.text}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{n.time}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{timeAgo(n.ts)}</div>
                     </div>
                     {isUnread && (
                       <span title="Mark as read" style={{ color: 'var(--brand)', padding: '2px', alignSelf: 'center' }}>
@@ -247,6 +314,36 @@ export default function Header({ activeModule, onToggleSidebar }: HeaderProps) {
         </div>
         <ChevronDown size={14} color="var(--text-muted)" />
       </div>
+
+      {/* Sign Out */}
+      <button
+        id="sign-out-btn"
+        onClick={onLogout}
+        title="Sign out"
+        style={{
+          width: '38px', height: '38px',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: '10px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          transition: 'var(--transition)',
+          flexShrink: 0,
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.color = '#EF4444';
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.3)';
+          (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)';
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+          (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+          (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)';
+        }}
+      >
+        <LogOut size={16} />
+      </button>
     </header>
   );
 }
