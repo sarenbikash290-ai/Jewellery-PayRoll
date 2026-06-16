@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  allowedDevOrigins: ['emely-figural-roselee.ngrok-free.dev'],
 };
 
 export default nextConfig;
