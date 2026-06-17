@@ -278,133 +278,216 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Load and save from localStorage
-  const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [leaves, setLeaves] = useState<LeaveApplication[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('hrpulse_leaves');
+      return stored ? JSON.parse(stored) : [];
+    }
+    return [];
+  });
+
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('hrpulse_attendance_records');
+      return stored ? JSON.parse(stored) : [];
+    }
+    return [];
+  });
+
   const [employeePins, setEmployeePins] = useState<Record<string, string>>({});
 
+  const knownLeaveIds = useRef<Set<string>>(new Set());
+  const isInitialLeavesLoad = useRef(true);
+  const knownAttendanceKeys = useRef<Set<string>>(new Set());
+  const isInitialAttendanceLoad = useRef(true);
+
+  const fetchLeaves = useCallback(async () => {
+    try {
+      const res = await fetch('/api/leaves');
+      const data = await res.json();
+      if (data.ok && data.leaves) {
+        const serverLeaves = data.leaves as LeaveApplication[];
+        
+        if (!isInitialLeavesLoad.current) {
+          serverLeaves.forEach(leave => {
+            if (!knownLeaveIds.current.has(leave.id)) {
+              knownLeaveIds.current.add(leave.id);
+              if (typeof window !== 'undefined' && window.location.pathname === '/') {
+                toast('info', 'New Leave Request', `${leave.employeeName} applied for ${leave.type} leave: "${leave.reason}"`);
+              }
+            }
+          });
+        } else {
+          serverLeaves.forEach(leave => knownLeaveIds.current.add(leave.id));
+          isInitialLeavesLoad.current = false;
+        }
+
+        setLeaves(serverLeaves);
+        localStorage.setItem('hrpulse_leaves', JSON.stringify(serverLeaves));
+      }
+    } catch (err) {
+      console.error('Failed to fetch leaves:', err);
+    }
+  }, [toast]);
+
+  const fetchAttendance = useCallback(async () => {
+    try {
+      const res = await fetch('/api/attendance');
+      const data = await res.json();
+      if (data.ok && data.attendanceRecords) {
+        const serverRecords = data.attendanceRecords as AttendanceRecord[];
+
+        if (!isInitialAttendanceLoad.current) {
+          serverRecords.forEach(record => {
+            const checkInKey = `${record.employeeId}-${record.date}-in-${record.checkIn}`;
+            const checkOutKey = `${record.employeeId}-${record.date}-out-${record.checkOut}`;
+
+            const emp = employees.find(e => e.id === record.employeeId);
+            const name = emp ? emp.name : record.employeeId;
+
+            if (record.checkIn && !knownAttendanceKeys.current.has(checkInKey)) {
+              knownAttendanceKeys.current.add(checkInKey);
+              if (typeof window !== 'undefined' && window.location.pathname === '/') {
+                toast('success', 'Employee Checked In', `${name} checked in at ${record.checkIn}`);
+              }
+            }
+
+            if (record.checkOut && !knownAttendanceKeys.current.has(checkOutKey)) {
+              knownAttendanceKeys.current.add(checkOutKey);
+              if (typeof window !== 'undefined' && window.location.pathname === '/') {
+                toast('warning', 'Employee Checked Out', `${name} checked out at ${record.checkOut}`);
+              }
+            }
+          });
+        } else {
+          serverRecords.forEach(record => {
+            if (record.checkIn) knownAttendanceKeys.current.add(`${record.employeeId}-${record.date}-in-${record.checkIn}`);
+            if (record.checkOut) knownAttendanceKeys.current.add(`${record.employeeId}-${record.date}-out-${record.checkOut}`);
+          });
+          isInitialAttendanceLoad.current = false;
+        }
+
+        setAttendanceRecords(serverRecords);
+        localStorage.setItem('hrpulse_attendance_records', JSON.stringify(serverRecords));
+      }
+    } catch (err) {
+      console.error('Failed to fetch attendance:', err);
+    }
+  }, [employees, toast]);
+
   useEffect(() => {
+    fetchLeaves();
+    fetchAttendance();
+
     if (typeof window !== 'undefined') {
-      const storedLeaves = localStorage.getItem('hrpulse_leaves');
-      if (storedLeaves) {
-        setLeaves(JSON.parse(storedLeaves));
-      } else {
-        const initialLeaves: LeaveApplication[] = [
-          { id: 'LV001', employeeId: 'EMP001', employeeName: 'Arjun Soni', type: 'PL', from: '2026-06-18', to: '2026-06-20', reason: 'Family function at hometown', status: 'pending', appliedOn: '2026-06-15' },
-          { id: 'LV002', employeeId: 'EMP002', employeeName: 'Priya Mehta', type: 'SL', from: '2026-06-10', to: '2026-06-10', reason: 'Medical checkup', status: 'approved', appliedOn: '2026-06-09' },
-          { id: 'LV003', employeeId: 'EMP005', employeeName: 'Suresh Jain', type: 'CL', from: '2026-06-25', to: '2026-06-25', reason: 'Personal work', status: 'pending', appliedOn: '2026-06-14' },
-        ];
-        setLeaves(initialLeaves);
-        localStorage.setItem('hrpulse_leaves', JSON.stringify(initialLeaves));
-      }
-
-      const storedAttendance = localStorage.getItem('hrpulse_attendance_records');
-      if (storedAttendance) {
-        setAttendanceRecords(JSON.parse(storedAttendance));
-      } else {
-        const initialAttendance: AttendanceRecord[] = [
-          { employeeId: 'EMP001', date: '2026-06-15', checkIn: '09:02 AM', checkOut: '06:30 PM', status: 'present' },
-          { employeeId: 'EMP001', date: '2026-06-16', checkIn: '09:12 AM', checkOut: '06:45 PM', status: 'present' },
-          { employeeId: 'EMP002', date: '2026-06-15', checkIn: '09:45 AM', checkOut: '06:00 PM', status: 'late' },
-          { employeeId: 'EMP002', date: '2026-06-16', checkIn: '09:40 AM', checkOut: '06:10 PM', status: 'late' }
-        ];
-        setAttendanceRecords(initialAttendance);
-        localStorage.setItem('hrpulse_attendance_records', JSON.stringify(initialAttendance));
-      }
-
       const storedPins = localStorage.getItem('hrpulse_employee_pins');
       if (storedPins) {
         setEmployeePins(JSON.parse(storedPins));
       } else {
         const defaultPins = {
-          'EMP001': '1234',
-          'EMP002': '1234',
-          'EMP003': '1234',
-          'EMP004': '1234',
-          'EMP005': '1234',
-          'EMP006': '1234',
-          'EMP007': '1234',
-          'EMP008': '1234',
-          'EMP009': '1234',
-          'EMP010': '1234',
-          'EMP011': '1234',
-          'EMP012': '1234',
+          'EMP001': '1234', 'EMP002': '1234', 'EMP003': '1234', 'EMP004': '1234',
+          'EMP005': '1234', 'EMP006': '1234', 'EMP007': '1234', 'EMP008': '1234',
+          'EMP009': '1234', 'EMP010': '1234', 'EMP011': '1234', 'EMP012': '1234',
         };
         setEmployeePins(defaultPins);
         localStorage.setItem('hrpulse_employee_pins', JSON.stringify(defaultPins));
       }
     }
-  }, []);
 
-  const applyLeave = useCallback((newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
-    setLeaves(prev => {
-      const emp = employees.find(e => e.id === newLeave.employeeId);
-      const leaveId = `LV${String(prev.length + 1).padStart(3, '0')}`;
-      const leave: LeaveApplication = {
-        ...newLeave,
-        id: leaveId,
-        employeeName: emp ? emp.name : 'Unknown Employee',
-        status: 'pending',
-        appliedOn: new Date().toISOString().split('T')[0]
-      };
-      const updated = [...prev, leave];
-      localStorage.setItem('hrpulse_leaves', JSON.stringify(updated));
-      return updated;
-    });
-    toast('success', 'Leave Applied', 'Your leave application has been submitted successfully.');
+    const interval = setInterval(() => {
+      fetchLeaves();
+      fetchAttendance();
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [fetchLeaves, fetchAttendance]);
+
+  const applyLeave = useCallback(async (newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
+    const emp = employees.find(e => e.id === newLeave.employeeId);
+    const employeeName = emp ? emp.name : 'Unknown Employee';
+
+    try {
+      const res = await fetch('/api/leaves', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newLeave,
+          employeeName
+        })
+      });
+      const data = await res.json();
+      if (data.ok && data.leave) {
+        setLeaves(prev => {
+          const updated = [...prev, data.leave];
+          localStorage.setItem('hrpulse_leaves', JSON.stringify(updated));
+          return updated;
+        });
+        toast('success', 'Leave Applied', 'Your leave application has been submitted successfully.');
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err) {
+      console.error(err);
+      toast('error', 'Submission Failed', 'Could not sync leave request with the server.');
+    }
   }, [employees, toast]);
 
-  const updateLeave = useCallback((id: string, status: 'approved' | 'rejected') => {
-    setLeaves(prev => {
-      const updated = prev.map(l => l.id === id ? { ...l, status } : l);
-      localStorage.setItem('hrpulse_leaves', JSON.stringify(updated));
-      return updated;
-    });
-    toast('success', `Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`, `Leave application has been marked as ${status}.`);
+  const updateLeave = useCallback(async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      const res = await fetch('/api/leaves', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status })
+      });
+      const data = await res.json();
+      if (data.ok && data.leave) {
+        setLeaves(prev => {
+          const updated = prev.map(l => l.id === id ? { ...l, status } : l);
+          localStorage.setItem('hrpulse_leaves', JSON.stringify(updated));
+          return updated;
+        });
+        toast('success', `Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`, `Leave application has been marked as ${status}.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err) {
+      console.error(err);
+      toast('error', 'Status Update Failed', 'Could not sync leave status change with the server.');
+    }
   }, [toast]);
 
-  const markAttendance = useCallback((employeeId: string, type: 'checkIn' | 'checkOut') => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-    
-    setAttendanceRecords(prev => {
-      let updated: AttendanceRecord[];
-      const existingIdx = prev.findIndex(r => r.employeeId === employeeId && r.date === todayStr);
-      
-      if (existingIdx > -1) {
-        const record = { ...prev[existingIdx] };
-        if (type === 'checkIn') {
-          record.checkIn = timeStr;
-        } else {
-          record.checkOut = timeStr;
-        }
-        updated = [...prev];
-        updated[existingIdx] = record;
-      } else {
-        const checkInTime = type === 'checkIn' ? timeStr : null;
-        const checkOutTime = type === 'checkOut' ? timeStr : null;
-        
-        let status: 'present' | 'late' = 'present';
-        if (checkInTime) {
-          const [time, period] = checkInTime.split(' ');
-          const [hour, minute] = time.split(':').map(Number);
-          if (period === 'PM' || hour > 9 || (hour === 9 && minute > 15)) {
-            status = 'late';
-          }
-        }
+  const markAttendance = useCallback(async (employeeId: string, type: 'checkIn' | 'checkOut') => {
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId, type })
+      });
+      const data = await res.json();
+      if (data.ok && data.record) {
+        setAttendanceRecords(prev => {
+          let updated: AttendanceRecord[];
+          const todayStr = data.record.date;
+          const existingIdx = prev.findIndex(r => r.employeeId === employeeId && r.date === todayStr);
 
-        const newRecord: AttendanceRecord = {
-          employeeId,
-          date: todayStr,
-          checkIn: checkInTime,
-          checkOut: checkOutTime,
-          status
-        };
-        updated = [...prev, newRecord];
+          if (existingIdx > -1) {
+            updated = [...prev];
+            updated[existingIdx] = data.record;
+          } else {
+            updated = [...prev, data.record];
+          }
+          localStorage.setItem('hrpulse_attendance_records', JSON.stringify(updated));
+          return updated;
+        });
+        const timeStr = data.record[type];
+        toast('success', `Checked ${type === 'checkIn' ? 'In' : 'Out'}`, `Successfully checked ${type === 'checkIn' ? 'in' : 'out'} at ${timeStr}.`);
+      } else {
+        throw new Error(data.error || 'Server error');
       }
-      localStorage.setItem('hrpulse_attendance_records', JSON.stringify(updated));
-      return updated;
-    });
-    toast('success', `Checked ${type === 'checkIn' ? 'In' : 'Out'}`, `Successfully checked ${type === 'checkIn' ? 'in' : 'out'} at ${timeStr}.`);
+    } catch (err) {
+      console.error(err);
+      toast('error', 'Attendance Failed', 'Could not sync check-in/out with the server.');
+    }
   }, [toast]);
 
   const changePin = useCallback((employeeId: string, oldPin: string, newPin: string) => {
