@@ -10,12 +10,43 @@ interface AttendanceRecord {
   status: 'present' | 'late' | 'absent' | 'wfh';
 }
 
-let attendanceStore: AttendanceRecord[] = [
-  { employeeId: 'EMP001', date: '2026-06-15', checkIn: '09:02 AM', checkOut: '06:30 PM', status: 'present' },
-  { employeeId: 'EMP001', date: '2026-06-16', checkIn: '09:12 AM', checkOut: '06:45 PM', status: 'present' },
-  { employeeId: 'EMP002', date: '2026-06-15', checkIn: '09:45 AM', checkOut: '06:00 PM', status: 'late' },
-  { employeeId: 'EMP002', date: '2026-06-16', checkIn: '09:40 AM', checkOut: '06:10 PM', status: 'late' }
-];
+const DATA_DIR = path.join(process.cwd(), 'data');
+const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
+
+function loadAttendance(): AttendanceRecord[] {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (fs.existsSync(ATTENDANCE_FILE)) {
+      const data = fs.readFileSync(ATTENDANCE_FILE, 'utf-8');
+      return JSON.parse(data);
+    } else {
+      const initial: AttendanceRecord[] = [
+        { employeeId: 'EMP001', date: '2026-06-15', checkIn: '09:02 AM', checkOut: '06:30 PM', status: 'present' },
+        { employeeId: 'EMP001', date: '2026-06-16', checkIn: '09:12 AM', checkOut: '06:45 PM', status: 'present' },
+        { employeeId: 'EMP002', date: '2026-06-15', checkIn: '09:45 AM', checkOut: '06:00 PM', status: 'late' },
+        { employeeId: 'EMP002', date: '2026-06-16', checkIn: '09:40 AM', checkOut: '06:10 PM', status: 'late' }
+      ];
+      fs.writeFileSync(ATTENDANCE_FILE, JSON.stringify(initial, null, 2), 'utf-8');
+      return initial;
+    }
+  } catch (e) {
+    console.error('Error loading attendance file:', e);
+    return [];
+  }
+}
+
+function saveAttendance(records: AttendanceRecord[]) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(ATTENDANCE_FILE, JSON.stringify(records, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Error saving attendance file:', e);
+  }
+}
 
 const CONFIG_PATH = path.join(process.cwd(), 'src/app/api/attendance/config.json');
 
@@ -60,9 +91,10 @@ export async function GET(request: Request) {
   const forwarded = request.headers.get('x-forwarded-for');
   const clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
   const authorizedWifiIp = getAuthorizedWifiIp();
+  const records = loadAttendance();
   return NextResponse.json({ 
     ok: true, 
-    attendanceRecords: attendanceStore, 
+    attendanceRecords: records, 
     clientIp, 
     authorizedWifiIp 
   });
@@ -71,6 +103,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const records = loadAttendance();
     
     // Check if it is a configuration update action
     if (body.action === 'updateConfig') {
@@ -86,7 +119,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });
       }
 
-      const existingIdx = attendanceStore.findIndex(r => r.employeeId === employeeId && r.date === date);
+      const existingIdx = records.findIndex(r => r.employeeId === employeeId && r.date === date);
 
       const record: AttendanceRecord = {
         employeeId,
@@ -97,11 +130,12 @@ export async function POST(request: Request) {
       };
 
       if (existingIdx > -1) {
-        attendanceStore[existingIdx] = record;
+        records[existingIdx] = record;
       } else {
-        attendanceStore.push(record);
+        records.push(record);
       }
 
+      saveAttendance(records);
       return NextResponse.json({ ok: true, record });
     }
 
@@ -153,16 +187,17 @@ export async function POST(request: Request) {
     })();
     const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    const existingIdx = attendanceStore.findIndex(r => r.employeeId === employeeId && r.date === todayStr);
+    const existingIdx = records.findIndex(r => r.employeeId === employeeId && r.date === todayStr);
 
     if (existingIdx > -1) {
-      const record = { ...attendanceStore[existingIdx] };
+      const record = { ...records[existingIdx] };
       if (type === 'checkIn') {
         record.checkIn = timeStr;
       } else {
         record.checkOut = timeStr;
       }
-      attendanceStore[existingIdx] = record;
+      records[existingIdx] = record;
+      saveAttendance(records);
       return NextResponse.json({ ok: true, record });
     } else {
       const checkInTime = type === 'checkIn' ? timeStr : null;
@@ -185,7 +220,8 @@ export async function POST(request: Request) {
         status
       };
 
-      attendanceStore.push(newRecord);
+      records.push(newRecord);
+      saveAttendance(records);
       return NextResponse.json({ ok: true, record: newRecord });
     }
   } catch (error) {
