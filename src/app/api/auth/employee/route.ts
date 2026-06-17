@@ -1,43 +1,5 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { writeJsonAtomic } from '@/utils/db';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const PINS_FILE = path.join(DATA_DIR, 'employee_pins.json');
-
-const defaultPins: Record<string, string> = {
-  'EMP001': '1234', 'EMP002': '1234', 'EMP003': '1234', 'EMP004': '1234',
-  'EMP005': '1234', 'EMP006': '1234', 'EMP007': '1234', 'EMP008': '1234',
-  'EMP009': '1234', 'EMP010': '1234', 'EMP011': '1234', 'EMP012': '1234',
-};
-
-function loadPins(): Record<string, string> {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(PINS_FILE)) {
-      const data = fs.readFileSync(PINS_FILE, 'utf-8');
-      return JSON.parse(data);
-    } else {
-      writeJsonAtomic(PINS_FILE, defaultPins);
-      return defaultPins;
-    }
-  } catch (e) {
-    console.error('Error loading employee PINs:', e);
-    return defaultPins;
-  }
-}
-
-function savePins(pins: Record<string, string>) {
-  try {
-    writeJsonAtomic(PINS_FILE, pins);
-  } catch (e) {
-    console.error('Error saving employee PINs:', e);
-  }
-}
-
+import { supabase } from '@/utils/supabase';
 import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
@@ -57,38 +19,103 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Employee ID is required' }, { status: 400 });
     }
 
-    const pins = loadPins();
+    const upperEmpId = employeeId.toUpperCase();
 
     if (action === 'login') {
       const { pin } = body;
-      let storedPin = pins[employeeId.toUpperCase()];
+      if (!pin) {
+        return NextResponse.json({ ok: false, error: 'PIN is required' }, { status: 400 });
+      }
 
-      // If no PIN is registered for this employee, default to '1234'
+      // Check if pin exists in employee_pins
+      let { data: pinData, error: pinErr } = await supabase
+        .from('employee_pins')
+        .select('pin')
+        .eq('employee_id', upperEmpId)
+        .maybeSingle();
+
+      if (pinErr) {
+        console.error('Error fetching employee pin:', pinErr);
+        return NextResponse.json({ ok: false, error: 'Database error' }, { status: 500 });
+      }
+
+      let storedPin = pinData?.pin;
+
+      // If no PIN entry exists, verify employee exists in employees table
       if (!storedPin) {
+        const { data: empData, error: empErr } = await supabase
+          .from('employees')
+          .select('name')
+          .eq('id', upperEmpId)
+          .maybeSingle();
+
+        if (empErr) {
+          console.error('Error verifying employee existence:', empErr);
+          return NextResponse.json({ ok: false, error: 'Database error' }, { status: 500 });
+        }
+
+        if (!empData) {
+          return NextResponse.json({ ok: false, error: 'Invalid Employee ID. Please check and try again.' }, { status: 401 });
+        }
+
+        // Initialize default pin
+        const { error: insertErr } = await supabase
+          .from('employee_pins')
+          .insert({ employee_id: upperEmpId, pin: '1234' });
+
+        if (insertErr) {
+          console.error('Error initializing pin entry:', insertErr);
+        }
         storedPin = '1234';
       }
 
       if (pin === storedPin) {
-        if (!pins[employeeId.toUpperCase()]) {
-          pins[employeeId.toUpperCase()] = '1234';
-          savePins(pins);
-        }
-        cookieStore.set('hrpulse_emp_session', employeeId.toUpperCase(), {
+        // Fetch employee details to return
+        const { data: empDetails } = await supabase
+          .from('employees')
+          .select('name')
+          .eq('id', upperEmpId)
+          .single();
+
+        cookieStore.set('hrpulse_emp_session', upperEmpId, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict',
           maxAge: 60 * 60 * 24, // 24 hours
           path: '/',
         });
-        return NextResponse.json({ ok: true });
+
+        return NextResponse.json({
+          ok: true,
+          employee: {
+            id: upperEmpId,
+            name: empDetails?.name || 'Employee'
+          }
+        });
       } else {
-        return NextResponse.json({ ok: false, error: 'Incorrect PIN' }, { status: 401 });
+        return NextResponse.json({ ok: false, error: 'Incorrect PIN. Please try again.' }, { status: 401 });
       }
     }
 
     if (action === 'changePin') {
       const { oldPin, newPin } = body;
-      const storedPin = pins[employeeId.toUpperCase()] || '1234';
+      if (!oldPin || !newPin) {
+        return NextResponse.json({ ok: false, error: 'Current and new PIN are required' }, { status: 400 });
+      }
+
+      // Fetch stored pin
+      const { data: pinData, error: pinErr } = await supabase
+        .from('employee_pins')
+        .select('pin')
+        .eq('employee_id', upperEmpId)
+        .maybeSingle();
+
+      if (pinErr) {
+        console.error('Error fetching PIN during changePin:', pinErr);
+        return NextResponse.json({ ok: false, error: 'Database error' }, { status: 500 });
+      }
+
+      const storedPin = pinData?.pin || '1234';
 
       if (oldPin !== storedPin) {
         return NextResponse.json({ ok: false, error: 'Current PIN is incorrect' }, { status: 401 });
@@ -98,10 +125,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'New PIN must be exactly 4 digits' }, { status: 400 });
       }
 
-      pins[employeeId.toUpperCase()] = newPin;
-      savePins(pins);
+      // Update PIN in DB
+      const { error: updateErr } = await supabase
+        .from('employee_pins')
+        .upsert({ employee_id: upperEmpId, pin: newPin });
 
-      cookieStore.set('hrpulse_emp_session', employeeId.toUpperCase(), {
+      if (updateErr) {
+        console.error('Error updating employee PIN:', updateErr);
+        return NextResponse.json({ ok: false, error: 'Failed to update PIN in database' }, { status: 500 });
+      }
+
+      cookieStore.set('hrpulse_emp_session', upperEmpId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
@@ -113,7 +147,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ ok: false, error: 'Invalid action' }, { status: 400 });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error.message || 'Invalid payload' }, { status: 400 });
   }
 }
+

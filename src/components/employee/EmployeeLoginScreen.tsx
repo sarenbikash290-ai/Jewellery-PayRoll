@@ -50,23 +50,11 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
     setLoginError('');
 
     try {
-      // Find employee in active roster
-      const employee = employees.find(
-        (emp) => emp.id.toUpperCase() === empId.trim().toUpperCase()
-      );
-
-      if (!employee) {
-        setLoading(false);
-        setLoginError('Invalid Employee ID. Please check and try again.');
-        triggerShake();
-        return;
-      }
-
-      // Verify PIN via server
+      // Verify PIN via server directly
       const res = await fetch('/api/auth/employee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', employeeId: employee.id, pin })
+        body: JSON.stringify({ action: 'login', employeeId: empId.trim(), pin })
       });
       const data = await res.json();
       if (!data.ok) {
@@ -87,7 +75,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
         // Complete login
         setScreen('success');
         setTimeout(() => {
-          onSuccess({ empId: employee.id, name: employee.name });
+          onSuccess({ empId: data.employee.id, name: data.employee.name });
         }, 1200);
       }
     } catch {
@@ -118,37 +106,31 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
       return;
     }
 
-    const employee = employees.find(
-      (emp) => emp.id.toUpperCase() === empId.trim().toUpperCase()
-    );
-
-    if (employee) {
-      try {
-        const res = await fetch('/api/auth/employee', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'changePin',
-            employeeId: employee.id,
-            oldPin: '1234',
-            newPin
-          })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setScreen('success');
-          toast('success', 'PIN Updated', 'Your PIN has been changed successfully.');
-          setTimeout(() => {
-            onSuccess({ empId: employee.id, name: employee.name });
-          }, 1200);
-        } else {
-          setPinError(data.error || 'Failed to update PIN.');
-          triggerShake();
-        }
-      } catch {
-        setPinError('Server communication failed.');
+    try {
+      const res = await fetch('/api/auth/employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'changePin',
+          employeeId: empId.trim(),
+          oldPin: '1234',
+          newPin
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setScreen('success');
+        toast('success', 'PIN Updated', 'Your PIN has been changed successfully.');
+        setTimeout(() => {
+          onSuccess({ empId: empId.trim().toUpperCase(), name: data.employee?.name || 'Employee' });
+        }, 1200);
+      } else {
+        setPinError(data.error || 'Failed to update PIN.');
         triggerShake();
       }
+    } catch {
+      setPinError('Server communication failed.');
+      triggerShake();
     }
   };
 

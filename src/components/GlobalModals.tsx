@@ -79,14 +79,30 @@ export default function GlobalModals() {
   const handleSaveEmployee = (e: React.FormEvent) => {
     e.preventDefault();
     const name = formData.name || 'New Employee';
+    const email = formData.email || '';
+    const phone = formData.phone || '';
     const isEdit = modal.open === 'editEmployee';
+
+    // 1. Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email && !emailRegex.test(email)) {
+      toast('error', 'Invalid Email', 'Please enter a valid email address (e.g. name@domain.com).');
+      return;
+    }
+
+    // 2. Phone number validation (at least 10 digits)
+    const phoneDigits = phone.replace(/[^\d]/g, '');
+    if (phoneDigits.length < 10) {
+      toast('error', 'Invalid Mobile Number', 'Please enter a valid mobile number with at least 10 digits.');
+      return;
+    }
     
     const empData = {
       name,
       dept: formData.dept || 'Sales',
       role: formData.role || 'Sales Representative',
-      email: formData.email || '',
-      phone: formData.phone || '',
+      email,
+      phone,
       location: formData.location || '',
       status: formData.status || 'active',
       joined: formData.joined || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -1105,8 +1121,12 @@ export default function GlobalModals() {
                           localStorage.removeItem('hrpulse_employee_sales');
                           localStorage.removeItem('hrpulse_leaves');
                           localStorage.removeItem('hrpulse_attendance_records');
-                          localStorage.removeItem('hrpulse_notifications');
-                          
+                          await fetch('/api/employees', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'resetData' })
+                          });
+
                           await fetch('/api/attendance', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1114,6 +1134,24 @@ export default function GlobalModals() {
                           });
                           
                           await fetch('/api/leaves', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'resetData' })
+                          });
+
+                          await fetch('/api/incentives', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'resetData' })
+                          });
+
+                          await fetch('/api/commissions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'resetData' })
+                          });
+
+                          await fetch('/api/sales', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ action: 'resetData' })

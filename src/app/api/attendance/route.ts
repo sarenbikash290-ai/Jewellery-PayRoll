@@ -3,49 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { writeJsonAtomic } from '@/utils/db';
 import { cookies } from 'next/headers';
-
-interface AttendanceRecord {
-  employeeId: string;
-  date: string; // YYYY-MM-DD
-  checkIn: string | null;
-  checkOut: string | null;
-  status: 'present' | 'late' | 'absent' | 'wfh';
-}
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
-
-function loadAttendance(): AttendanceRecord[] {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(ATTENDANCE_FILE)) {
-      const data = fs.readFileSync(ATTENDANCE_FILE, 'utf-8');
-      return JSON.parse(data);
-    } else {
-      const initial: AttendanceRecord[] = [
-        { employeeId: 'EMP001', date: '2026-06-15', checkIn: '09:02 AM', checkOut: '06:30 PM', status: 'present' },
-        { employeeId: 'EMP001', date: '2026-06-16', checkIn: '09:12 AM', checkOut: '06:45 PM', status: 'present' },
-        { employeeId: 'EMP002', date: '2026-06-15', checkIn: '09:45 AM', checkOut: '06:00 PM', status: 'late' },
-        { employeeId: 'EMP002', date: '2026-06-16', checkIn: '09:40 AM', checkOut: '06:10 PM', status: 'late' }
-      ];
-      writeJsonAtomic(ATTENDANCE_FILE, initial);
-      return initial;
-    }
-  } catch (e) {
-    console.error('Error loading attendance file:', e);
-    return [];
-  }
-}
-
-function saveAttendance(records: AttendanceRecord[]) {
-  try {
-    writeJsonAtomic(ATTENDANCE_FILE, records);
-  } catch (e) {
-    console.error('Error saving attendance file:', e);
-  }
-}
+import { supabase } from '@/utils/supabase';
 
 const CONFIG_PATH = path.join(process.cwd(), 'src/app/api/attendance/config.json');
 
@@ -86,14 +44,51 @@ function getIpv6Prefix(ip: string): string | null {
   return parts.slice(0, 4).join(':');
 }
 
+async function getSession() {
+  const cookieStore = await cookies();
+  const adminSession = cookieStore.get('hrpulse_admin_session');
+  if (adminSession && adminSession.value === 'granted') {
+    return { role: 'admin' };
+  }
+  const empSession = cookieStore.get('hrpulse_emp_session');
+  if (empSession && empSession.value) {
+    return { role: 'employee', employeeId: empSession.value.toUpperCase() };
+  }
+  return null;
+}
+
 export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let query = supabase.from('attendance').select('*');
+  if (session.role === 'employee') {
+    query = query.eq('employee_id', session.employeeId);
+  }
+
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) {
+    console.error('Error fetching attendance from Supabase:', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  const attendanceRecords = (data || []).map(r => ({
+    employeeId: r.employee_id,
+    date: r.date,
+    checkIn: r.check_in,
+    checkOut: r.check_out,
+    status: r.status
+  }));
+
   const forwarded = request.headers.get('x-forwarded-for');
   const clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
   const authorizedWifiIp = getAuthorizedWifiIp();
-  const records = loadAttendance();
+
   return NextResponse.json({ 
     ok: true, 
-    attendanceRecords: records, 
+    attendanceRecords, 
     clientIp, 
     authorizedWifiIp 
   });
@@ -101,14 +96,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
-    const records = loadAttendance();
     
     // Check if it is a configuration update action
     if (body.action === 'updateConfig') {
-      const cookieStore = await cookies();
-      const session = cookieStore.get('hrpulse_admin_session');
-      if (!session || session.value !== 'granted') {
+      if (session.role !== 'admin') {
         return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
       }
 
@@ -119,21 +116,21 @@ export async function POST(request: Request) {
 
     // Check if it is a database reset action
     if (body.action === 'resetData') {
-      const cookieStore = await cookies();
-      const session = cookieStore.get('hrpulse_admin_session');
-      if (!session || session.value !== 'granted') {
+      if (session.role !== 'admin') {
         return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
       }
 
-      saveAttendance([]);
+      const { error } = await supabase.from('attendance').delete().neq('employee_id', '');
+      if (error) {
+        console.error('Error resetting attendance:', error);
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
       return NextResponse.json({ ok: true });
     }
 
     // Check if it is a manual attendance logging action
     if (body.action === 'manualAttendance') {
-      const cookieStore = await cookies();
-      const session = cookieStore.get('hrpulse_admin_session');
-      if (!session || session.value !== 'granted') {
+      if (session.role !== 'admin') {
         return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
       }
 
@@ -142,23 +139,33 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });
       }
 
-      const existingIdx = records.findIndex(r => r.employeeId === employeeId && r.date === date);
+      const upperEmpId = employeeId.toUpperCase();
 
-      const record: AttendanceRecord = {
-        employeeId,
-        date,
-        checkIn: checkIn || null,
-        checkOut: checkOut || null,
-        status: status as 'present' | 'late' | 'absent' | 'wfh'
-      };
+      const { data, error } = await supabase
+        .from('attendance')
+        .upsert({
+          employee_id: upperEmpId,
+          date: date,
+          check_in: checkIn || null,
+          check_out: checkOut || null,
+          status: status
+        }, { onConflict: 'employee_id,date' })
+        .select()
+        .single();
 
-      if (existingIdx > -1) {
-        records[existingIdx] = record;
-      } else {
-        records.push(record);
+      if (error) {
+        console.error('Error saving manual attendance:', error);
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
       }
 
-      saveAttendance(records);
+      const record = {
+        employeeId: data.employee_id,
+        date: data.date,
+        checkIn: data.check_in,
+        checkOut: data.check_out,
+        status: data.status
+      };
+
       return NextResponse.json({ ok: true, record });
     }
 
@@ -166,6 +173,13 @@ export async function POST(request: Request) {
 
     if (!employeeId || !type || !['checkIn', 'checkOut'].includes(type)) {
       return NextResponse.json({ ok: false, error: 'Invalid parameters' }, { status: 400 });
+    }
+
+    const upperEmpId = employeeId.toUpperCase();
+
+    // Enforce employee session constraint
+    if (session.role === 'employee' && session.employeeId !== upperEmpId) {
+      return NextResponse.json({ ok: false, error: 'Cannot clock in/out for another employee' }, { status: 403 });
     }
 
     // Extract client public IP
@@ -210,18 +224,41 @@ export async function POST(request: Request) {
     })();
     const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    const existingIdx = records.findIndex(r => r.employeeId === employeeId && r.date === todayStr);
+    // Fetch existing attendance record for today
+    const { data: existing, error: fetchErr } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('employee_id', upperEmpId)
+      .eq('date', todayStr)
+      .maybeSingle();
 
-    if (existingIdx > -1) {
-      const record = { ...records[existingIdx] };
+    if (fetchErr) {
+      console.error('Error fetching today attendance:', fetchErr);
+      return NextResponse.json({ ok: false, error: 'Database error' }, { status: 500 });
+    }
+
+    let recordData: any;
+
+    if (existing) {
+      const updates: any = {};
       if (type === 'checkIn') {
-        record.checkIn = timeStr;
+        updates.check_in = timeStr;
       } else {
-        record.checkOut = timeStr;
+        updates.check_out = timeStr;
       }
-      records[existingIdx] = record;
-      saveAttendance(records);
-      return NextResponse.json({ ok: true, record });
+
+      const { data: updated, error: updateErr } = await supabase
+        .from('attendance')
+        .update(updates)
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (updateErr) {
+        console.error('Error updating attendance:', updateErr);
+        return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
+      }
+      recordData = updated;
     } else {
       const checkInTime = type === 'checkIn' ? timeStr : null;
       const checkOutTime = type === 'checkOut' ? timeStr : null;
@@ -235,18 +272,34 @@ export async function POST(request: Request) {
         }
       }
 
-      const newRecord: AttendanceRecord = {
-        employeeId,
-        date: todayStr,
-        checkIn: checkInTime,
-        checkOut: checkOutTime,
-        status
-      };
+      const { data: inserted, error: insertErr } = await supabase
+        .from('attendance')
+        .insert({
+          employee_id: upperEmpId,
+          date: todayStr,
+          check_in: checkInTime,
+          check_out: checkOutTime,
+          status
+        })
+        .select()
+        .single();
 
-      records.push(newRecord);
-      saveAttendance(records);
-      return NextResponse.json({ ok: true, record: newRecord });
+      if (insertErr) {
+        console.error('Error inserting attendance:', insertErr);
+        return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
+      }
+      recordData = inserted;
     }
+
+    const record = {
+      employeeId: recordData.employee_id,
+      date: recordData.date,
+      checkIn: recordData.check_in,
+      checkOut: recordData.check_out,
+      status: recordData.status
+    };
+
+    return NextResponse.json({ ok: true, record });
   } catch (error) {
     return NextResponse.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
   }

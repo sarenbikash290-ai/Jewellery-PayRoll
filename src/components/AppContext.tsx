@@ -183,110 +183,196 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Core data stores (dynamic LocalStorage synced)
-  const [employees, setEmployees] = useState<Employee[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('hrpulse_employees');
-      return stored ? JSON.parse(stored) : [];
-    }
-    return [];
-  });
-  const [incentives, setIncentives] = useState<Incentive[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('hrpulse_incentives');
-      return stored ? JSON.parse(stored) : [];
-    }
-    return [];
-  });
-  const [commissions, setCommissions] = useState<Commission[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('hrpulse_commissions');
-      return stored ? JSON.parse(stored) : [];
-    }
-    return [];
-  });
-  const [employeeSales, setEmployeeSales] = useState<Sale[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('hrpulse_employee_sales');
-      return stored ? JSON.parse(stored) : [];
-    }
-    return [];
-  });
-
-  // Sync state mutations to localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('hrpulse_employees', JSON.stringify(employees));
-    }
-  }, [employees]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('hrpulse_incentives', JSON.stringify(incentives));
-    }
-  }, [incentives]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('hrpulse_commissions', JSON.stringify(commissions));
-    }
-  }, [commissions]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('hrpulse_employee_sales', JSON.stringify(employeeSales));
-    }
-  }, [employeeSales]);
+  // Core data stores
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [incentives, setIncentives] = useState<Incentive[]>([]);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [employeeSales, setEmployeeSales] = useState<Sale[]>([]);
 
   // CRUD helpers
-  const addEmployee = useCallback((emp: Omit<Employee, 'id'>) => {
-    setEmployees(prev => {
-      const maxNum = prev.reduce((max, e) => {
-        const num = parseInt(e.id.replace('EMP', ''), 10);
-        return isNaN(num) ? max : Math.max(max, num);
-      }, 0);
-      const nextId = `EMP${String(maxNum + 1).padStart(3, '0')}`;
-      return [...prev, { ...emp, id: nextId }];
-    });
-  }, []);
-  const updateEmployee = useCallback((emp: Employee) => {
-    setEmployees(prev => prev.map(e => (e.id === emp.id ? emp : e)));
-  }, []);
-  const deleteEmployee = useCallback((id: string) => {
-    setEmployees(prev => prev.filter(e => e.id !== id));
-  }, []);
+  const addEmployee = useCallback(async (emp: Omit<Employee, 'id'>) => {
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emp)
+      });
+      const data = await res.json();
+      if (data.ok && data.employee) {
+        setEmployees(prev => [...prev, data.employee]);
+        toast('success', 'Employee Created', `${emp.name} has been added to the roster.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Add Employee Failed', err.message || 'Could not save employee.');
+    }
+  }, [toast]);
 
-  const addIncentive = useCallback((inc: Omit<Incentive, 'id'>) => {
-    setIncentives(prev => {
-      const newId = `INC${String(prev.length + 1).padStart(3, '0')}`;
-      return [...prev, { ...inc, id: newId }];
-    });
-  }, []);
-  const updateIncentive = useCallback((inc: Incentive) => {
-    setIncentives(prev => prev.map(i => (i.id === inc.id ? inc : i)));
-  }, []);
-  const deleteIncentive = useCallback((id: string) => {
-    setIncentives(prev => prev.filter(i => i.id !== id));
-  }, []);
+  const updateEmployee = useCallback(async (emp: Employee) => {
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emp)
+      });
+      const data = await res.json();
+      if (data.ok && data.employee) {
+        setEmployees(prev => prev.map(e => (e.id === emp.id ? data.employee : e)));
+        toast('success', 'Employee Updated', `${emp.name} has been modified.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Update Employee Failed', err.message || 'Could not update employee.');
+    }
+  }, [toast]);
 
-  const addCommission = useCallback((com: Omit<Commission, 'id'>) => {
-    setCommissions(prev => {
-      const newId = `COM${String(prev.length + 1).padStart(3, '0')}`;
-      return [...prev, { ...com, id: newId }];
-    });
-  }, []);
-  const updateCommission = useCallback((com: Commission) => {
-    setCommissions(prev => prev.map(c => (c.id === com.id ? com : c)));
-  }, []);
-  const deleteCommission = useCallback((id: string) => {
-    setCommissions(prev => prev.filter(c => c.id !== id));
-  }, []);
+  const deleteEmployee = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/employees?id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setEmployees(prev => prev.filter(e => e.id !== id));
+        toast('warning', 'Employee Removed', `Employee ID ${id} was deleted from database.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Delete Employee Failed', err.message || 'Could not delete employee.');
+    }
+  }, [toast]);
 
-  const addSale = useCallback((sale: Omit<Sale, 'id'>) => {
-    setEmployeeSales(prev => {
-      const newId = `SALE${String(prev.length + 1).padStart(3, '0')}`;
-      return [...prev, { ...sale, id: newId }];
-    });
-  }, []);
+  const addIncentive = useCallback(async (inc: Omit<Incentive, 'id'>) => {
+    try {
+      const res = await fetch('/api/incentives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inc)
+      });
+      const data = await res.json();
+      if (data.ok && data.incentive) {
+        setIncentives(prev => [...prev, data.incentive]);
+        toast('success', 'Incentive Logged', `Incentive of ₹${inc.amount} logged for ${inc.employeeName}.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Add Incentive Failed', err.message || 'Could not log incentive.');
+    }
+  }, [toast]);
+
+  const updateIncentive = useCallback(async (inc: Incentive) => {
+    try {
+      const res = await fetch('/api/incentives', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inc)
+      });
+      const data = await res.json();
+      if (data.ok && data.incentive) {
+        setIncentives(prev => prev.map(i => (i.id === inc.id ? data.incentive : i)));
+        toast('success', 'Incentive Updated', 'Performance incentive modified successfully.');
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Update Incentive Failed', err.message || 'Could not update incentive.');
+    }
+  }, [toast]);
+
+  const deleteIncentive = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/incentives?id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setIncentives(prev => prev.filter(i => i.id !== id));
+        toast('warning', 'Incentive Deleted', 'Performance incentive record removed.');
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Delete Incentive Failed', err.message || 'Could not delete incentive.');
+    }
+  }, [toast]);
+
+  const addCommission = useCallback(async (com: Omit<Commission, 'id'>) => {
+    try {
+      const res = await fetch('/api/commissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(com)
+      });
+      const data = await res.json();
+      if (data.ok && data.commission) {
+        setCommissions(prev => [...prev, data.commission]);
+        toast('success', 'Commission Logged', `Commission of ₹${com.amount} logged for lead ${com.leadName}.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Add Commission Failed', err.message || 'Could not log commission.');
+    }
+  }, [toast]);
+
+  const updateCommission = useCallback(async (com: Commission) => {
+    try {
+      const res = await fetch('/api/commissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(com)
+      });
+      const data = await res.json();
+      if (data.ok && data.commission) {
+        setCommissions(prev => prev.map(c => (c.id === com.id ? data.commission : c)));
+        toast('success', 'Commission Updated', 'Commission record modified successfully.');
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Update Commission Failed', err.message || 'Could not update commission.');
+    }
+  }, [toast]);
+
+  const deleteCommission = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/commissions?id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCommissions(prev => prev.filter(c => c.id !== id));
+        toast('warning', 'Commission Deleted', 'Commission record removed.');
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Delete Commission Failed', err.message || 'Could not delete commission.');
+    }
+  }, [toast]);
+
+  const addSale = useCallback(async (sale: Omit<Sale, 'id'>) => {
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sale)
+      });
+      const data = await res.json();
+      if (data.ok && data.sale) {
+        setEmployeeSales(prev => [...prev, data.sale]);
+        toast('success', 'Sale Logged', `Logged transaction of ₹${sale.amount} for ${sale.product}.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Failed to Log Sale', err.message || 'Could not save sales transaction.');
+    }
+  }, [toast]);
 
   // Load and save from localStorage
   const [leaves, setLeaves] = useState<LeaveApplication[]>(() => {
@@ -391,19 +477,77 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [employees, toast]);
 
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const res = await fetch('/api/employees');
+      const data = await res.json();
+      if (data.ok && data.employees) {
+        setEmployees(data.employees);
+        localStorage.setItem('hrpulse_employees', JSON.stringify(data.employees));
+      }
+    } catch (err) {
+      console.error('Failed to fetch employees:', err);
+    }
+  }, []);
+
+  const fetchIncentives = useCallback(async () => {
+    try {
+      const res = await fetch('/api/incentives');
+      const data = await res.json();
+      if (data.ok && data.incentives) {
+        setIncentives(data.incentives);
+        localStorage.setItem('hrpulse_incentives', JSON.stringify(data.incentives));
+      }
+    } catch (err) {
+      console.error('Failed to fetch incentives:', err);
+    }
+  }, []);
+
+  const fetchCommissions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/commissions');
+      const data = await res.json();
+      if (data.ok && data.commissions) {
+        setCommissions(data.commissions);
+        localStorage.setItem('hrpulse_commissions', JSON.stringify(data.commissions));
+      }
+    } catch (err) {
+      console.error('Failed to fetch commissions:', err);
+    }
+  }, []);
+
+  const fetchSales = useCallback(async () => {
+    try {
+      const res = await fetch('/api/sales');
+      const data = await res.json();
+      if (data.ok && data.sales) {
+        setEmployeeSales(data.sales);
+        localStorage.setItem('hrpulse_employee_sales', JSON.stringify(data.sales));
+      }
+    } catch (err) {
+      console.error('Failed to fetch sales:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeaves();
     fetchAttendance();
-
-
+    fetchEmployees();
+    fetchIncentives();
+    fetchCommissions();
+    fetchSales();
 
     const interval = setInterval(() => {
       fetchLeaves();
       fetchAttendance();
+      fetchEmployees();
+      fetchIncentives();
+      fetchCommissions();
+      fetchSales();
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [fetchLeaves, fetchAttendance]);
+  }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales]);
 
   const applyLeave = useCallback(async (newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
     const emp = employees.find(e => e.id === newLeave.employeeId);

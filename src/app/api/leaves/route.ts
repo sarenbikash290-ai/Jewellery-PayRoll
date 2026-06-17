@@ -1,73 +1,75 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { writeJsonAtomic } from '@/utils/db';
 import { cookies } from 'next/headers';
+import { supabase } from '@/utils/supabase';
 
-interface LeaveApp {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  type: string;
-  from: string;
-  to: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  appliedOn: string;
+async function getSession() {
+  const cookieStore = await cookies();
+  const adminSession = cookieStore.get('hrpulse_admin_session');
+  if (adminSession && adminSession.value === 'granted') {
+    return { role: 'admin' };
+  }
+  const empSession = cookieStore.get('hrpulse_emp_session');
+  if (empSession && empSession.value) {
+    return { role: 'employee', employeeId: empSession.value.toUpperCase() };
+  }
+  return null;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const LEAVES_FILE = path.join(DATA_DIR, 'leaves.json');
-
-function loadLeaves(): LeaveApp[] {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(LEAVES_FILE)) {
-      const data = fs.readFileSync(LEAVES_FILE, 'utf-8');
-      return JSON.parse(data);
-    } else {
-      const initial: LeaveApp[] = [
-        { id: 'LV001', employeeId: 'EMP001', employeeName: 'Arjun Soni', type: 'PL', from: '2026-06-18', to: '2026-06-20', reason: 'Family function at hometown', status: 'pending', appliedOn: '2026-06-15' },
-        { id: 'LV002', employeeId: 'EMP002', employeeName: 'Priya Mehta', type: 'SL', from: '2026-06-10', to: '2026-06-10', reason: 'Medical checkup', status: 'approved', appliedOn: '2026-06-09' },
-        { id: 'LV003', employeeId: 'EMP005', employeeName: 'Suresh Jain', type: 'CL', from: '2026-06-25', to: '2026-06-25', reason: 'Personal work', status: 'pending', appliedOn: '2026-06-14' },
-      ];
-      writeJsonAtomic(LEAVES_FILE, initial);
-      return initial;
-    }
-  } catch (e) {
-    console.error('Error loading leaves file:', e);
-    return [];
-  }
-}
-
-function saveLeaves(leaves: LeaveApp[]) {
-  try {
-    writeJsonAtomic(LEAVES_FILE, leaves);
-  } catch (e) {
-    console.error('Error saving leaves file:', e);
-  }
+function mapLeaveToClient(l: any) {
+  return {
+    id: l.id,
+    employeeId: l.employee_id,
+    employeeName: l.employee_name,
+    type: l.type,
+    from: l.from_date,
+    to: l.to_date,
+    reason: l.reason,
+    status: l.status,
+    appliedOn: l.applied_on
+  };
 }
 
 export async function GET() {
-  const leaves = loadLeaves();
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let query = supabase.from('leaves').select('*');
+  if (session.role === 'employee') {
+    query = query.eq('employee_id', session.employeeId);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error fetching leaves from Supabase:', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  const leaves = (data || []).map(mapLeaveToClient);
   return NextResponse.json({ ok: true, leaves });
 }
 
 export async function POST(request: Request) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     // Check if it is a database reset action
     if (body.action === 'resetData') {
-      const cookieStore = await cookies();
-      const session = cookieStore.get('hrpulse_admin_session');
-      if (!session || session.value !== 'granted') {
+      if (session.role !== 'admin') {
         return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
       }
 
-      saveLeaves([]);
+      const { error } = await supabase.from('leaves').delete().neq('id', '');
+      if (error) {
+        console.error('Error resetting leaves in Supabase:', error);
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -77,38 +79,65 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });
     }
 
-    const leaves = loadLeaves();
-    const newLeave: LeaveApp = {
-      id: `LV${String(leaves.length + 1).padStart(3, '0')}`,
-      employeeId,
-      employeeName: employeeName || 'Unknown Employee',
-      type,
-      from,
-      to,
-      reason,
-      status: 'pending',
-      appliedOn: (() => {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      })()
-    };
+    const upperEmpId = employeeId.toUpperCase();
 
-    leaves.push(newLeave);
-    saveLeaves(leaves);
-    return NextResponse.json({ ok: true, leave: newLeave });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
+    // Enforce employee session constraint
+    if (session.role === 'employee' && session.employeeId !== upperEmpId) {
+      return NextResponse.json({ ok: false, error: 'Cannot apply leave for another employee' }, { status: 403 });
+    }
+
+    // Determine the next Leave ID LVxxx
+    const { data: allLeaves, error: fetchErr } = await supabase
+      .from('leaves')
+      .select('id');
+    
+    if (fetchErr) throw fetchErr;
+
+    const maxNum = (allLeaves || []).reduce((max, l) => {
+      const num = parseInt(l.id.replace('LV', ''), 10);
+      return isNaN(num) ? max : Math.max(max, num);
+    }, 0);
+    const nextId = `LV${String(maxNum + 1).padStart(3, '0')}`;
+
+    const appliedOnStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
+    const { data: newLeave, error: insertErr } = await supabase
+      .from('leaves')
+      .insert({
+        id: nextId,
+        employee_id: upperEmpId,
+        employee_name: employeeName || 'Unknown Employee',
+        type,
+        from_date: from,
+        to_date: to,
+        reason,
+        status: 'pending',
+        applied_on: appliedOnStr
+      })
+      .select()
+      .single();
+
+    if (insertErr) {
+      console.error('Error creating leave in Supabase:', insertErr);
+      return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, leave: mapLeaveToClient(newLeave) });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error.message || 'Invalid payload' }, { status: 400 });
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const session = cookieStore.get('hrpulse_admin_session');
-    if (!session || session.value !== 'granted') {
+    const session = await getSession();
+    if (!session || session.role !== 'admin') {
       return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
     }
 
@@ -119,16 +148,20 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, error: 'Invalid parameters' }, { status: 400 });
     }
 
-    const leaves = loadLeaves();
-    const index = leaves.findIndex(l => l.id === id);
-    if (index === -1) {
-      return NextResponse.json({ ok: false, error: 'Leave request not found' }, { status: 404 });
+    const { data: updatedLeave, error } = await supabase
+      .from('leaves')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating leave status:', error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    leaves[index].status = status;
-    saveLeaves(leaves);
-    return NextResponse.json({ ok: true, leave: leaves[index] });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
+    return NextResponse.json({ ok: true, leave: mapLeaveToClient(updatedLeave) });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error.message || 'Invalid payload' }, { status: 400 });
   }
 }
