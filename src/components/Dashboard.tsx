@@ -11,85 +11,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 
-const payrollTrend = [
-  { month: 'Jan', amount: 42.3 }, { month: 'Feb', amount: 44.1 },
-  { month: 'Mar', amount: 43.8 }, { month: 'Apr', amount: 46.2 },
-  { month: 'May', amount: 48.7 }, { month: 'Jun', amount: 51.2 },
-];
-
-const attendanceTrend = [
-  { day: 'Mon', present: 218, absent: 12, late: 17 },
-  { day: 'Tue', present: 224, absent: 8,  late: 15 },
-  { day: 'Wed', present: 215, absent: 15, late: 17 },
-  { day: 'Thu', present: 228, absent: 5,  late: 14 },
-  { day: 'Fri', present: 211, absent: 19, late: 17 },
-];
-
-const deptData = [
-  { name: 'Engineering', value: 82, color: '#4F8EF7' },
-  { name: 'Sales',       value: 64, color: '#10B981' },
-  { name: 'HR',          value: 28, color: '#8B5CF6' },
-  { name: 'Finance',     value: 35, color: '#F59E0B' },
-  { name: 'Operations',  value: 38, color: '#06B6D4' },
-];
-
-const topPerformers = [
-  { name: 'Arjun Soni',    dept: 'Sales',         incentive: '₹ 8,500', badge: 'Top Closer' },
-  { name: 'Anita Tiwari', dept: 'Sales',         incentive: '₹ 7,800', badge: '3x Target' },
-  { name: 'Ramesh Sonar', dept: 'Gold Crafting', incentive: '₹ 3,000', badge: 'Zero Absent' },
-  { name: 'Priya Mehta',  dept: 'Sales',         incentive: '₹ 5,200', badge: 'Rising Star' },
-];
-
-const recentActivity = [
-  { icon: UserCheck,  color: '#10B981', text: 'Arjun Soni marked Present',              time: '2 min ago' },
-  { icon: DollarSign, color: '#4F8EF7', text: 'Jun payroll approved by Accounts',       time: '15 min ago' },
-  { icon: Clock,      color: '#F59E0B', text: 'Priya Mehta requested 2-day CL leave',  time: '32 min ago' },
-  { icon: UserX,      color: '#EF4444', text: 'Sanjay Agarwal marked Absent today',     time: '1 hr ago' },
-  { icon: TrendingUp, color: '#8B5CF6', text: 'Jun Incentive payouts processed',        time: '2 hr ago' },
-];
-
-const statCards = [
-  {
-    id: 'headcount',
-    title: 'Total Employees',
-    value: '247',
-    change: '+12 this month',
-    changeType: 'up',
-    icon: Users,
-    color: '#4F8EF7',
-    bg: 'rgba(79,142,247,0.1)',
-  },
-  {
-    id: 'payroll',
-    title: 'Monthly Payroll',
-    value: '₹ 51.2L',
-    change: '+5.3% vs last month',
-    changeType: 'up',
-    icon: DollarSign,
-    color: '#10B981',
-    bg: 'rgba(16,185,129,0.1)',
-  },
-  {
-    id: 'attendance',
-    title: "Today's Attendance",
-    value: '91.4%',
-    change: '226/247 present',
-    changeType: 'neutral',
-    icon: Clock,
-    color: '#F59E0B',
-    bg: 'rgba(245,158,11,0.1)',
-  },
-  {
-    id: 'pending',
-    title: 'Pending Approvals',
-    value: '18',
-    change: '3 urgent, 15 normal',
-    changeType: 'down',
-    icon: AlertCircle,
-    color: '#EF4444',
-    bg: 'rgba(239,68,68,0.1)',
-  },
-];
+// Dynamic dashboard metrics are computed inside the Dashboard component body
 
 const Card = ({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) => (
   <div style={{
@@ -117,7 +39,269 @@ const tooltipStyle = {
 
 export default function Dashboard() {
   const [period, setPeriod] = useState('monthly');
-  const { employees, setActiveModule, openModal } = useApp();
+  const { 
+    employees, 
+    setActiveModule, 
+    openModal, 
+    attendanceRecords, 
+    leaves, 
+    incentives, 
+    commissions 
+  } = useApp();
+
+  const parseSalary = (s: string) => {
+    if (!s) return 0;
+    const clean = s.replace(/[^\d]/g, '');
+    const val = parseInt(clean, 10);
+    return isNaN(val) ? 0 : val;
+  };
+
+  const parseJoinedDate = (joinedStr: string) => {
+    if (!joinedStr) return new Date(2000, 0, 1);
+    const parts = joinedStr.split(' ');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIdx = months.indexOf(parts[1]);
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && monthIdx > -1 && !isNaN(year)) {
+        return new Date(year, monthIdx, day);
+      }
+    }
+    const parsed = Date.parse(joinedStr);
+    return isNaN(parsed) ? new Date(2000, 0, 1) : new Date(parsed);
+  };
+
+  // KPI Computations
+  const totalEmps = employees.length;
+  const currentYear = new Date().getFullYear();
+  const joinedThisMonth = employees.filter(e => {
+    try {
+      const joinedDate = parseJoinedDate(e.joined);
+      return joinedDate.getMonth() === new Date().getMonth() && joinedDate.getFullYear() === currentYear;
+    } catch {
+      return false;
+    }
+  }).length;
+
+  const monthlyPayrollSum = employees.reduce((sum, e) => sum + (e.status === 'active' ? parseSalary(e.salary) : 0), 0);
+  const payrollDisplay = monthlyPayrollSum >= 100000 
+    ? `₹ ${(monthlyPayrollSum / 100000).toFixed(2)}L` 
+    : `₹ ${monthlyPayrollSum.toLocaleString('en-IN')}`;
+
+  const todayDateStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  const todayRecords = attendanceRecords.filter(r => r.date === todayDateStr);
+  const presentToday = todayRecords.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+  const attendancePct = totalEmps > 0 ? (presentToday / totalEmps) * 100 : 0;
+
+  const pendingLeaves = leaves.filter(l => l.status === 'pending').length;
+  const pendingIncentives = incentives.filter(i => i.status === 'pending').length;
+  const pendingCommissions = commissions.filter(c => c.status === 'pending').length;
+  const totalPending = pendingLeaves + pendingIncentives + pendingCommissions;
+
+  const statCards = [
+    {
+      id: 'headcount',
+      title: 'Total Employees',
+      value: totalEmps.toString(),
+      change: `+${joinedThisMonth} joined this month`,
+      changeType: 'up' as const,
+      icon: Users,
+      color: '#4F8EF7',
+      bg: 'rgba(79,142,247,0.1)',
+    },
+    {
+      id: 'payroll',
+      title: 'Monthly Payroll',
+      value: payrollDisplay,
+      change: `Avg: ₹ ${totalEmps > 0 ? Math.round(monthlyPayrollSum / totalEmps).toLocaleString('en-IN') : 0}/emp`,
+      changeType: 'neutral' as const,
+      icon: DollarSign,
+      color: '#10B981',
+      bg: 'rgba(16,185,129,0.1)',
+    },
+    {
+      id: 'attendance',
+      title: "Today's Attendance",
+      value: `${attendancePct.toFixed(1)}%`,
+      change: `${presentToday}/${totalEmps} present today`,
+      changeType: presentToday === totalEmps && totalEmps > 0 ? ('up' as const) : ('neutral' as const),
+      icon: Clock,
+      color: '#F59E0B',
+      bg: 'rgba(245,158,11,0.1)',
+    },
+    {
+      id: 'pending',
+      title: 'Pending Approvals',
+      value: totalPending.toString(),
+      change: `${pendingLeaves} leaves, ${pendingIncentives + pendingCommissions} finance`,
+      changeType: totalPending > 0 ? ('down' as const) : ('neutral' as const),
+      icon: AlertCircle,
+      color: '#EF4444',
+      bg: 'rgba(239,68,68,0.1)',
+    },
+  ];
+
+  // Dynamic Payroll Trend for last 6 months
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const getLast6Months = () => {
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        name: monthNames[d.getMonth()],
+        year: d.getFullYear(),
+        date: d
+      });
+    }
+    return months;
+  };
+
+  const payrollTrend = getLast6Months().map(m => {
+    const total = employees.reduce((sum, emp) => {
+      const joined = parseJoinedDate(emp.joined);
+      if (joined <= m.date && emp.status === 'active') {
+        return sum + parseSalary(emp.salary);
+      }
+      return sum;
+    }, 0);
+    return {
+      month: m.name,
+      amount: Number((total / 100000).toFixed(2)) // in Lakhs
+    };
+  });
+
+  // Dynamic Attendance Trend for the current week (Monday-Friday)
+  const getWeekDates = () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const startOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekDays = [];
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + startOffset + i);
+      weekDays.push({
+        name: dayNames[i],
+        dateStr: d.toLocaleDateString('en-CA')
+      });
+    }
+    return weekDays;
+  };
+
+  const attendanceTrend = getWeekDates().map(day => {
+    const recordsForDay = attendanceRecords.filter(r => r.date === day.dateStr);
+    const present = recordsForDay.filter(r => r.status === 'present').length;
+    const late = recordsForDay.filter(r => r.status === 'late').length;
+    const wfh = recordsForDay.filter(r => r.status === 'wfh').length;
+    const absent = recordsForDay.filter(r => r.status === 'absent').length;
+
+    const todayDateStr = new Date().toLocaleDateString('en-CA');
+    const isFuture = day.dateStr > todayDateStr;
+
+    if (isFuture) {
+      return { day: day.name, present: 0, late: 0, absent: 0 };
+    }
+
+    const recordedEmpIds = new Set(recordsForDay.map(r => r.employeeId));
+    const activeEmps = employees.filter(e => e.status === 'active');
+    const unrecordedCount = activeEmps.filter(e => {
+      const joined = parseJoinedDate(e.joined);
+      const targetDate = new Date(day.dateStr);
+      return joined <= targetDate && !recordedEmpIds.has(e.id);
+    }).length;
+
+    return {
+      day: day.name,
+      present: present + wfh,
+      late: late,
+      absent: absent + unrecordedCount
+    };
+  });
+
+  // Dynamic Top Performers for current month
+  const currentMonthYear = (() => {
+    const now = new Date();
+    const mNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fullMNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return {
+      short: `${mNames[now.getMonth()]} ${now.getFullYear()}`,
+      long: `${fullMNames[now.getMonth()]} ${now.getFullYear()}`,
+      iso: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    };
+  })();
+
+  const isCurrentMonth = (mStr: string) => {
+    if (!mStr) return false;
+    const clean = mStr.trim();
+    return clean === currentMonthYear.short || 
+           clean === currentMonthYear.long || 
+           clean === currentMonthYear.iso ||
+           clean.startsWith(currentMonthYear.iso);
+  };
+
+  const topPerformers = employees.map(emp => {
+    const empIncentives = incentives.filter(inc => inc.employeeId === emp.id && isCurrentMonth(inc.month));
+    const empCommissions = commissions.filter(com => (com.leadId === emp.id || com.leadName.toLowerCase() === emp.name.toLowerCase()) && isCurrentMonth(com.month));
+    
+    const totalIncentive = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + 
+                           empCommissions.reduce((sum, com) => sum + com.amount, 0);
+    
+    return {
+      name: emp.name,
+      dept: emp.dept,
+      incentive: `₹ ${totalIncentive.toLocaleString('en-IN')}`,
+      incentiveVal: totalIncentive,
+      badge: totalIncentive > 20000 ? 'Top Performer' : totalIncentive > 10000 ? 'Star Closer' : 'Rising Star'
+    };
+  })
+  .filter(p => p.incentiveVal > 0)
+  .sort((a, b) => b.incentiveVal - a.incentiveVal)
+  .slice(0, 4);
+
+  // Dynamic Recent Activity List
+  const activityList: any[] = [];
+  
+  attendanceRecords.forEach(r => {
+    const emp = employees.find(e => e.id === r.employeeId);
+    const name = emp ? emp.name : `Employee ${r.employeeId}`;
+    
+    if (r.checkIn) {
+      activityList.push({
+        id: `att-in-${r.employeeId}-${r.date}`,
+        icon: UserCheck,
+        color: '#10B981',
+        text: `${name} marked Present`,
+        time: `${r.checkIn} today`,
+        ts: Date.parse(`${r.date} ${r.checkIn.replace(/(AM|PM)/i, ' $1')}`) || 0
+      });
+    }
+    if (r.checkOut) {
+      activityList.push({
+        id: `att-out-${r.employeeId}-${r.date}`,
+        icon: UserX,
+        color: '#EF4444',
+        text: `${name} Checked Out`,
+        time: `${r.checkOut} today`,
+        ts: Date.parse(`${r.date} ${r.checkOut.replace(/(AM|PM)/i, ' $1')}`) || 0
+      });
+    }
+  });
+
+  leaves.forEach(l => {
+    activityList.push({
+      id: `leave-${l.id}`,
+      icon: Clock,
+      color: '#F59E0B',
+      text: `${l.employeeName} requested ${l.type} leave`,
+      time: `Applied ${l.appliedOn}`,
+      ts: Date.parse(l.appliedOn) || 0
+    });
+  });
+
+  const recentActivity = activityList
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 5);
 
   // Dynamic date — always shows the real current date
   const todayStr = (() => {
@@ -293,28 +477,34 @@ export default function Dashboard() {
         <Card>
           <CardHeader title="Recent Activity" subtitle="Last 2 hours" />
           <div style={{ padding: '8px 0' }}>
-            {recentActivity.map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <div key={i} style={{
-                  padding: '14px 24px',
-                  display: 'flex', gap: '14px', alignItems: 'flex-start',
-                  borderBottom: i < recentActivity.length - 1 ? '1px solid var(--border)' : 'none',
-                  transition: 'var(--transition)',
-                }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <div style={{ width: '32px', height: '32px', background: `${item.color}18`, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon size={14} color={item.color} />
+            {recentActivity.length === 0 ? (
+              <div style={{ padding: '32px 24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                No recent activity logged.
+              </div>
+            ) : (
+              recentActivity.map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.id || i} style={{
+                    padding: '14px 24px',
+                    display: 'flex', gap: '14px', alignItems: 'flex-start',
+                    borderBottom: i < recentActivity.length - 1 ? '1px solid var(--border)' : 'none',
+                    transition: 'var(--transition)',
+                  }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <div style={{ width: '32px', height: '32px', background: `${item.color}18`, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={14} color={item.color} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.4 }}>{item.text}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{item.time}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.4 }}>{item.text}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{item.time}</div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </Card>
       </div>
@@ -339,59 +529,67 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {topPerformers.map((emp, i) => (
-                <tr key={i}
-                  style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)', cursor: 'pointer' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <td style={{ padding: '16px 24px' }}>
-                    <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: i === 0 ? 'linear-gradient(135deg,#F59E0B,#EF4444)' : i === 1 ? 'linear-gradient(135deg,#8B9AB5,#4A5568)' : 'linear-gradient(135deg,#B45309,#92400E)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff' }}>
-                      {i + 1}
-                    </span>
-                  </td>
-                  <td style={{ padding: '16px 24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '36px', height: '36px', background: `hsl(${i * 60 + 200}, 70%, 50%)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                        {emp.name.charAt(0)}
-                      </div>
-                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '16px 24px', fontSize: '13px', color: 'var(--text-secondary)' }}>{emp.dept}</td>
-                  <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 700, color: 'var(--success)' }}>{emp.incentive}</td>
-                  <td style={{ padding: '16px 24px' }}>
-                    <span style={{ background: 'rgba(79,142,247,0.12)', border: '1px solid rgba(79,142,247,0.25)', color: 'var(--brand)', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px' }}>{emp.badge}</span>
-                  </td>
-                  <td style={{ padding: '16px 24px' }}>
-                    <button 
-                      onClick={() => {
-                        const matchedEmp = employees.find(e => e.name === emp.name);
-                        if (matchedEmp) {
-                          openModal('viewEmployee', matchedEmp);
-                        } else {
-                          openModal('viewEmployee', { 
-                            id: `EMP0${10 + i}`, 
-                            name: emp.name, 
-                            dept: emp.dept, 
-                            role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Engineering' ? 'Senior Engineer' : 'Operations Coordinator',
-                            email: emp.name.toLowerCase().replace(' ', '') + '@company.com', 
-                            phone: '+91 98765 1100' + i, 
-                            location: 'Delhi', 
-                            status: 'active', 
-                            joined: '12 Mar 2021', 
-                            salary: '₹ 72,000', 
-                            type: 'Full-time' 
-                          });
-                        }
-                      }}
-                      style={{ fontSize: '12px', color: 'var(--brand)', background: 'rgba(79,142,247,0.1)', padding: '6px 14px', borderRadius: '6px', fontWeight: 600, transition: 'var(--transition)', border: 'none', cursor: 'pointer' }}
-                    >
-                      View Profile
-                    </button>
+              {topPerformers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '32px 24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                    No incentives or commissions recorded this month yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                topPerformers.map((emp, i) => (
+                  <tr key={i}
+                    style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)', cursor: 'pointer' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <td style={{ padding: '16px 24px' }}>
+                      <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: i === 0 ? 'linear-gradient(135deg,#F59E0B,#EF4444)' : i === 1 ? 'linear-gradient(135deg,#8B9AB5,#4A5568)' : 'linear-gradient(135deg,#B45309,#92400E)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff' }}>
+                        {i + 1}
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '36px', height: '36px', background: `hsl(${i * 60 + 200}, 70%, 50%)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                          {emp.name.charAt(0)}
+                        </div>
+                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 24px', fontSize: '13px', color: 'var(--text-secondary)' }}>{emp.dept}</td>
+                    <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 700, color: 'var(--success)' }}>{emp.incentive}</td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <span style={{ background: 'rgba(79,142,247,0.12)', border: '1px solid rgba(79,142,247,0.25)', color: 'var(--brand)', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px' }}>{emp.badge}</span>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <button 
+                        onClick={() => {
+                          const matchedEmp = employees.find(e => e.name === emp.name);
+                          if (matchedEmp) {
+                            openModal('viewEmployee', matchedEmp);
+                          } else {
+                            openModal('viewEmployee', { 
+                              id: `EMP0${10 + i}`, 
+                              name: emp.name, 
+                              dept: emp.dept, 
+                              role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Engineering' ? 'Senior Engineer' : 'Operations Coordinator',
+                              email: emp.name.toLowerCase().replace(' ', '') + '@company.com', 
+                              phone: '+91 98765 1100' + i, 
+                              location: 'Delhi', 
+                              status: 'active', 
+                              joined: '12 Mar 2021', 
+                              salary: '₹ 72,000', 
+                              type: 'Full-time' 
+                            });
+                          }
+                        }}
+                        style={{ fontSize: '12px', color: 'var(--brand)', background: 'rgba(79,142,247,0.1)', padding: '6px 14px', borderRadius: '6px', fontWeight: 600, transition: 'var(--transition)', border: 'none', cursor: 'pointer' }}
+                      >
+                        View Profile
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

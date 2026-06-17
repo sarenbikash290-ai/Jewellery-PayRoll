@@ -7,11 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
 
-const attendanceTrend = [
-  { week: 'Wk 1', rate: 88 }, { week: 'Wk 2', rate: 91 },
-  { week: 'Wk 3', rate: 86 }, { week: 'Wk 4', rate: 93 },
-  { week: 'Wk 5', rate: 91 },
-];
+// Dynamic weekly attendance trend is calculated inside the Reports component body
 
 const tooltipStyle = { contentStyle: { background: '#1E2A42', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px' }, labelStyle: { color: '#8B9AB5' } };
 
@@ -120,6 +116,55 @@ export default function Reports() {
     { month: 'Jun', cost: parseFloat(totalNetPayroll.toFixed(2)), employees: employees.length },
   ];
 
+  // Dynamic Reports Page KPI Calculations
+  const payrollYtdSum = monthlyPayroll.reduce((sum, m) => sum + m.cost, 0);
+  const payrollYtdDisplay = payrollYtdSum >= 100 
+    ? `₹ ${(payrollYtdSum / 100).toFixed(2)} Cr` 
+    : `₹ ${payrollYtdSum.toFixed(2)} Lakhs`;
+
+  const totalAttRecords = attendanceRecords.length;
+  const presentAttRecords = attendanceRecords.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+  const avgAttendanceDisplay = totalAttRecords > 0 
+    ? `${((presentAttRecords / totalAttRecords) * 100).toFixed(1)}%` 
+    : (employees.length > 0 ? '100.0%' : '0.0%');
+
+  const inactiveCount = employees.filter(e => e.status === 'inactive').length;
+  const attritionRateDisplay = employees.length > 0 
+    ? `${((inactiveCount / employees.length) * 100).toFixed(1)}%` 
+    : '0.0%';
+
+  const totalIncentivesPaid = incentives.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0) +
+                              commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+  const incentivesDisplay = totalIncentivesPaid >= 100000 
+    ? `₹ ${(totalIncentivesPaid / 100000).toFixed(2)}L` 
+    : `₹ ${totalIncentivesPaid.toLocaleString('en-IN')}`;
+
+  // Dynamic weekly attendance rate trend for the last 5 weeks
+  const getWeeklyAttendanceTrend = () => {
+    const trend = [];
+    const now = new Date();
+    for (let i = 4; i >= 0; i--) {
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() || 7) - i * 7 + 1);
+      const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+      
+      const recordsInWeek = attendanceRecords.filter(r => {
+        const recordDate = new Date(r.date);
+        return recordDate >= weekStart && recordDate <= weekEnd;
+      });
+      
+      const total = recordsInWeek.length;
+      const present = recordsInWeek.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+      const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+      
+      trend.push({
+        week: `Wk ${5 - i}`,
+        rate: employees.length === 0 ? 0 : rate
+      });
+    }
+    return trend;
+  };
+  const dynamicAttendanceTrend = getWeeklyAttendanceTrend();
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -146,15 +191,15 @@ export default function Reports() {
       {/* KPI Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
         {[
-          { label: 'Payroll YTD',        value: '₹ 2.76 Cr', change: '+12.4%', color: '#10B981' },
-          { label: 'Avg Attendance Rate', value: '91.4%',      change: '+2.1%',  color: '#4F8EF7' },
-          { label: 'Attrition Rate (YTD)',value: '4.2%',       change: '-0.8%',  color: '#8B5CF6' },
-          { label: 'Incentives Paid YTD', value: '₹ 18.4L',   change: '+22%',   color: '#F59E0B' },
+          { label: 'Payroll YTD',        value: payrollYtdDisplay, change: '+0.0%', color: '#10B981' },
+          { label: 'Avg Attendance Rate', value: avgAttendanceDisplay, change: '+0.0%',  color: '#4F8EF7' },
+          { label: 'Attrition Rate (YTD)',value: attritionRateDisplay, change: '-0.0%',  color: '#8B5CF6' },
+          { label: 'Incentives Paid YTD', value: incentivesDisplay, change: '+0%',   color: '#F59E0B' },
         ].map((kpi, i) => (
           <Card key={i} style={{ padding: '20px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: '6px' }}>{kpi.value}</div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{kpi.label}</div>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: kpi.change.startsWith('+') ? '#10B981' : '#EF4444' }}>{kpi.change} vs last year</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#8B9AB5' }}>Estimated from current month</div>
           </Card>
         ))}
       </div>
@@ -220,7 +265,7 @@ export default function Reports() {
         } />
         <div style={{ padding: '24px' }}>
           <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={attendanceTrend}>
+            <LineChart data={dynamicAttendanceTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
               <XAxis dataKey="week" tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis domain={[80, 100]} tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />

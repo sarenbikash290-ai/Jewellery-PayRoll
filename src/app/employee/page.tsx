@@ -50,14 +50,14 @@ function EmployeeAppShell() {
 
   if (!session) {
     return (
-      <div className="light-mode" style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      <div className="dark-mode" style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
         <EmployeeLoginScreen onSuccess={handleLoginSuccess} />
       </div>
     );
   }
 
   return (
-    <div className="light-mode" style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+    <div className="dark-mode" style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <EmployeePortal empSession={session} onLogout={handleLogout} />
     </div>
   );

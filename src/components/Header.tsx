@@ -83,7 +83,8 @@ function timeAgo(ts: number): string {
 
 export default function Header({ activeModule, onToggleSidebar, onLogout }: HeaderProps) {
   const { openModal, toast, modal } = useApp();
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -92,6 +93,11 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
 
   // Load from localStorage on mount
   useEffect(() => {
+    setMounted(true);
+    const stored = localStorage.getItem('hrpulse_dark_mode');
+    if (stored) {
+      setDarkMode(stored === 'true');
+    }
     const loaded = loadOrSeedNotifs();
     setNotifications(loaded);
     saveNotifs(loaded);
@@ -144,12 +150,16 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
   }, [modal.open]);
 
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.remove('light-mode');
-    } else {
-      document.documentElement.classList.add('light-mode');
+    if (!mounted) return;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hrpulse_dark_mode', String(darkMode));
     }
-  }, [darkMode]);
+    if (darkMode) {
+      document.documentElement.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark-mode');
+    }
+  }, [darkMode, mounted]);
 
   return (
     <header style={{
@@ -293,7 +303,7 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--warning)'; }}
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
       >
-        {darkMode ? <Sun size={17} /> : <Moon size={17} />}
+        {!mounted ? <Moon size={17} /> : darkMode ? <Sun size={17} /> : <Moon size={17} />}
       </button>
 
       {/* User Avatar */}

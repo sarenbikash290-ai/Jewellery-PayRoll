@@ -1088,6 +1088,64 @@ export default function GlobalModals() {
                     Employees will only be allowed to log attendance when their device requests come from this public IP.
                   </span>
                 </div>
+                {/* System Reset Operations */}
+                <div style={{ gridColumn: 'span 2', marginTop: '10px', padding: '16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px dashed rgba(239, 68, 68, 0.3)', borderRadius: '8px' }}>
+                  <label style={{ color: '#EF4444', fontWeight: 700, display: 'block', marginBottom: '6px', fontSize: '13px' }}>System Maintenance</label>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
+                    Clear all locally cached data (employees roster, attendance, leaves, incentives, commissions, and notifications) to start with a fresh database.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (confirm("Are you sure you want to completely RESET all workforce, payroll, and attendance data? This will clear everything in your browser and cannot be undone.")) {
+                        try {
+                          localStorage.removeItem('hrpulse_employees');
+                          localStorage.removeItem('hrpulse_incentives');
+                          localStorage.removeItem('hrpulse_commissions');
+                          localStorage.removeItem('hrpulse_employee_sales');
+                          localStorage.removeItem('hrpulse_leaves');
+                          localStorage.removeItem('hrpulse_attendance_records');
+                          localStorage.removeItem('hrpulse_notifications');
+                          
+                          await fetch('/api/attendance', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'resetData' })
+                          });
+                          
+                          await fetch('/api/leaves', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'resetData' })
+                          });
+
+                          toast('success', 'System Reset Successful', 'All local and server-side records have been deleted. Reloading...');
+                          setTimeout(() => {
+                            window.location.reload();
+                          }, 1000);
+                        } catch (err) {
+                          console.error(err);
+                          toast('error', 'Reset Failed', 'Something went wrong while resetting database records.');
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#EF4444',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'background 0.2s ease',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#DC2626'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#EF4444'; }}
+                  >
+                    Reset Application Database
+                  </button>
+                </div>
               </div>
             )}
 

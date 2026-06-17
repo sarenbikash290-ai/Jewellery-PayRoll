@@ -117,6 +117,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, authorizedWifiIp: newIp });
     }
 
+    // Check if it is a database reset action
+    if (body.action === 'resetData') {
+      const cookieStore = await cookies();
+      const session = cookieStore.get('hrpulse_admin_session');
+      if (!session || session.value !== 'granted') {
+        return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
+      }
+
+      saveAttendance([]);
+      return NextResponse.json({ ok: true });
+    }
+
     // Check if it is a manual attendance logging action
     if (body.action === 'manualAttendance') {
       const cookieStore = await cookies();

@@ -4,21 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+:root, .light-mode {
   /* ── Base surfaces ── */
-  --bg-0:           #060912;
-  --bg-1:           #090e1a;
-  --bg-2:           #0d1424;
-  --bg-3:           #111b2e;
-  --bg-4:           #172035;
-  --bg-hover:       rgba(255,255,255,0.04);
+  --bg-0:           #F8FAFC;
+  --bg-1:           #FFFFFF;
+  --bg-2:           #F1F5F9;
+  --bg-3:           #E2E8F0;
+  --bg-4:           #CBD5E1;
+  --bg-hover:       rgba(0,0,0,0.04);
   --bg-active:      rgba(79,142,247,0.08);
 
   /* ── Component Aliases ── */
   --bg-primary:     var(--bg-0);
   --bg-secondary:   var(--bg-1);
-  --bg-card:        var(--bg-2);
-  --bg-elevated:    var(--bg-3);
+  --bg-card:        var(--bg-1);
+  --bg-elevated:    var(--bg-2);
 
   /* ── Brand ── */
   --brand:          #4F8EF7;
@@ -44,6 +44,50 @@
   --amber:          #F59E0B;
 
   /* ── Border ── */
+  --border:         rgba(15,23,42,0.06);
+  --border-md:      rgba(15,23,42,0.1);
+  --border-brand:   rgba(79,142,247,0.25);
+
+  /* ── Text ── */
+  --text-1:         #0F172A;
+  --text-2:         #475569;
+  --text-3:         #64748B;
+  --text-4:         #94A3B8;
+
+  --text-primary:   var(--text-1);
+  --text-secondary: var(--text-2);
+  --text-muted:     var(--text-3);
+
+  /* ── Misc ── */
+  --radius-sm:      6px;
+  --radius:         10px;
+  --radius-lg:      14px;
+  --radius-xl:      20px;
+  --radius-full:    9999px;
+  --shadow-sm:      0 2px 8px rgba(0,0,0,0.08);
+  --shadow:         0 4px 24px rgba(0,0,0,0.1);
+  --shadow-lg:      0 12px 40px rgba(0,0,0,0.12);
+  --shadow-brand:   0 4px 20px rgba(79,142,247,0.25);
+  --transition:     all 0.18s cubic-bezier(0.4,0,0.2,1);
+  --transition-lg:  all 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+.dark-mode {
+  /* ── Base surfaces ── */
+  --bg-0:           #060912;
+  --bg-1:           #090e1a;
+  --bg-2:           #0d1424;
+  --bg-3:           #111b2e;
+  --bg-4:           #172035;
+  --bg-hover:       rgba(255,255,255,0.04);
+  --bg-active:      rgba(79,142,247,0.08);
+
+  --bg-primary:     var(--bg-0);
+  --bg-secondary:   var(--bg-1);
+  --bg-card:        var(--bg-2);
+  --bg-elevated:    var(--bg-3);
+
+  /* ── Border ── */
   --border:         rgba(255,255,255,0.06);
   --border-md:      rgba(255,255,255,0.1);
   --border-brand:   rgba(79,142,247,0.25);
@@ -59,48 +103,10 @@
   --text-muted:     var(--text-3);
 
   /* ── Misc ── */
-  --radius-sm:      6px;
-  --radius:         10px;
-  --radius-lg:      14px;
-  --radius-xl:      20px;
-  --radius-full:    9999px;
   --shadow-sm:      0 2px 8px rgba(0,0,0,0.3);
   --shadow:         0 4px 24px rgba(0,0,0,0.4);
   --shadow-lg:      0 12px 40px rgba(0,0,0,0.5);
   --shadow-brand:   0 4px 20px rgba(79,142,247,0.3);
-  --transition:     all 0.18s cubic-bezier(0.4,0,0.2,1);
-  --transition-lg:  all 0.3s cubic-bezier(0.4,0,0.2,1);
-}
-
-.light-mode {
-  /* ── Base surfaces ── */
-  --bg-0:           #F8FAFC;
-  --bg-1:           #FFFFFF;
-  --bg-2:           #F1F5F9;
-  --bg-3:           #E2E8F0;
-  --bg-4:           #CBD5E1;
-  --bg-hover:       rgba(0,0,0,0.04);
-  --bg-active:      rgba(79,142,247,0.08);
-
-  --bg-primary:     var(--bg-0);
-  --bg-secondary:   var(--bg-1);
-  --bg-card:        var(--bg-1);
-  --bg-elevated:    var(--bg-2);
-
-  /* ── Border ── */
-  --border:         rgba(15,23,42,0.06);
-  --border-md:      rgba(15,23,42,0.1);
-  --border-brand:   rgba(79,142,247,0.25);
-
-  /* ── Text ── */
-  --text-1:         #0F172A;
-  --text-2:         #475569;
-  --text-3:         #64748B;
-  --text-4:         #94A3B8;
-
-  --text-primary:   var(--text-1);
-  --text-secondary: var(--text-2);
-  --text-muted:     var(--text-3);
 }
 
 /* ── Reset ── */
