@@ -61,13 +61,18 @@ export async function POST(request: Request) {
 
     if (action === 'login') {
       const { pin } = body;
-      const storedPin = pins[employeeId.toUpperCase()];
+      let storedPin = pins[employeeId.toUpperCase()];
 
+      // If no PIN is registered for this employee, default to '1234'
       if (!storedPin) {
-        return NextResponse.json({ ok: false, error: 'Employee profile not found' }, { status: 404 });
+        storedPin = '1234';
       }
 
       if (pin === storedPin) {
+        if (!pins[employeeId.toUpperCase()]) {
+          pins[employeeId.toUpperCase()] = '1234';
+          savePins(pins);
+        }
         cookieStore.set('hrpulse_emp_session', employeeId.toUpperCase(), {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
