@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from './AppContext';
+import { parseTimeToMinutes } from '@/utils/time';
 import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X } from 'lucide-react';
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
@@ -237,16 +238,7 @@ export default function Attendance() {
       let hours: number | null = null;
       if (realRecord.checkIn && realRecord.checkOut) {
         try {
-          const parseTime = (t: string) => {
-            const [timePart, modifier] = t.split(' ');
-            let [hoursStr, minutesStr] = timePart.split(':');
-            let hours = parseInt(hoursStr, 10);
-            const minutes = parseInt(minutesStr, 10);
-            if (modifier === 'PM' && hours < 12) hours += 12;
-            if (modifier === 'AM' && hours === 12) hours = 0;
-            return hours * 60 + minutes;
-          };
-          const diff = parseTime(realRecord.checkOut) - parseTime(realRecord.checkIn);
+          const diff = parseTimeToMinutes(realRecord.checkOut) - parseTimeToMinutes(realRecord.checkIn);
           if (diff > 0) {
             hours = parseFloat((diff / 60).toFixed(1));
           }
@@ -833,15 +825,7 @@ export default function Attendance() {
                     let delayStr = '30 mins';
                     if (emp.checkIn) {
                       try {
-                        const parts = emp.checkIn.split(' ');
-                        const timePart = parts[0];
-                        const period = parts[1];
-                        const [hStr, mStr] = timePart.split(':');
-                        let h = Number(hStr);
-                        const m = Number(mStr);
-                        if (period === 'PM' && h < 12) h += 12;
-                        if (period === 'AM' && h === 12) h = 0;
-                        const checkInMinutes = h * 60 + m;
+                        const checkInMinutes = parseTimeToMinutes(emp.checkIn);
                         const shiftStartMinutes = 9 * 60; // 09:00 AM
                         const diff = checkInMinutes - shiftStartMinutes;
                         if (diff > 0) delayStr = `${diff} mins`;

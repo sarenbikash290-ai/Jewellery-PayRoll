@@ -6,17 +6,28 @@ import {
 } from 'lucide-react';
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
-const SESSION_KEY    = 'hrpulse_auth';
-const CORRECT_PASSWORD = 'Bikash@123';
-
-export function isAuthenticated(): boolean {
-  try { return localStorage.getItem(SESSION_KEY) === 'granted'; } catch { return false; }
-}
-export function setAuthenticated(v: boolean) {
+export async function checkAdminSession(): Promise<boolean> {
   try {
-    if (v) localStorage.setItem(SESSION_KEY, 'granted');
-    else   localStorage.removeItem(SESSION_KEY);
-  } catch { /* ignore */ }
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check' })
+    });
+    const data = await res.json();
+    return !!data.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function logoutAdmin(): Promise<void> {
+  try {
+    await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout' })
+    });
+  } catch {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +45,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
 
   // Login
   const [password, setPassword]     = useState('');
+  const [recoveredPassword, setRecoveredPassword] = useState('');
   const [showPw, setShowPw]         = useState(false);
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -81,14 +93,25 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
     e.preventDefault();
     if (!password) { setLoginError('Please enter the password.'); return; }
     setLoginLoading(true); setLoginError('');
-    await new Promise(r => setTimeout(r, 500));
-    if (password === CORRECT_PASSWORD) {
-      setAuthenticated(true); onSuccess();
-    } else {
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', password })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        onSuccess();
+      } else {
+        setLoginLoading(false);
+        setLoginError(data.error || 'Incorrect password. Please try again.');
+        triggerShake(); setPassword('');
+        setTimeout(() => pwRef.current?.focus(), 50);
+      }
+    } catch {
       setLoginLoading(false);
-      setLoginError('Incorrect password. Please try again.');
-      triggerShake(); setPassword('');
-      setTimeout(() => pwRef.current?.focus(), 50);
+      setLoginError('Server authentication failed.');
+      triggerShake();
     }
   };
 
@@ -153,6 +176,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
         setTimeout(() => otpRefs[0].current?.focus(), 50);
         return;
       }
+      setRecoveredPassword(data.password || '');
       setScreen('revealed');
     } catch {
       setOtpLoading(false); setOtpError('Network error. Please try again.');
@@ -392,7 +416,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
             <div style={{ position:'relative', marginBottom:'20px' }}>
               <div style={{ padding:'18px 56px 18px 20px', background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.25)', borderRadius:'14px', textAlign:'center' }}>
                 <div style={{ fontSize: showReveal ? '22px' : '28px', fontWeight:900, color:'#10B981', letterSpacing: showReveal ? '4px' : '8px', fontFamily:'monospace', transition:'all 0.3s', userSelect: showReveal ? 'text' : 'none' }}>
-                  {showReveal ? CORRECT_PASSWORD : '••••••••••'}
+                  {showReveal ? recoveredPassword : '••••••••••'}
                 </div>
                 <div style={{ fontSize:'11px', color:'rgba(100,116,139,0.6)', marginTop:'6px' }}>
                   {showReveal ? 'Copy and save it somewhere safe!' : 'Tap the eye icon to reveal'}

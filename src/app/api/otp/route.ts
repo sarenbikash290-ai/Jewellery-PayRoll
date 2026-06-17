@@ -110,7 +110,8 @@ export async function POST(request: Request) {
     }
 
     otpStore.delete(token); // one-time use
-    return Response.json({ ok: true });
+    const expectedPassword = process.env.ADMIN_PASSWORD || 'Bikash@123';
+    return Response.json({ ok: true, password: expectedPassword });
   }
 
   return Response.json({ ok: false, error: 'Invalid action.' }, { status: 400 });

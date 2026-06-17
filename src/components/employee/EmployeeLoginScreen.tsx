@@ -10,7 +10,7 @@ interface EmployeeLoginScreenProps {
 type ScreenType = 'login' | 'changePin' | 'success';
 
 export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenProps) {
-  const { employees, employeePins, changePin, toast } = useApp();
+  const { employees, toast } = useApp();
   const [screen, setScreen] = useState<ScreenType>('login');
   const [mounted, setMounted] = useState(false);
   const [shake, setShake] = useState(false);
@@ -39,7 +39,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
     setTimeout(() => setShake(false), 600);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!empId.trim() || !pin) {
       setLoginError('Please fill in both fields.');
@@ -49,8 +49,8 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
     setLoading(true);
     setLoginError('');
 
-    setTimeout(() => {
-      // Find employee
+    try {
+      // Find employee in active roster
       const employee = employees.find(
         (emp) => emp.id.toUpperCase() === empId.trim().toUpperCase()
       );
@@ -62,11 +62,16 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
         return;
       }
 
-      // Check pin
-      const savedPin = employeePins[employee.id] || '1234';
-      if (pin !== savedPin) {
+      // Verify PIN via server
+      const res = await fetch('/api/auth/employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', employeeId: employee.id, pin })
+      });
+      const data = await res.json();
+      if (!data.ok) {
         setLoading(false);
-        setLoginError('Incorrect PIN. Please try again.');
+        setLoginError(data.error || 'Incorrect PIN. Please try again.');
         triggerShake();
         setPin('');
         return;
@@ -85,10 +90,14 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
           onSuccess({ empId: employee.id, name: employee.name });
         }, 1200);
       }
-    }, 600);
+    } catch {
+      setLoading(false);
+      setLoginError('Server authentication failed.');
+      triggerShake();
+    }
   };
 
-  const handleChangePin = (e: React.FormEvent) => {
+  const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPin.length !== 4 || confirmPin.length !== 4) {
       setPinError('PIN must be exactly 4 digits.');
@@ -109,21 +118,35 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
       return;
     }
 
-    // Call context to change PIN
     const employee = employees.find(
       (emp) => emp.id.toUpperCase() === empId.trim().toUpperCase()
     );
 
     if (employee) {
-      const ok = changePin(employee.id, '1234', newPin);
-      if (ok) {
-        setScreen('success');
-        toast('success', 'PIN Updated', 'Your PIN has been changed successfully.');
-        setTimeout(() => {
-          onSuccess({ empId: employee.id, name: employee.name });
-        }, 1200);
-      } else {
-        setPinError('Failed to update PIN. Please contact support.');
+      try {
+        const res = await fetch('/api/auth/employee', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'changePin',
+            employeeId: employee.id,
+            oldPin: '1234',
+            newPin
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setScreen('success');
+          toast('success', 'PIN Updated', 'Your PIN has been changed successfully.');
+          setTimeout(() => {
+            onSuccess({ empId: employee.id, name: employee.name });
+          }, 1200);
+        } else {
+          setPinError(data.error || 'Failed to update PIN.');
+          triggerShake();
+        }
+      } catch {
+        setPinError('Server communication failed.');
         triggerShake();
       }
     }

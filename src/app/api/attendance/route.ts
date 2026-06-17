@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { writeJsonAtomic } from '@/utils/db';
+import { cookies } from 'next/headers';
 
 interface AttendanceRecord {
   employeeId: string;
@@ -28,7 +30,7 @@ function loadAttendance(): AttendanceRecord[] {
         { employeeId: 'EMP002', date: '2026-06-15', checkIn: '09:45 AM', checkOut: '06:00 PM', status: 'late' },
         { employeeId: 'EMP002', date: '2026-06-16', checkIn: '09:40 AM', checkOut: '06:10 PM', status: 'late' }
       ];
-      fs.writeFileSync(ATTENDANCE_FILE, JSON.stringify(initial, null, 2), 'utf-8');
+      writeJsonAtomic(ATTENDANCE_FILE, initial);
       return initial;
     }
   } catch (e) {
@@ -39,10 +41,7 @@ function loadAttendance(): AttendanceRecord[] {
 
 function saveAttendance(records: AttendanceRecord[]) {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(ATTENDANCE_FILE, JSON.stringify(records, null, 2), 'utf-8');
+    writeJsonAtomic(ATTENDANCE_FILE, records);
   } catch (e) {
     console.error('Error saving attendance file:', e);
   }
@@ -64,7 +63,7 @@ function getAuthorizedWifiIp(): string {
 
 function setAuthorizedWifiIp(ip: string) {
   try {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ authorizedWifiIp: ip }, null, 2), 'utf-8');
+    writeJsonAtomic(CONFIG_PATH, { authorizedWifiIp: ip });
   } catch (e) {
     console.error('Error writing WiFi config:', e);
   }
@@ -107,6 +106,12 @@ export async function POST(request: Request) {
     
     // Check if it is a configuration update action
     if (body.action === 'updateConfig') {
+      const cookieStore = await cookies();
+      const session = cookieStore.get('hrpulse_admin_session');
+      if (!session || session.value !== 'granted') {
+        return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
+      }
+
       const newIp = body.authorizedWifiIp || '127.0.0.1';
       setAuthorizedWifiIp(newIp);
       return NextResponse.json({ ok: true, authorizedWifiIp: newIp });
@@ -114,6 +119,12 @@ export async function POST(request: Request) {
 
     // Check if it is a manual attendance logging action
     if (body.action === 'manualAttendance') {
+      const cookieStore = await cookies();
+      const session = cookieStore.get('hrpulse_admin_session');
+      if (!session || session.value !== 'granted') {
+        return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
+      }
+
       const { employeeId, date, checkIn, checkOut, status } = body;
       if (!employeeId || !date || !status) {
         return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });

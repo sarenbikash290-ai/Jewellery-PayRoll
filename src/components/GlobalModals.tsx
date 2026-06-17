@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 export default function GlobalModals() {
-  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, logManualAttendance } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [wifiIpInput, setWifiIpInput] = useState('');
@@ -706,7 +706,8 @@ export default function GlobalModals() {
     }
 
     case 'viewPayslip': {
-      const emp = (modal.data as Record<string, string>) || defaultEmployee;
+      const empData = (modal.data as Record<string, string>) || defaultEmployee;
+      const emp = employees.find(e => e.id === empData.id) || { ...defaultEmployee, ...empData };
       
       const parsedSalary = (salStr: string) => {
         const clean = salStr.replace(/[^\d]/g, '');
@@ -719,14 +720,43 @@ export default function GlobalModals() {
       const hra = Math.round(basic * 0.4);
       const allowances = Math.round(basic * 0.2);
       const gross = basic + hra + allowances;
-      const incentive = 12500; // Standard mock incentive
-      const totalGrossEarnings = gross + incentive;
+
+      // LOP Days & Deduction
+      const absentDays = attendanceRecords.filter(
+        r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes('-06-') || r.date.startsWith('2026-06'))
+      ).length;
+
+      const unpaidLeavesCount = leaves.filter(
+        l => l.employeeId === emp.id && 
+             l.status === 'approved' && 
+             (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
+             (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
+      ).length;
+
+      const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
+      const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
+
+      // Incentives & Commissions
+      const empIncentives = incentives.filter(
+        inc => inc.employeeId === emp.id && 
+               (inc.status === 'approved' || inc.status === 'paid') && 
+               (inc.month.includes('Jun') || inc.month.includes('June'))
+      );
+      
+      const empCommissions = commissions.filter(
+        com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
+               (com.status === 'approved' || com.status === 'paid') && 
+               (com.month.includes('Jun') || com.month.includes('June'))
+      );
+
+      const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
+      const totalGrossEarnings = gross + totalIncentives;
 
       const pf = Math.round(basic * 0.12);
       const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
       const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
       const pt = 200;
-      const totalDeductions = pf + esi + tds + pt;
+      const totalDeductions = pf + esi + tds + pt + lopDeduction;
       const net = totalGrossEarnings - totalDeductions;
 
       const numberToWords = (num: number) => {
@@ -805,7 +835,7 @@ export default function GlobalModals() {
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Basic Salary</span> <span style={{ fontWeight: 600 }}>₹ {basic.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>House Rent Allowance (HRA)</span> <span style={{ fontWeight: 600 }}>₹ {hra.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Special Allowance</span> <span style={{ fontWeight: 600 }}>₹ {allowances.toLocaleString('en-IN')}.00</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Monthly Incentive</span> <span style={{ fontWeight: 600 }}>₹ {incentive.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Monthly Incentive</span> <span style={{ fontWeight: 600 }}>₹ {totalIncentives.toLocaleString('en-IN')}.00</span></div>
                   </div>
                 </div>
                 {/* Right side - Deductions */}
@@ -816,6 +846,7 @@ export default function GlobalModals() {
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Employee Insurance (ESI)</span> <span style={{ fontWeight: 600 }}>₹ {esi.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Tax Deducted at Source (TDS)</span> <span style={{ fontWeight: 600 }}>₹ {tds.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Professional Tax (PT)</span> <span style={{ fontWeight: 600 }}>₹ {pt.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e53e3e' }}><span>Loss of Pay (LOP)</span> <span style={{ fontWeight: 600 }}>-₹ {lopDeduction.toLocaleString('en-IN')}.00</span></div>
                   </div>
                 </div>
               </div>

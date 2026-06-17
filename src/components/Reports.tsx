@@ -7,23 +7,6 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
 
-const monthlyPayroll = [
-  { month: 'Jan', cost: 42.3, employees: 234 },
-  { month: 'Feb', cost: 44.1, employees: 236 },
-  { month: 'Mar', cost: 43.8, employees: 238 },
-  { month: 'Apr', cost: 46.2, employees: 242 },
-  { month: 'May', cost: 48.7, employees: 245 },
-  { month: 'Jun', cost: 51.2, employees: 247 },
-];
-
-const deptCosts = [
-  { dept: 'Engineering', cost: 18.4, headcount: 82 },
-  { dept: 'Sales',       cost: 11.2, headcount: 64 },
-  { dept: 'Operations',  cost: 8.6,  headcount: 38 },
-  { dept: 'Finance',     cost: 7.2,  headcount: 35 },
-  { dept: 'HR',          cost: 5.8,  headcount: 28 },
-];
-
 const attendanceTrend = [
   { week: 'Wk 1', rate: 88 }, { week: 'Wk 2', rate: 91 },
   { week: 'Wk 3', rate: 86 }, { week: 'Wk 4', rate: 93 },
@@ -57,7 +40,85 @@ const reportTemplates = [
 ];
 
 export default function Reports() {
-  const { openModal, toast } = useApp();
+  const { openModal, toast, employees, incentives, commissions, attendanceRecords, leaves } = useApp();
+
+  const parsedSalary = (salStr: string) => {
+    const clean = salStr.replace(/[^\d]/g, '');
+    const val = parseInt(clean, 10);
+    return isNaN(val) ? 50000 : val;
+  };
+
+  // Group by active departments: "Sales", "Gold Crafting", "Store Ops", "Accounts"
+  const targetDepts = ["Sales", "Gold Crafting", "Store Ops", "Accounts"];
+
+  const deptCosts = targetDepts.map(dept => {
+    const deptEmployees = employees.filter(e => e.dept === dept && e.status === 'active');
+    let totalCost = 0;
+
+    deptEmployees.forEach(emp => {
+      const salaryVal = parsedSalary(emp.salary);
+      const basic = Math.round(salaryVal * 0.6);
+      const hra = Math.round(basic * 0.4);
+      const allowances = Math.round(basic * 0.2);
+      const gross = basic + hra + allowances;
+
+      // LOP Days & Deduction
+      const absentDays = attendanceRecords.filter(
+        r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes('-06-') || r.date.startsWith('2026-06'))
+      ).length;
+
+      const unpaidLeavesCount = leaves.filter(
+        l => l.employeeId === emp.id && 
+             l.status === 'approved' && 
+             (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
+             (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
+      ).length;
+
+      const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
+      const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
+
+      // Incentives & Commissions
+      const empIncentives = incentives.filter(
+        inc => inc.employeeId === emp.id && 
+               (inc.status === 'approved' || inc.status === 'paid') && 
+               (inc.month.includes('Jun') || inc.month.includes('June'))
+      );
+      
+      const empCommissions = commissions.filter(
+        com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
+               (com.status === 'approved' || com.status === 'paid') && 
+               (com.month.includes('Jun') || com.month.includes('June'))
+      );
+
+      const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
+
+      const pf = Math.round(basic * 0.12);
+      const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
+      const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
+
+      const netPay = gross - pf - esi - tds - lopDeduction + totalIncentives;
+      totalCost += netPay;
+    });
+
+    // Convert totalCost to Lakhs (1 Lakh = 100,000)
+    const costInLakhs = parseFloat((totalCost / 100000).toFixed(2));
+
+    return {
+      dept,
+      cost: costInLakhs,
+      headcount: deptEmployees.length
+    };
+  });
+
+  const totalNetPayroll = deptCosts.reduce((sum, d) => sum + d.cost, 0);
+  const monthlyPayroll = [
+    { month: 'Jan', cost: parseFloat((totalNetPayroll * 0.90).toFixed(2)), employees: employees.length },
+    { month: 'Feb', cost: parseFloat((totalNetPayroll * 0.92).toFixed(2)), employees: employees.length },
+    { month: 'Mar', cost: parseFloat((totalNetPayroll * 0.91).toFixed(2)), employees: employees.length },
+    { month: 'Apr', cost: parseFloat((totalNetPayroll * 0.95).toFixed(2)), employees: employees.length },
+    { month: 'May', cost: parseFloat((totalNetPayroll * 0.98).toFixed(2)), employees: employees.length },
+    { month: 'Jun', cost: parseFloat(totalNetPayroll.toFixed(2)), employees: employees.length },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

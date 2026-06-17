@@ -32,7 +32,16 @@ function EmployeeAppShell() {
     setSession(empSession);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' })
+      });
+    } catch (err) {
+      console.error('Failed to log out employee from server:', err);
+    }
     localStorage.removeItem(SESSION_KEY);
     setSession(null);
   };

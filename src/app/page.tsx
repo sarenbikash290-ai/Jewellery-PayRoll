@@ -9,7 +9,7 @@ import Payroll from '@/components/Payroll';
 import Incentives from '@/components/Incentives';
 import Reports from '@/components/Reports';
 import GlobalModals from '@/components/GlobalModals';
-import LoginScreen, { isAuthenticated, setAuthenticated } from '@/components/LoginScreen';
+import LoginScreen, { checkAdminSession, logoutAdmin } from '@/components/LoginScreen';
 import { useState, useEffect } from 'react';
 
 function AppShell({ onLogout }: { onLogout: () => void }) {
@@ -53,17 +53,17 @@ export default function Home() {
   const [authed, setAuthed] = useState<boolean | null>(null); // null = checking
 
   useEffect(() => {
-    setAuthed(isAuthenticated());
+    checkAdminSession().then(setAuthed);
   }, []);
 
   const handleLogin = () => setAuthed(true);
 
-  const handleLogout = () => {
-    setAuthenticated(false);
+  const handleLogout = async () => {
+    await logoutAdmin();
     setAuthed(false);
   };
 
-  // Still checking localStorage — show nothing to prevent flash
+  // Still checking session — show nothing to prevent flash
   if (authed === null) return null;
 
   if (!authed) {

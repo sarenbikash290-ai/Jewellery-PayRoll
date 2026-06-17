@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useApp, Employee } from '../AppContext';
+import { parseTimeToMinutes } from '@/utils/time';
 import { Clock, CheckCircle, Fingerprint, Calendar as CalendarIcon, UserCheck, AlertCircle } from 'lucide-react';
 
 interface EmpAttendanceProps {
@@ -71,16 +72,7 @@ export default function EmpAttendance({ employee }: EmpAttendanceProps) {
   const getDuration = (inTime?: string | null, outTime?: string | null) => {
     if (!inTime || !outTime) return '—';
     try {
-      const parseTime = (t: string) => {
-        const [timePart, modifier] = t.split(' ');
-        let [hoursStr, minutesStr] = timePart.split(':');
-        let hours = parseInt(hoursStr, 10);
-        const minutes = parseInt(minutesStr, 10);
-        if (modifier === 'PM' && hours < 12) hours += 12;
-        if (modifier === 'AM' && hours === 12) hours = 0;
-        return hours * 60 + minutes;
-      };
-      const diff = parseTime(outTime) - parseTime(inTime);
+      const diff = parseTimeToMinutes(outTime) - parseTimeToMinutes(inTime);
       if (diff <= 0) return '—';
       const hrs = (diff / 60).toFixed(1);
       return `${hrs} Hours`;

@@ -147,8 +147,7 @@ interface AppCtx {
   updateLeave: (id: string, status: 'approved' | 'rejected') => void;
   attendanceRecords: AttendanceRecord[];
   markAttendance: (employeeId: string, type: 'checkIn' | 'checkOut') => void;
-  employeePins: Record<string, string>;
-  changePin: (employeeId: string, oldPin: string, newPin: string) => boolean;
+  changePin: (employeeId: string, oldPin: string, newPin: string) => Promise<boolean>;
   authorizedWifiIp: string;
   clientIp: string;
   updateAuthorizedWifiIp: (ip: string) => Promise<void>;
@@ -298,7 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return [];
   });
 
-  const [employeePins, setEmployeePins] = useState<Record<string, string>>({});
+
   const [authorizedWifiIp, setAuthorizedWifiIp] = useState('127.0.0.1');
   const [clientIp, setClientIp] = useState('127.0.0.1');
 
@@ -388,20 +387,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchLeaves();
     fetchAttendance();
 
-    if (typeof window !== 'undefined') {
-      const storedPins = localStorage.getItem('hrpulse_employee_pins');
-      if (storedPins) {
-        setEmployeePins(JSON.parse(storedPins));
-      } else {
-        const defaultPins = {
-          'EMP001': '1234', 'EMP002': '1234', 'EMP003': '1234', 'EMP004': '1234',
-          'EMP005': '1234', 'EMP006': '1234', 'EMP007': '1234', 'EMP008': '1234',
-          'EMP009': '1234', 'EMP010': '1234', 'EMP011': '1234', 'EMP012': '1234',
-        };
-        setEmployeePins(defaultPins);
-        localStorage.setItem('hrpulse_employee_pins', JSON.stringify(defaultPins));
-      }
-    }
+
 
     const interval = setInterval(() => {
       fetchLeaves();
@@ -561,19 +547,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
-  const changePin = useCallback((employeeId: string, oldPin: string, newPin: string) => {
-    let success = false;
-    setEmployeePins(prev => {
-      const currentPin = prev[employeeId] || '1234';
-      if (currentPin !== oldPin) {
-        return prev;
-      }
-      const updated = { ...prev, [employeeId]: newPin };
-      localStorage.setItem('hrpulse_employee_pins', JSON.stringify(updated));
-      success = true;
-      return updated;
-    });
-    return success;
+  const changePin = useCallback(async (employeeId: string, oldPin: string, newPin: string) => {
+    try {
+      const res = await fetch('/api/auth/employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'changePin', employeeId, oldPin, newPin })
+      });
+      const data = await res.json();
+      return !!data.ok;
+    } catch {
+      return false;
+    }
   }, []);
 
   return (
@@ -606,7 +591,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateLeave,
         attendanceRecords,
         markAttendance,
-        employeePins,
         changePin,
         authorizedWifiIp,
         clientIp,

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { writeJsonAtomic } from '@/utils/db';
+import { cookies } from 'next/headers';
 
 interface LeaveApp {
   id: string;
@@ -31,7 +33,7 @@ function loadLeaves(): LeaveApp[] {
         { id: 'LV002', employeeId: 'EMP002', employeeName: 'Priya Mehta', type: 'SL', from: '2026-06-10', to: '2026-06-10', reason: 'Medical checkup', status: 'approved', appliedOn: '2026-06-09' },
         { id: 'LV003', employeeId: 'EMP005', employeeName: 'Suresh Jain', type: 'CL', from: '2026-06-25', to: '2026-06-25', reason: 'Personal work', status: 'pending', appliedOn: '2026-06-14' },
       ];
-      fs.writeFileSync(LEAVES_FILE, JSON.stringify(initial, null, 2), 'utf-8');
+      writeJsonAtomic(LEAVES_FILE, initial);
       return initial;
     }
   } catch (e) {
@@ -42,10 +44,7 @@ function loadLeaves(): LeaveApp[] {
 
 function saveLeaves(leaves: LeaveApp[]) {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(LEAVES_FILE, JSON.stringify(leaves, null, 2), 'utf-8');
+    writeJsonAtomic(LEAVES_FILE, leaves);
   } catch (e) {
     console.error('Error saving leaves file:', e);
   }
@@ -94,6 +93,12 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const session = cookieStore.get('hrpulse_admin_session');
+    if (!session || session.value !== 'granted') {
+      return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { id, status } = body;
 
