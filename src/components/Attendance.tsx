@@ -76,8 +76,8 @@ function LiveClock({ size = 14, weight = 700, showIcon = false }: { size?: numbe
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
-  const [activeTab, setActiveTab] = useState<'today' | 'calendar'>('today');
-  const { employees, toast } = useApp();
+  const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves'>('today');
+  const { employees, toast, leaves, updateLeave } = useApp();
 
   // Stable "today" — only recalculates on mount (no ticking re-renders)
   const todayDate = useMemo(() => {
@@ -241,6 +241,7 @@ export default function Attendance() {
         {[
           { id: 'today', label: "Today's Log" },
           { id: 'calendar', label: 'Calendar' },
+          { id: 'leaves', label: 'Leave Requests' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as typeof activeTab)}
             style={{ padding: '8px 20px', borderRadius: '8px', background: activeTab === tab.id ? 'var(--brand)' : 'transparent', color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', whiteSpace: 'nowrap', border: 'none' }}>
@@ -579,6 +580,94 @@ export default function Attendance() {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Leave Requests Tab */}
+      {activeTab === 'leaves' && (
+        <Card>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600 }}>Employee Leave Requests</span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  {['Employee', 'Leave Type', 'From Date', 'To Date', 'Reason', 'Applied On', 'Status', 'Actions'].map(h => (
+                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {leaves.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      No leave applications submitted yet.
+                    </td>
+                  </tr>
+                ) : (
+                  [...leaves].reverse().map((leave, i) => {
+                    const statusBadgeColors = {
+                      pending: { bg: 'rgba(245,158,11,0.12)', text: '#F59E0B' },
+                      approved: { bg: 'rgba(16,185,129,0.12)', text: '#10B981' },
+                      rejected: { bg: 'rgba(239,68,68,0.12)', text: '#EF4444' },
+                    }[leave.status];
+                    
+                    return (
+                      <tr key={leave.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '14px 20px' }}>
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{leave.employeeName}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{leave.employeeId}</div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: 'rgba(79,142,247,0.12)', color: 'var(--brand)' }}>
+                            {leave.type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{leave.from}</td>
+                        <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{leave.to}</td>
+                        <td style={{ padding: '14px 20px', fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={leave.reason}>
+                          {leave.reason}
+                        </td>
+                        <td style={{ padding: '14px 20px', fontSize: '12px', color: 'var(--text-muted)' }}>{leave.appliedOn}</td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: statusBadgeColors.bg, color: statusBadgeColors.text }}>
+                            {leave.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 20px' }}>
+                          {leave.status === 'pending' ? (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => updateLeave(leave.id, 'approved')}
+                                style={{
+                                  padding: '6px 12px', borderRadius: '6px', background: 'rgba(16,185,129,0.12)', border: 'none', color: '#10B981', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+                                }}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => updateLeave(leave.id, 'rejected')}
+                                style={{
+                                  padding: '6px 12px', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', border: 'none', color: '#EF4444', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+                                }}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );

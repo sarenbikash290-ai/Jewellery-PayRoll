@@ -52,6 +52,27 @@ export interface Sale {
   amount: number;
 }
 
+export interface LeaveApplication {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: 'PL' | 'SL' | 'CL' | 'WFH';
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  appliedOn: string; // YYYY-MM-DD
+}
+
+export interface AttendanceRecord {
+  employeeId: string;
+  date: string; // YYYY-MM-DD
+  checkIn: string | null;
+  checkOut: string | null;
+  status: 'present' | 'late' | 'absent' | 'wfh';
+}
+
+
 // ---- UI Helper Types ----
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 export interface ToastItem {
@@ -121,6 +142,13 @@ interface AppCtx {
   deleteCommission: (id: string) => void;
   employeeSales: Sale[];
   addSale: (sale: Omit<Sale, 'id'>) => void;
+  leaves: LeaveApplication[];
+  applyLeave: (leave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => void;
+  updateLeave: (id: string, status: 'approved' | 'rejected') => void;
+  attendanceRecords: AttendanceRecord[];
+  markAttendance: (employeeId: string, type: 'checkIn' | 'checkOut') => void;
+  employeePins: Record<string, string>;
+  changePin: (employeeId: string, oldPin: string, newPin: string) => boolean;
 }
 
 const Ctx = createContext<AppCtx>({} as AppCtx);
@@ -249,6 +277,151 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Load and save from localStorage
+  const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [employeePins, setEmployeePins] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedLeaves = localStorage.getItem('hrpulse_leaves');
+      if (storedLeaves) {
+        setLeaves(JSON.parse(storedLeaves));
+      } else {
+        const initialLeaves: LeaveApplication[] = [
+          { id: 'LV001', employeeId: 'EMP001', employeeName: 'Arjun Soni', type: 'PL', from: '2026-06-18', to: '2026-06-20', reason: 'Family function at hometown', status: 'pending', appliedOn: '2026-06-15' },
+          { id: 'LV002', employeeId: 'EMP002', employeeName: 'Priya Mehta', type: 'SL', from: '2026-06-10', to: '2026-06-10', reason: 'Medical checkup', status: 'approved', appliedOn: '2026-06-09' },
+          { id: 'LV003', employeeId: 'EMP005', employeeName: 'Suresh Jain', type: 'CL', from: '2026-06-25', to: '2026-06-25', reason: 'Personal work', status: 'pending', appliedOn: '2026-06-14' },
+        ];
+        setLeaves(initialLeaves);
+        localStorage.setItem('hrpulse_leaves', JSON.stringify(initialLeaves));
+      }
+
+      const storedAttendance = localStorage.getItem('hrpulse_attendance_records');
+      if (storedAttendance) {
+        setAttendanceRecords(JSON.parse(storedAttendance));
+      } else {
+        const initialAttendance: AttendanceRecord[] = [
+          { employeeId: 'EMP001', date: '2026-06-15', checkIn: '09:02 AM', checkOut: '06:30 PM', status: 'present' },
+          { employeeId: 'EMP001', date: '2026-06-16', checkIn: '09:12 AM', checkOut: '06:45 PM', status: 'present' },
+          { employeeId: 'EMP002', date: '2026-06-15', checkIn: '09:45 AM', checkOut: '06:00 PM', status: 'late' },
+          { employeeId: 'EMP002', date: '2026-06-16', checkIn: '09:40 AM', checkOut: '06:10 PM', status: 'late' }
+        ];
+        setAttendanceRecords(initialAttendance);
+        localStorage.setItem('hrpulse_attendance_records', JSON.stringify(initialAttendance));
+      }
+
+      const storedPins = localStorage.getItem('hrpulse_employee_pins');
+      if (storedPins) {
+        setEmployeePins(JSON.parse(storedPins));
+      } else {
+        const defaultPins = {
+          'EMP001': '1234',
+          'EMP002': '1234',
+          'EMP003': '1234',
+          'EMP004': '1234',
+          'EMP005': '1234',
+          'EMP006': '1234',
+          'EMP007': '1234',
+          'EMP008': '1234',
+          'EMP009': '1234',
+          'EMP010': '1234',
+          'EMP011': '1234',
+          'EMP012': '1234',
+        };
+        setEmployeePins(defaultPins);
+        localStorage.setItem('hrpulse_employee_pins', JSON.stringify(defaultPins));
+      }
+    }
+  }, []);
+
+  const applyLeave = useCallback((newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
+    setLeaves(prev => {
+      const emp = employees.find(e => e.id === newLeave.employeeId);
+      const leaveId = `LV${String(prev.length + 1).padStart(3, '0')}`;
+      const leave: LeaveApplication = {
+        ...newLeave,
+        id: leaveId,
+        employeeName: emp ? emp.name : 'Unknown Employee',
+        status: 'pending',
+        appliedOn: new Date().toISOString().split('T')[0]
+      };
+      const updated = [...prev, leave];
+      localStorage.setItem('hrpulse_leaves', JSON.stringify(updated));
+      return updated;
+    });
+    toast('success', 'Leave Applied', 'Your leave application has been submitted successfully.');
+  }, [employees, toast]);
+
+  const updateLeave = useCallback((id: string, status: 'approved' | 'rejected') => {
+    setLeaves(prev => {
+      const updated = prev.map(l => l.id === id ? { ...l, status } : l);
+      localStorage.setItem('hrpulse_leaves', JSON.stringify(updated));
+      return updated;
+    });
+    toast('success', `Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`, `Leave application has been marked as ${status}.`);
+  }, [toast]);
+
+  const markAttendance = useCallback((employeeId: string, type: 'checkIn' | 'checkOut') => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    
+    setAttendanceRecords(prev => {
+      let updated: AttendanceRecord[];
+      const existingIdx = prev.findIndex(r => r.employeeId === employeeId && r.date === todayStr);
+      
+      if (existingIdx > -1) {
+        const record = { ...prev[existingIdx] };
+        if (type === 'checkIn') {
+          record.checkIn = timeStr;
+        } else {
+          record.checkOut = timeStr;
+        }
+        updated = [...prev];
+        updated[existingIdx] = record;
+      } else {
+        const checkInTime = type === 'checkIn' ? timeStr : null;
+        const checkOutTime = type === 'checkOut' ? timeStr : null;
+        
+        let status: 'present' | 'late' = 'present';
+        if (checkInTime) {
+          const [time, period] = checkInTime.split(' ');
+          const [hour, minute] = time.split(':').map(Number);
+          if (period === 'PM' || hour > 9 || (hour === 9 && minute > 15)) {
+            status = 'late';
+          }
+        }
+
+        const newRecord: AttendanceRecord = {
+          employeeId,
+          date: todayStr,
+          checkIn: checkInTime,
+          checkOut: checkOutTime,
+          status
+        };
+        updated = [...prev, newRecord];
+      }
+      localStorage.setItem('hrpulse_attendance_records', JSON.stringify(updated));
+      return updated;
+    });
+    toast('success', `Checked ${type === 'checkIn' ? 'In' : 'Out'}`, `Successfully checked ${type === 'checkIn' ? 'in' : 'out'} at ${timeStr}.`);
+  }, [toast]);
+
+  const changePin = useCallback((employeeId: string, oldPin: string, newPin: string) => {
+    let success = false;
+    setEmployeePins(prev => {
+      const currentPin = prev[employeeId] || '1234';
+      if (currentPin !== oldPin) {
+        return prev;
+      }
+      const updated = { ...prev, [employeeId]: newPin };
+      localStorage.setItem('hrpulse_employee_pins', JSON.stringify(updated));
+      success = true;
+      return updated;
+    });
+    return success;
+  }, []);
+
   return (
     <Ctx.Provider
       value={{
@@ -274,6 +447,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteCommission,
         employeeSales,
         addSale,
+        leaves,
+        applyLeave,
+        updateLeave,
+        attendanceRecords,
+        markAttendance,
+        employeePins,
+        changePin,
       }}
     >
       {children}

@@ -1,0 +1,22 @@
+{
+  "name": "HRPulse SAI Jewellers",
+  "short_name": "HRPulse",
+  "description": "SAI Jewellers HR and Payroll Management Platform",
+  "start_url": "/employee",
+  "display": "standalone",
+  "background_color": "#060912",
+  "theme_color": "#0d1424",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

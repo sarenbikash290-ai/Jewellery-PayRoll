@@ -243,11 +243,10 @@ export default function Dashboard() {
           <CardHeader title="Headcount by Dept" subtitle={`Total: ${employees.length} employees`} />
           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
-              { name: 'Engineering', value: employees.filter(e => e.dept === 'Engineering').length, color: '#4F8EF7' },
-              { name: 'Sales',       value: employees.filter(e => e.dept === 'Sales').length, color: '#10B981' },
-              { name: 'HR',          value: employees.filter(e => e.dept === 'HR').length, color: '#8B5CF6' },
-              { name: 'Finance',     value: employees.filter(e => e.dept === 'Finance').length, color: '#F59E0B' },
-              { name: 'Operations',  value: employees.filter(e => e.dept === 'Operations').length, color: '#06B6D4' },
+              { name: 'Sales',          value: employees.filter(e => e.dept === 'Sales').length, color: '#10B981' },
+              { name: 'Gold Crafting',  value: employees.filter(e => e.dept === 'Gold Crafting').length, color: '#F59E0B' },
+              { name: 'Store Ops',      value: employees.filter(e => e.dept === 'Store Ops').length, color: '#06B6D4' },
+              { name: 'Accounts',       value: employees.filter(e => e.dept === 'Accounts').length, color: '#8B5CF6' },
             ].map(dept => (
               <div key={dept.name}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
