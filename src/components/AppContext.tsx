@@ -152,6 +152,7 @@ interface AppCtx {
   authorizedWifiIp: string;
   clientIp: string;
   updateAuthorizedWifiIp: (ip: string) => Promise<void>;
+  logManualAttendance: (employeeId: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh') => Promise<void>;
 }
 
 const Ctx = createContext<AppCtx>({} as AppCtx);
@@ -516,6 +517,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
+  const logManualAttendance = useCallback(async (
+    employeeId: string, 
+    date: string, 
+    checkIn: string | null, 
+    checkOut: string | null, 
+    status: 'present' | 'late' | 'absent' | 'wfh'
+  ) => {
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'manualAttendance',
+          employeeId,
+          date,
+          checkIn,
+          checkOut,
+          status
+        })
+      });
+      const data = await res.json();
+      if (data.ok && data.record) {
+        setAttendanceRecords(prev => {
+          let updated: AttendanceRecord[];
+          const existingIdx = prev.findIndex(r => r.employeeId === employeeId && r.date === date);
+          if (existingIdx > -1) {
+            updated = [...prev];
+            updated[existingIdx] = data.record;
+          } else {
+            updated = [...prev, data.record];
+          }
+          localStorage.setItem('hrpulse_attendance_records', JSON.stringify(updated));
+          return updated;
+        });
+        toast('success', 'Attendance Logged Manually', `Successfully updated attendance for ${date}.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast('error', 'Failed to Log Attendance', err.message || 'Could not save manual attendance record.');
+    }
+  }, [toast]);
+
   const changePin = useCallback((employeeId: string, oldPin: string, newPin: string) => {
     let success = false;
     setEmployeePins(prev => {
@@ -566,6 +611,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         authorizedWifiIp,
         clientIp,
         updateAuthorizedWifiIp,
+        logManualAttendance,
       }}
     >
       {children}

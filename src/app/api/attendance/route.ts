@@ -79,6 +79,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, authorizedWifiIp: newIp });
     }
 
+    // Check if it is a manual attendance logging action
+    if (body.action === 'manualAttendance') {
+      const { employeeId, date, checkIn, checkOut, status } = body;
+      if (!employeeId || !date || !status) {
+        return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });
+      }
+
+      const existingIdx = attendanceStore.findIndex(r => r.employeeId === employeeId && r.date === date);
+
+      const record: AttendanceRecord = {
+        employeeId,
+        date,
+        checkIn: checkIn || null,
+        checkOut: checkOut || null,
+        status: status as 'present' | 'late' | 'absent' | 'wfh'
+      };
+
+      if (existingIdx > -1) {
+        attendanceStore[existingIdx] = record;
+      } else {
+        attendanceStore.push(record);
+      }
+
+      return NextResponse.json({ ok: true, record });
+    }
+
     const { employeeId, type } = body;
 
     if (!employeeId || !type || !['checkIn', 'checkOut'].includes(type)) {

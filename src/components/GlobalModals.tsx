@@ -10,10 +10,17 @@ import {
 } from 'lucide-react';
 
 export default function GlobalModals() {
-  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, logManualAttendance } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [wifiIpInput, setWifiIpInput] = useState('');
+
+  // Manual attendance states
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [manualCheckIn, setManualCheckIn] = useState('09:00 AM');
+  const [manualCheckOut, setManualCheckOut] = useState('06:00 PM');
+  const [manualStatus, setManualStatus] = useState<'present' | 'late' | 'absent' | 'wfh'>('present');
 
   // Reset tab/form state when modal changes
   useEffect(() => {
@@ -29,6 +36,12 @@ export default function GlobalModals() {
     } else {
       setFormData({});
     }
+    // Reset manual attendance states
+    setShowManualForm(false);
+    setManualDate(new Date().toISOString().split('T')[0]);
+    setManualCheckIn('09:00 AM');
+    setManualCheckOut('06:00 PM');
+    setManualStatus('present');
   }, [modal.open, modal.data, authorizedWifiIp]);
 
   if (!modal.open) return null;
@@ -419,6 +432,130 @@ export default function GlobalModals() {
                 ))}
               </div>
             </div>
+
+            {/* Manual Attendance Section */}
+            {!showManualForm ? (
+              <button
+                type="button"
+                onClick={() => setShowManualForm(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  padding: '10px 14px', width: '100%',
+                  background: 'rgba(79, 142, 247, 0.08)', border: '1px dashed rgba(79, 142, 247, 0.4)',
+                  borderRadius: '8px', color: 'var(--brand)', fontSize: '13px', fontWeight: 600,
+                  cursor: 'pointer', transition: 'all 0.2s ease', outline: 'none'
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(79, 142, 247, 0.12)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(79, 142, 247, 0.08)'; }}
+              >
+                <Clock size={14} /> Log Manual Attendance (No Smartphone)
+              </button>
+            ) : (
+              <div style={{
+                background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px',
+                padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Log Manual Attendance
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Date</label>
+                    <input 
+                      type="date" 
+                      value={manualDate} 
+                      onChange={e => setManualDate(e.target.value)}
+                      style={{
+                        padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
+                        border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-1)'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Status</label>
+                    <select 
+                      value={manualStatus} 
+                      onChange={e => setManualStatus(e.target.value as any)}
+                      style={{
+                        padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
+                        border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-1)'
+                      }}
+                    >
+                      <option value="present">Present</option>
+                      <option value="late">Late</option>
+                      <option value="wfh">WFH</option>
+                      <option value="absent">Absent</option>
+                    </select>
+                  </div>
+                </div>
+
+                {manualStatus !== 'absent' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Check In Time</label>
+                      <input 
+                        type="text" 
+                        value={manualCheckIn} 
+                        onChange={e => setManualCheckIn(e.target.value)}
+                        placeholder="e.g. 09:00 AM"
+                        style={{
+                          padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
+                          border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-1)'
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Check Out Time</label>
+                      <input 
+                        type="text" 
+                        value={manualCheckOut} 
+                        onChange={e => setManualCheckOut(e.target.value)}
+                        placeholder="e.g. 06:00 PM (optional)"
+                        style={{
+                          padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
+                          border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-1)'
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualForm(false)}
+                    style={{
+                      padding: '6px 12px', fontSize: '12px', fontWeight: 600,
+                      borderRadius: '6px', border: '1px solid var(--border)',
+                      background: 'transparent', color: 'var(--text-2)', cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await logManualAttendance(
+                        emp.id,
+                        manualDate,
+                        manualStatus === 'absent' ? null : manualCheckIn,
+                        manualStatus === 'absent' ? null : (manualCheckOut || null),
+                        manualStatus
+                      );
+                      setShowManualForm(false);
+                    }}
+                    style={{
+                      padding: '6px 14px', fontSize: '12px', fontWeight: 600,
+                      borderRadius: '6px', border: 'none',
+                      background: 'var(--brand)', color: '#fff', cursor: 'pointer'
+                    }}
+                  >
+                    Save Attendance
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Footer action buttons */}
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
