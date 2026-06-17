@@ -10,20 +10,26 @@ import {
 } from 'lucide-react';
 
 export default function GlobalModals() {
-  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [wifiIpInput, setWifiIpInput] = useState('');
 
   // Reset tab/form state when modal changes
   useEffect(() => {
-    setActiveTab('basic');
+    if (modal.open === 'settings') {
+      setActiveTab('business');
+      setWifiIpInput(authorizedWifiIp);
+    } else {
+      setActiveTab('basic');
+    }
     if (modal.open === 'editEmployee' && modal.data) {
       const emp = modal.data as Record<string, string>;
       setFormData(emp);
     } else {
       setFormData({});
     }
-  }, [modal.open, modal.data]);
+  }, [modal.open, modal.data, authorizedWifiIp]);
 
   if (!modal.open) return null;
 
@@ -98,7 +104,7 @@ export default function GlobalModals() {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    toast('success', 'Settings Saved', 'Global HR and Payroll configurations updated successfully.');
+    updateAuthorizedWifiIp(wifiIpInput);
     closeModal();
   };
 
@@ -869,6 +875,38 @@ export default function GlobalModals() {
                     <option value="sunday">Sundays Only</option>
                     <option value="sat-sun">Saturday & Sunday</option>
                   </select>
+                </div>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label>Authorized Store WiFi Static Public IP</label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input 
+                      type="text" 
+                      value={wifiIpInput} 
+                      onChange={e => setWifiIpInput(e.target.value)} 
+                      placeholder="e.g. 103.88.23.14 (Default 127.0.0.1 bypasses validation)" 
+                      className="form-input" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setWifiIpInput(clientIp)}
+                      style={{
+                        padding: '8px 14px',
+                        background: 'rgba(79, 142, 247, 0.1)',
+                        border: '1px solid rgba(79, 142, 247, 0.25)',
+                        borderRadius: '8px',
+                        color: 'var(--brand)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Use Current IP ({clientIp})
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                    Employees will only be allowed to log attendance when their device requests come from this public IP.
+                  </span>
                 </div>
               </div>
             )}

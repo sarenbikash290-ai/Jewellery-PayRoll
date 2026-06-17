@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 interface AttendanceRecord {
   employeeId: string;
@@ -15,17 +17,105 @@ let attendanceStore: AttendanceRecord[] = [
   { employeeId: 'EMP002', date: '2026-06-16', checkIn: '09:40 AM', checkOut: '06:10 PM', status: 'late' }
 ];
 
-export async function GET() {
-  return NextResponse.json({ ok: true, attendanceRecords: attendanceStore });
+const CONFIG_PATH = path.join(process.cwd(), 'src/app/api/attendance/config.json');
+
+function getAuthorizedWifiIp(): string {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const data = fs.readFileSync(CONFIG_PATH, 'utf-8');
+      return JSON.parse(data).authorizedWifiIp || '127.0.0.1';
+    }
+  } catch (e) {
+    console.error('Error reading WiFi config:', e);
+  }
+  return '127.0.0.1';
+}
+
+function setAuthorizedWifiIp(ip: string) {
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ authorizedWifiIp: ip }, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Error writing WiFi config:', e);
+  }
+}
+
+function normalizeIp(ip: string): string {
+  let clean = ip.trim().toLowerCase();
+  if (clean.startsWith('::ffff:')) {
+    clean = clean.substring(7);
+  }
+  if (clean === '::1') {
+    clean = '127.0.0.1';
+  }
+  return clean;
+}
+
+function getIpv6Prefix(ip: string): string | null {
+  const parts = ip.split(':');
+  if (parts.length < 4) return null;
+  return parts.slice(0, 4).join(':');
+}
+
+export async function GET(request: Request) {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
+  const authorizedWifiIp = getAuthorizedWifiIp();
+  return NextResponse.json({ 
+    ok: true, 
+    attendanceRecords: attendanceStore, 
+    clientIp, 
+    authorizedWifiIp 
+  });
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    
+    // Check if it is a configuration update action
+    if (body.action === 'updateConfig') {
+      const newIp = body.authorizedWifiIp || '127.0.0.1';
+      setAuthorizedWifiIp(newIp);
+      return NextResponse.json({ ok: true, authorizedWifiIp: newIp });
+    }
+
     const { employeeId, type } = body;
 
     if (!employeeId || !type || !['checkIn', 'checkOut'].includes(type)) {
       return NextResponse.json({ ok: false, error: 'Invalid parameters' }, { status: 400 });
+    }
+
+    // Extract client public IP
+    const forwarded = request.headers.get('x-forwarded-for');
+    const clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
+
+    const authorizedWifiIp = getAuthorizedWifiIp();
+    const normalizedClient = normalizeIp(clientIp);
+    const normalizedAuth = normalizeIp(authorizedWifiIp);
+
+    const isLocal = normalizedClient === '127.0.0.1';
+    const isAuthBypassed = normalizedAuth === '127.0.0.1' || normalizedAuth === '';
+
+    let ipMatches = normalizedClient === normalizedAuth;
+
+    // If both are IPv6 addresses, compare the /64 prefix (first 4 segments)
+    if (!ipMatches && normalizedClient.includes(':') && normalizedAuth.includes(':')) {
+      const clientPrefix = getIpv6Prefix(normalizedClient);
+      const authPrefix = getIpv6Prefix(normalizedAuth);
+      if (clientPrefix && authPrefix && clientPrefix === authPrefix) {
+        ipMatches = true;
+      }
+    }
+
+    // Perform Geofencing Check
+    if (!isAuthBypassed && !isLocal && !ipMatches) {
+      console.log(`[Geofencing Blocked] Client: ${clientIp} (${normalizedClient}), Auth IP: ${authorizedWifiIp} (${normalizedAuth})`);
+      return NextResponse.json({ 
+        ok: false, 
+        error: `Outside authorized WiFi network. Device IP: ${clientIp}, Store WiFi: ${authorizedWifiIp}`, 
+        clientIp, 
+        authorizedWifiIp 
+      }, { status: 403 });
     }
 
     const todayStr = new Date().toISOString().split('T')[0];

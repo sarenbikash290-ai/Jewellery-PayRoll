@@ -13,7 +13,7 @@ const Card = ({ children, style = {} }: CardProps) => (
 );
 
 export default function EmpAttendance({ employee }: EmpAttendanceProps) {
-  const { attendanceRecords, markAttendance } = useApp();
+  const { attendanceRecords, markAttendance, toast } = useApp();
   const [time, setTime] = useState(() => new Date());
   const [isMobile, setIsMobile] = useState(false);
   const [scanning, setScanning] = useState(false);

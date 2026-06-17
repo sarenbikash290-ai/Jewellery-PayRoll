@@ -149,6 +149,9 @@ interface AppCtx {
   markAttendance: (employeeId: string, type: 'checkIn' | 'checkOut') => void;
   employeePins: Record<string, string>;
   changePin: (employeeId: string, oldPin: string, newPin: string) => boolean;
+  authorizedWifiIp: string;
+  clientIp: string;
+  updateAuthorizedWifiIp: (ip: string) => Promise<void>;
 }
 
 const Ctx = createContext<AppCtx>({} as AppCtx);
@@ -295,6 +298,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const [employeePins, setEmployeePins] = useState<Record<string, string>>({});
+  const [authorizedWifiIp, setAuthorizedWifiIp] = useState('127.0.0.1');
+  const [clientIp, setClientIp] = useState('127.0.0.1');
 
   const knownLeaveIds = useRef<Set<string>>(new Set());
   const isInitialLeavesLoad = useRef(true);
@@ -366,6 +371,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           });
           isInitialAttendanceLoad.current = false;
         }
+
+        if (data.authorizedWifiIp) setAuthorizedWifiIp(data.authorizedWifiIp);
+        if (data.clientIp) setClientIp(data.clientIp);
 
         setAttendanceRecords(serverRecords);
         localStorage.setItem('hrpulse_attendance_records', JSON.stringify(serverRecords));
@@ -484,9 +492,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         throw new Error(data.error || 'Server error');
       }
+    } catch (err: any) {
+      console.error(err);
+      toast('error', 'Attendance Failed', err.message || 'Could not sync check-in/out with the server.');
+    }
+  }, [toast]);
+
+  const updateAuthorizedWifiIp = useCallback(async (ip: string) => {
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateConfig', authorizedWifiIp: ip })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAuthorizedWifiIp(data.authorizedWifiIp);
+        toast('success', 'WiFi Config Updated', `Authorized store WiFi IP is now set to ${data.authorizedWifiIp}.`);
+      }
     } catch (err) {
       console.error(err);
-      toast('error', 'Attendance Failed', 'Could not sync check-in/out with the server.');
+      toast('error', 'Update Failed', 'Could not update WiFi configuration on the server.');
     }
   }, [toast]);
 
@@ -537,6 +563,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         markAttendance,
         employeePins,
         changePin,
+        authorizedWifiIp,
+        clientIp,
+        updateAuthorizedWifiIp,
       }}
     >
       {children}
