@@ -229,7 +229,7 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
                     fontWeight: isActive ? 700 : 500,
                     cursor: 'pointer',
                     padding: '6px 12px',
-                    transition: 'color 0.2s',
+                    transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s',
                     flex: 1
                   }}
                 >
@@ -382,7 +382,7 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  transition: 'background 0.18s ease, color 0.18s ease, padding 0.15s ease',
+                  transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.18s ease, color 0.18s ease, padding 0.15s ease',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--danger)'; (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}

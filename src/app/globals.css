@@ -104,7 +104,12 @@
 }
 
 /* ── Reset ── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+  -webkit-tap-highlight-color: transparent !important;
+}
 html { font-size: 16px; }
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -116,7 +121,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 a { text-decoration: none; color: inherit; }
-button { cursor: pointer; border: none; background: none; font-family: inherit; }
+button, a, select, input, textarea {
+  outline: none !important;
+}
+button:focus, a:focus, select:focus, input:focus, textarea:focus {
+  outline: none !important;
+}
+button { 
+  cursor: pointer; 
+  border: none; 
+  background: none; 
+  font-family: inherit; 
+  transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+button:active {
+  transform: scale(0.96);
+}
 input, select, textarea { font-family: inherit; }
 img { display: block; max-width: 100%; }
 

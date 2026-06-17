@@ -140,7 +140,7 @@ export default function EmpDashboard({ employee }: EmpDashboardProps) {
             justifyContent: 'center',
             gap: '6px',
             cursor: 'pointer',
-            transition: 'background 0.2s'
+            transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s'
           }}>
             <Fingerprint size={14} /> CLOCK IN NOW
           </button>
@@ -154,7 +154,7 @@ export default function EmpDashboard({ employee }: EmpDashboardProps) {
             padding: '10px 14px',
             borderRadius: '10px',
             cursor: 'pointer',
-            transition: 'background 0.2s'
+            transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s'
           }}>
             VIEW ROSTER
           </button>
