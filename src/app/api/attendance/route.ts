@@ -144,7 +144,13 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
     const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     const existingIdx = attendanceStore.findIndex(r => r.employeeId === employeeId && r.date === todayStr);

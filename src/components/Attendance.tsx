@@ -79,11 +79,24 @@ export default function Attendance() {
   const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves' | 'alerts' | 'analytics' | 'reports'>('today');
   const { employees, toast, leaves, updateLeave, openModal, attendanceRecords } = useApp();
 
-  // Stable "today" — only recalculates on mount (no ticking re-renders)
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      if (now.getDate() !== currentDate.getDate() || 
+          now.getMonth() !== currentDate.getMonth() || 
+          now.getFullYear() !== currentDate.getFullYear()) {
+        setCurrentDate(now);
+      }
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [currentDate]);
+
+  // Stable "today" — only recalculates when calendar date changes
   const todayDate = useMemo(() => {
-    const d = new Date();
-    return { day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), dow: d.getDay() };
-  }, []);
+    return { day: currentDate.getDate(), month: currentDate.getMonth(), year: currentDate.getFullYear(), dow: currentDate.getDay() };
+  }, [currentDate]);
 
   const [calYear, setCalYear] = useState(todayDate.year);
   const [calMonth, setCalMonth] = useState(todayDate.month);
@@ -109,7 +122,7 @@ export default function Attendance() {
     setSelectedDay(null);
   }, []);
 
-  // Build calendar grid (only recalculates when month/year changes)
+  // Build calendar grid (only recalculates when month/year changes or records update)
   const calendarGrid = useMemo(() => {
     const daysInMonth = getDaysInMonth(calYear, calMonth);
     const firstDay = getFirstDayOfMonth(calYear, calMonth);
@@ -121,19 +134,63 @@ export default function Attendance() {
     }
     // Day cells
     for (let d = 1; d <= daysInMonth; d++) {
-      cells.push({ day: d, status: getMockDayStatus(d, calMonth, calYear) });
+      const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayRecords = attendanceRecords.filter(r => r.date === dateStr);
+      
+      let status: string;
+      if (dayRecords.length > 0) {
+        const late = dayRecords.filter(r => r.status === 'late').length;
+        const present = dayRecords.filter(r => r.status === 'present').length;
+        const wfh = dayRecords.filter(r => r.status === 'wfh').length;
+        if (late > 0) status = 'late';
+        else if (present > 0) status = 'present';
+        else if (wfh > 0) status = 'wfh';
+        else status = 'absent';
+      } else {
+        status = getMockDayStatus(d, calMonth, calYear);
+      }
+
+      cells.push({ day: d, status });
     }
     // Trailing empty cells to fill last row
     while (cells.length % 7 !== 0) {
       cells.push({ day: 0, status: '' });
     }
     return cells;
-  }, [calYear, calMonth]);
+  }, [calYear, calMonth, attendanceRecords]);
 
-  // Day summary for selected day (only recalculates when selection changes)
+  // Day summary for selected day (only recalculates when selection changes or records update)
   const selectedDaySummary = useMemo(() => {
     if (selectedDay === null) return null;
+    const selDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
     const statuses = employees.map((emp, idx) => {
+      // 1. Check for real attendance record
+      const realRecord = attendanceRecords.find(r => r.employeeId === emp.id && r.date === selDateStr);
+      if (realRecord) {
+        return { id: emp.id, name: emp.name, dept: emp.dept, status: realRecord.status };
+      }
+
+      // 2. Check for approved leave
+      const leave = leaves.find(l => 
+        l.employeeId === emp.id && 
+        l.status === 'approved' && 
+        selDateStr >= l.from && 
+        selDateStr <= l.to
+      );
+      if (leave) {
+        return { id: emp.id, name: emp.name, dept: emp.dept, status: (leave.type === 'WFH' ? 'wfh' : 'absent') as 'wfh' | 'absent' };
+      }
+
+      // If it is the current local day, and there's no real record, they are absent/not checked in yet
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+      if (selDateStr === todayStr) {
+        return { id: emp.id, name: emp.name, dept: emp.dept, status: 'absent' as const };
+      }
+
+      // Otherwise, fallback to deterministic mock
       const seed = (selectedDay * 7 + calMonth * 31 + calYear + idx * 3) % 20;
       const dow = new Date(calYear, calMonth, selectedDay).getDay();
       if (dow === 0) return { id: emp.id, name: emp.name, dept: emp.dept, status: 'weekend' as const };
@@ -150,15 +207,20 @@ export default function Attendance() {
     const wfhCount = statuses.filter(s => s.status === 'wfh').length;
     const isWeekend = statuses.every(s => s.status === 'weekend');
     return { statuses, presentCount, lateCount, absentCount, wfhCount, isWeekend };
-  }, [selectedDay, calMonth, calYear, employees]);
+  }, [selectedDay, calMonth, calYear, employees, attendanceRecords, leaves, currentDate]);
 
   // Is current calendar on the current month?
   const isCurrentMonth = calYear === todayDate.year && calMonth === todayDate.month;
 
-  // Memoized attendance data (prioritizes real server records, falls back to mocks)
+  // Memoized attendance data (prioritizes real server records, falls back to absent)
   const attendanceData = useMemo(() => employees.map((emp, index) => {
-    // 1. Check for real today's attendance record
-    const todayStr = new Date().toISOString().split('T')[0];
+    // 1. Get today's local date string
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    // Check for real today's attendance record
     const realRecord = attendanceRecords.find(r => r.employeeId === emp.id && r.date === todayStr);
 
     // 2. Check for today's approved leave
@@ -168,18 +230,6 @@ export default function Attendance() {
       todayStr >= l.from && 
       todayStr <= l.to
     );
-
-    const staticMocks = [
-      { checkIn: '09:02', checkOut: '18:30', status: 'present', hours: 9.5, leave: null, source: 'Biometric Gate 1', icon: Fingerprint, color: '#10B981' },
-      { checkIn: '09:45', checkOut: '18:00', status: 'late', hours: 8.2, leave: null, source: 'Mobile GPS App', icon: MapPin, color: '#F59E0B' },
-      { checkIn: null, checkOut: null, status: 'absent', hours: 0, leave: 'PL', source: '—', icon: null, color: 'transparent' },
-      { checkIn: '08:55', checkOut: '18:30', status: 'present', hours: 9.6, leave: null, source: 'Face ID Terminal', icon: Eye, color: '#8B5CF6' },
-      { checkIn: null, checkOut: null, status: 'wfh', hours: 8.0, leave: 'WFH', source: 'Web Portal', icon: Monitor, color: '#06B6D4' },
-      { checkIn: '10:15', checkOut: '19:00', status: 'late', hours: 8.7, leave: null, source: 'Biometric Gate 2', icon: Fingerprint, color: '#10B981' },
-      { checkIn: '09:01', checkOut: null, status: 'present', hours: null, leave: null, source: 'Face ID Terminal', icon: Eye, color: '#8B5CF6' },
-      { checkIn: '08:50', checkOut: '17:45', status: 'present', hours: 8.9, leave: null, source: 'Mobile GPS App', icon: MapPin, color: '#F59E0B' },
-    ];
-    const mock = staticMocks[index % staticMocks.length] || staticMocks[0];
 
     // If there is a real server record for today, use it!
     if (realRecord) {
@@ -233,14 +283,14 @@ export default function Attendance() {
       };
     }
 
-    // Otherwise, fallback to the rich static mock data
+    // Otherwise, they start fresh (refreshed every day) as absent/not checked in
     return {
       id: emp.id, name: emp.name, dept: emp.dept,
-      checkIn: mock.checkIn, checkOut: mock.checkOut,
-      status: mock.status, hours: mock.hours, leave: mock.leave,
-      source: mock.source, icon: mock.icon, color: mock.color
+      checkIn: null, checkOut: null,
+      status: 'absent', hours: null, leave: null,
+      source: '—', icon: null, color: 'transparent'
     };
-  }), [employees, attendanceRecords, leaves]);
+  }), [employees, attendanceRecords, leaves, currentDate]);
 
   const presentCount = attendanceData.filter(e => e.status === 'present').length;
   const lateCount    = attendanceData.filter(e => e.status === 'late').length;

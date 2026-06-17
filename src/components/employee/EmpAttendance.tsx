@@ -35,7 +35,13 @@ export default function EmpAttendance({ employee }: EmpAttendanceProps) {
   const dateStr = time.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
   // Get today's record
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = useMemo(() => {
+    const year = time.getFullYear();
+    const month = String(time.getMonth() + 1).padStart(2, '0');
+    const day = String(time.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, [time.getDate(), time.getMonth(), time.getFullYear()]);
+
   const todayRecord = useMemo(() => {
     return attendanceRecords.find(r => r.employeeId === employee.id && r.date === todayStr);
   }, [attendanceRecords, employee.id, todayStr]);

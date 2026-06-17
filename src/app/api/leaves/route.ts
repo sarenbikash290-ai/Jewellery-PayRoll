@@ -41,7 +41,13 @@ export async function POST(request: Request) {
       to,
       reason,
       status: 'pending',
-      appliedOn: new Date().toISOString().split('T')[0]
+      appliedOn: (() => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })()
     };
 
     leavesStore.push(newLeave);

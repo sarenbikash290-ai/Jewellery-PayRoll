@@ -17,7 +17,13 @@ export default function GlobalModals() {
 
   // Manual attendance states
   const [showManualForm, setShowManualForm] = useState(false);
-  const [manualDate, setManualDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [manualDate, setManualDate] = useState(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   const [manualCheckIn, setManualCheckIn] = useState('09:00 AM');
   const [manualCheckOut, setManualCheckOut] = useState('06:00 PM');
   const [manualStatus, setManualStatus] = useState<'present' | 'late' | 'absent' | 'wfh'>('present');
@@ -38,7 +44,13 @@ export default function GlobalModals() {
     }
     // Reset manual attendance states
     setShowManualForm(false);
-    setManualDate(new Date().toISOString().split('T')[0]);
+    setManualDate(() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    });
     setManualCheckIn('09:00 AM');
     setManualCheckOut('06:00 PM');
     setManualStatus('present');
@@ -1191,7 +1203,9 @@ export default function GlobalModals() {
                     selected={formData.month ? new Date(formData.month + '-01') : null}
                     onChange={(date: Date | null) => {
                       if (date) {
-                        const monthStr = date.toISOString().slice(0, 7); // YYYY-MM
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const monthStr = `${year}-${month}`;
                         handleInputChange('month', monthStr);
                       } else {
                         handleInputChange('month', '');
