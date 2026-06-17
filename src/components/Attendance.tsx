@@ -77,7 +77,7 @@ function LiveClock({ size = 14, weight = 700, showIcon = false }: { size?: numbe
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves'>('today');
-  const { employees, toast, leaves, updateLeave } = useApp();
+  const { employees, toast, leaves, updateLeave, openModal } = useApp();
 
   // Stable "today" — only recalculates on mount (no ticking re-renders)
   const todayDate = useMemo(() => {
@@ -136,13 +136,13 @@ export default function Attendance() {
     const statuses = employees.map((emp, idx) => {
       const seed = (selectedDay * 7 + calMonth * 31 + calYear + idx * 3) % 20;
       const dow = new Date(calYear, calMonth, selectedDay).getDay();
-      if (dow === 0) return { name: emp.name, dept: emp.dept, status: 'weekend' as const };
+      if (dow === 0) return { id: emp.id, name: emp.name, dept: emp.dept, status: 'weekend' as const };
       let status: 'present' | 'late' | 'absent' | 'wfh';
       if (seed < 12) status = 'present';
       else if (seed < 16) status = 'late';
       else if (seed < 18) status = 'absent';
       else status = 'wfh';
-      return { name: emp.name, dept: emp.dept, status };
+      return { id: emp.id, name: emp.name, dept: emp.dept, status };
     });
     const presentCount = statuses.filter(s => s.status === 'present').length;
     const lateCount = statuses.filter(s => s.status === 'late').length;
@@ -270,9 +270,13 @@ export default function Attendance() {
                 {attendanceData.map((emp, i) => {
                   const SrcIcon = emp.icon;
                   return (
-                    <tr key={emp.id} style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)', cursor: 'default' }}
+                    <tr key={emp.id} style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)', cursor: 'pointer' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                      onClick={() => {
+                        const fullEmp = employees.find(e => e.id === emp.id);
+                        if (fullEmp) openModal('viewEmployee', fullEmp);
+                      }}
                     >
                       <td style={{ padding: '14px 20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -545,13 +549,15 @@ export default function Attendance() {
                   <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '8px 0' }}>
                     {selectedDaySummary.statuses.map((emp, idx) => {
                       const sc = statusColors[emp.status];
+                      const fullEmp = employees.find(e => e.id === emp.id);
                       return (
                         <div key={idx} style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '8px 16px', transition: 'background 0.1s',
+                          padding: '8px 16px', transition: 'background 0.1s', cursor: 'pointer'
                         }}
                           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
                           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                          onClick={() => fullEmp && openModal('viewEmployee', fullEmp)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{
@@ -614,10 +620,21 @@ export default function Attendance() {
                     
                     return (
                       <tr key={leave.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '14px 20px' }}>
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{leave.employeeName}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{leave.employeeId}</div>
+                        <td 
+                          style={{ padding: '14px 20px', cursor: 'pointer', transition: 'background 0.2s' }}
+                          onClick={() => {
+                            const fullEmp = employees.find(e => e.id === leave.employeeId);
+                            if (fullEmp) openModal('viewEmployee', fullEmp);
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '32px', height: '32px', background: avatarColors[i % avatarColors.length], borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{leave.employeeName.charAt(0)}</div>
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{leave.employeeName}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{leave.employeeId}</div>
+                            </div>
                           </div>
                         </td>
                         <td style={{ padding: '14px 20px' }}>
