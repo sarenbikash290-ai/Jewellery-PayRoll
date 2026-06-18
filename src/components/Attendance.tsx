@@ -1,8 +1,7 @@
 'use client';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from './AppContext';
-import { parseTimeToMinutes } from '@/utils/time';
-import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X } from 'lucide-react';
+import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell } from 'lucide-react';
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
   present: { bg: 'rgba(16,185,129,0.12)', text: '#10B981', label: 'Present' },
@@ -77,22 +76,8 @@ function LiveClock({ size = 14, weight = 700, showIcon = false }: { size?: numbe
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
-  const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves' | 'alerts' | 'analytics' | 'reports'>('today');
-  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords } = useApp();
-
-  const [currentDate, setCurrentDate] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      if (now.getDate() !== currentDate.getDate() || 
-          now.getMonth() !== currentDate.getMonth() || 
-          now.getFullYear() !== currentDate.getFullYear()) {
-        setCurrentDate(now);
-      }
-    }, 10000);
-    return () => clearInterval(timer);
-  }, [currentDate]);
+  const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves'>('today');
+  const { employees, toast, leaves, updateLeave, openModal } = useApp();
 
   // Stable "today" — only recalculates when calendar date changes
   const todayDate = useMemo(() => {
@@ -137,7 +122,7 @@ export default function Attendance() {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dayRecords = attendanceRecords.filter(r => r.date === dateStr);
-      
+
       let status: string;
       if (dayRecords.length > 0) {
         const late = dayRecords.filter(r => r.status === 'late').length;
@@ -172,10 +157,10 @@ export default function Attendance() {
       }
 
       // 2. Check for approved leave
-      const leave = leaves.find(l => 
-        l.employeeId === emp.id && 
-        l.status === 'approved' && 
-        selDateStr >= l.from && 
+      const leave = leaves.find(l =>
+        l.employeeId === emp.id &&
+        l.status === 'approved' &&
+        selDateStr >= l.from &&
         selDateStr <= l.to
       );
       if (leave) {
@@ -225,10 +210,10 @@ export default function Attendance() {
     const realRecord = attendanceRecords.find(r => r.employeeId === emp.id && r.date === todayStr);
 
     // 2. Check for today's approved leave
-    const todayLeave = leaves.find(l => 
-      l.employeeId === emp.id && 
-      l.status === 'approved' && 
-      todayStr >= l.from && 
+    const todayLeave = leaves.find(l =>
+      l.employeeId === emp.id &&
+      l.status === 'approved' &&
+      todayStr >= l.from &&
       todayStr <= l.to
     );
 
@@ -242,7 +227,7 @@ export default function Attendance() {
           if (diff > 0) {
             hours = parseFloat((diff / 60).toFixed(1));
           }
-        } catch {}
+        } catch { }
       }
 
       return {
@@ -285,9 +270,62 @@ export default function Attendance() {
   }), [employees, attendanceRecords, leaves, currentDate]);
 
   const presentCount = attendanceData.filter(e => e.status === 'present').length;
-  const lateCount    = attendanceData.filter(e => e.status === 'late').length;
-  const absentCount  = attendanceData.filter(e => e.status === 'absent').length;
-  const wfhCount     = attendanceData.filter(e => e.status === 'wfh').length;
+  const lateCount = attendanceData.filter(e => e.status === 'late').length;
+  const absentCount = attendanceData.filter(e => e.status === 'absent').length;
+  const wfhCount = attendanceData.filter(e => e.status === 'wfh').length;
+
+  // ── Late arrivals: employees not yet checked in after 10:00 AM ──────────────
+  const lateAlerts = useMemo(() => {
+    const now = new Date();
+    const currentHour = now.getHours() + now.getMinutes() / 60;
+    // After 10:00 AM — flag all absent/pending as late alerts
+    if (currentHour < 10) return [];
+    return attendanceData.filter(e => !e.checkIn && e.status !== 'wfh');
+  }, [attendanceData]);
+
+  // ── Analytics: last 30 days dept-wise & per-employee stats ─────────────────
+  const analyticsData = useMemo(() => {
+    const depts = [...new Set(employees.map(e => e.dept))];
+    return depts.map(dept => {
+      const deptEmps = employees.filter(e => e.dept === dept);
+      // deterministic 30-day present count per employee
+      let totalPresent = 0, totalDays = 0;
+      deptEmps.forEach((_, ei) => {
+        for (let ago = 0; ago < 26; ago++) {
+          const d = new Date(); d.setDate(d.getDate() - ago);
+          if (d.getDay() === 0) continue;
+          totalDays++;
+          const seed = (ei * 7 + ago * 13) % 10;
+          if (seed < 8) totalPresent++;
+        }
+      });
+      const pct = totalDays > 0 ? Math.round((totalPresent / totalDays) * 100) : 0;
+      return { dept, pct, count: deptEmps.length };
+    });
+  }, [employees]);
+
+  // ── Monthly report: per-employee stats for current month ───────────────────
+  const monthlyReport = useMemo(() => {
+    const daysInMonth = getDaysInMonth(todayDate.year, todayDate.month);
+    const workingDaysSoFar = Array.from({ length: Math.min(todayDate.day, daysInMonth) }, (_, i) => i + 1)
+      .filter(d => new Date(todayDate.year, todayDate.month, d).getDay() !== 0).length;
+
+    return employees.map((emp, ei) => {
+      let present = 0, late = 0, absent = 0, wfh = 0;
+      for (let d = 1; d <= Math.min(todayDate.day, daysInMonth); d++) {
+        const dow = new Date(todayDate.year, todayDate.month, d).getDay();
+        if (dow === 0) continue;
+        const seed = (ei * 7 + (todayDate.day - d) * 13) % 10;
+        if (seed < 6) present++;
+        else if (seed < 8) late++;
+        else if (seed === 8) { absent++; }
+        else wfh++;
+      }
+      const attendancePct = workingDaysSoFar > 0
+        ? Math.round(((present + late + wfh) / workingDaysSoFar) * 100) : 0;
+      return { id: emp.id, name: emp.name, dept: emp.dept, present, late, absent, wfh, attendancePct };
+    });
+  }, [employees, todayDate]);
 
   // Header date string (stable, doesn't tick)
   const headerDate = `${DAY_NAMES_FULL[todayDate.dow]}, ${todayDate.day} ${MONTH_NAMES[todayDate.month]} ${todayDate.year}`;
@@ -345,16 +383,13 @@ export default function Attendance() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px', width: 'fit-content', flexWrap: 'wrap', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px', width: 'fit-content' }}>
         {[
           { id: 'today', label: "Today's Log" },
           { id: 'calendar', label: 'Calendar' },
-          { id: 'leaves', label: 'Leaves' },
-          { id: 'alerts', label: `⚠️ Late Alerts (${lateCount})` },
-          { id: 'analytics', label: '📊 Analytics' },
-          { id: 'reports', label: '📄 Monthly Report' },
+          { id: 'leaves', label: 'Leave Requests' },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as typeof activeTab)}
             style={{ padding: '8px 20px', borderRadius: '8px', background: activeTab === tab.id ? 'var(--brand)' : 'transparent', color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', whiteSpace: 'nowrap', border: 'none' }}>
             {tab.label}
           </button>
@@ -728,10 +763,10 @@ export default function Attendance() {
                       approved: { bg: 'rgba(16,185,129,0.12)', text: '#10B981' },
                       rejected: { bg: 'rgba(239,68,68,0.12)', text: '#EF4444' },
                     }[leave.status];
-                    
+
                     return (
                       <tr key={leave.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td 
+                        <td
                           style={{ padding: '14px 20px', cursor: 'pointer', transition: 'background 0.2s' }}
                           onClick={() => {
                             const fullEmp = employees.find(e => e.id === leave.employeeId);
@@ -792,229 +827,6 @@ export default function Attendance() {
                     );
                   })
                 )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {/* ─── Late Alerts Tab ─── */}
-      {activeTab === 'alerts' && (
-        <Card>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>Late Arrival Notifications (Today)</span>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  {['Employee', 'Dept', 'Shift Start', 'Check In Time', 'Delay', 'Status', 'Action'].map(h => (
-                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {attendanceData.filter(e => e.status === 'late').length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                      No late arrivals recorded today.
-                    </td>
-                  </tr>
-                ) : (
-                  attendanceData.filter(e => e.status === 'late').map((emp, i) => {
-                    let delayStr = '30 mins';
-                    if (emp.checkIn) {
-                      try {
-                        const checkInMinutes = parseTimeToMinutes(emp.checkIn);
-                        const shiftStartMinutes = 9 * 60; // 09:00 AM
-                        const diff = checkInMinutes - shiftStartMinutes;
-                        if (diff > 0) delayStr = `${diff} mins`;
-                      } catch {}
-                    }
-                    return (
-                      <tr key={emp.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '14px 20px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: '32px', height: '32px', background: avatarColors[i % avatarColors.length], borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff' }}>{emp.name.charAt(0)}</div>
-                            <div>
-                              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{emp.id}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '14px 20px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>{emp.dept}</td>
-                        <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>09:00 AM</td>
-                        <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: '#F59E0B' }}>{emp.checkIn || '09:30'}</td>
-                        <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: 'var(--danger)' }}>+{delayStr}</td>
-                        <td style={{ padding: '14px 20px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }}>Late</span>
-                        </td>
-                        <td style={{ padding: '14px 20px' }}>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              onClick={() => toast('success', 'Warning Sent', `Sent late arrival warning to ${emp.name}.`)}
-                              style={{
-                                padding: '6px 12px', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', border: 'none', color: '#EF4444', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                              }}
-                            >
-                              Send Warning
-                            </button>
-                            <button
-                              onClick={() => toast('success', 'Attendance Waived', `Waived late delay for ${emp.name}.`)}
-                              style={{
-                                padding: '6px 12px', borderRadius: '6px', background: 'rgba(79,142,247,0.12)', border: 'none', color: 'var(--brand)', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                              }}
-                            >
-                              Waive
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {/* ─── Analytics Tab ─── */}
-      {activeTab === 'analytics' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Quick Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
-            {[
-              { label: 'On-Time Arrival Rate', value: '82%', sub: '+3.5% from last week', color: '#10B981' },
-              { label: 'Avg Work Hours', value: '8.8 hrs', sub: 'Stable vs target 8.5h', color: '#4F8EF7' },
-              { label: 'Absenteeism Rate', value: '4.8%', sub: '-1.2% from last month', color: '#EF4444' },
-              { label: 'WFH Share', value: '12%', sub: '+2% from last week', color: '#06B6D4' }
-            ].map((metric, idx) => (
-              <Card key={idx} style={{ padding: '20px' }}>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>{metric.label}</div>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{metric.value}</div>
-                <div style={{ fontSize: '11px', color: metric.color, marginTop: '6px', fontWeight: 700 }}>{metric.sub}</div>
-              </Card>
-            ))}
-          </div>
-
-          {/* Charts Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-            {/* Weekly Trend Chart */}
-            <Card style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '20px' }}>Weekly Attendance Trend</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '200px', padding: '0 10px', gap: '20px' }}>
-                {[
-                  { day: 'Mon', rate: 94 },
-                  { day: 'Tue', rate: 88 },
-                  { day: 'Wed', rate: 92 },
-                  { day: 'Thu', rate: 85 },
-                  { day: 'Fri', rate: 90 },
-                  { day: 'Sat', rate: 80 }
-                ].map((d, idx) => (
-                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '100%', position: 'relative', height: '160px', display: 'flex', alignItems: 'flex-end' }}>
-                      {/* Bar Background */}
-                      <div style={{ width: '100%', height: '100%', background: 'var(--bg-elevated)', borderRadius: '6px', position: 'absolute', top: 0, left: 0 }} />
-                      {/* Bar Fill */}
-                      <div style={{ width: '100%', height: `${d.rate}%`, background: 'linear-gradient(to top, var(--brand), #8B5CF6)', borderRadius: '6px', position: 'relative', zIndex: 1, transition: 'height 1s ease' }}>
-                        <div style={{ position: 'absolute', top: '-24px', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', fontWeight: 700, color: 'var(--text-primary)' }}>{d.rate}%</div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>{d.day}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Department Breakdown */}
-            <Card style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '20px' }}>Attendance by Department</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {[
-                  { dept: 'Sales & Marketing', rate: 92, color: '#4F8EF7' },
-                  { dept: 'Gold Crafting', rate: 96, color: '#8B5CF6' },
-                  { dept: 'Store Ops', rate: 88, color: '#06B6D4' },
-                  { dept: 'Accounts', rate: 94, color: '#10B981' }
-                ].map((dept, idx) => (
-                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600 }}>
-                      <span style={{ color: 'var(--text-primary)' }}>{dept.dept}</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{dept.rate}%</span>
-                    </div>
-                    <div style={{ height: '6px', background: 'var(--bg-elevated)', borderRadius: '3px' }}>
-                      <div style={{ height: '100%', width: `${dept.rate}%`, background: dept.color, borderRadius: '3px' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Monthly Report Tab ─── */}
-      {activeTab === 'reports' && (
-        <Card>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>Monthly Attendance Summary — June 2026</span>
-            <button
-              onClick={() => toast('success', 'Report Exported', 'Monthly attendance spreadsheet has been downloaded.')}
-              style={{
-                padding: '8px 16px', background: 'var(--brand)', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer'
-              }}
-            >
-              Export Full Report (CSV)
-            </button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  {['Employee', 'Department', 'Working Days', 'Present', 'Late', 'Absent / LOP', 'WFH', 'Net Hours', 'Action'].map(h => (
-                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((emp, i) => {
-                  const seed = (emp.name.length * 3 + i) % 5;
-                  const absent = seed === 0 ? 1 : 0;
-                  const late = seed === 1 ? 3 : seed === 2 ? 1 : 0;
-                  const wfh = seed === 3 ? 2 : 0;
-                  const present = 26 - absent - wfh;
-                  const netHours = Math.round(present * 8.5 + late * 8 + wfh * 8);
-                  return (
-                    <tr key={emp.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '14px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '32px', height: '32px', background: avatarColors[i % avatarColors.length], borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff' }}>{emp.name.charAt(0)}</div>
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{emp.id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '14px 20px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>{emp.dept}</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>26 days</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: '#10B981' }}>{present} days</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: '#F59E0B' }}>{late} days</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: absent > 0 ? '#EF4444' : 'var(--text-muted)' }}>{absent} days</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>{wfh} days</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 700 }}>{netHours} hrs</td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <button
-                          onClick={() => toast('success', 'PDF Downloaded', `Exported monthly slip for ${emp.name}.`)}
-                          style={{
-                            padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                          }}
-                        >
-                          Payslip
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
               </tbody>
             </table>
           </div>
