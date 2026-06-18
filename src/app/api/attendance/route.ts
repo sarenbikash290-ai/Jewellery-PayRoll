@@ -5,6 +5,8 @@ import { writeJsonAtomic } from '@/utils/db';
 import { cookies } from 'next/headers';
 import { supabase } from '@/utils/supabase';
 
+export const dynamic = 'force-dynamic';
+
 const CONFIG_PATH = path.join(process.cwd(), 'src/app/api/attendance/config.json');
 
 function getAuthorizedWifiIp(): string {
@@ -83,7 +85,17 @@ export async function GET(request: Request) {
   }));
 
   const forwarded = request.headers.get('x-forwarded-for');
-  const clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
+  const vercelIp = request.headers.get('x-vercel-forwarded-for');
+  const realIp = request.headers.get('x-real-ip');
+
+  let clientIp = '127.0.0.1';
+  const rawIp = vercelIp || forwarded || realIp;
+  if (rawIp) {
+    const parts = rawIp.split(',');
+    const ip = parts.map(p => p.trim()).find(p => p !== '127.0.0.1' && p !== '::1' && p !== '');
+    clientIp = ip || parts[0].trim();
+  }
+
   const authorizedWifiIp = getAuthorizedWifiIp();
 
   return NextResponse.json({ 
@@ -184,7 +196,16 @@ export async function POST(request: Request) {
 
     // Extract client public IP
     const forwarded = request.headers.get('x-forwarded-for');
-    const clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
+    const vercelIp = request.headers.get('x-vercel-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+
+    let clientIp = '127.0.0.1';
+    const rawIp = vercelIp || forwarded || realIp;
+    if (rawIp) {
+      const parts = rawIp.split(',');
+      const ip = parts.map(p => p.trim()).find(p => p !== '127.0.0.1' && p !== '::1' && p !== '');
+      clientIp = ip || parts[0].trim();
+    }
 
     const authorizedWifiIp = getAuthorizedWifiIp();
     const normalizedClient = normalizeIp(clientIp);
