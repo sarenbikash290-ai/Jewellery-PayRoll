@@ -41,27 +41,12 @@ interface StoredNotif {
 
 const STORAGE_KEY = 'hrpulse_notifications';
 
-/** Seed data: offsets in minutes from now */
-const SEED: Omit<StoredNotif, 'ts' | 'read'>[] = [
-  { id: 1, type: 'warning', text: '3 employees have pending leave requests' },
-  { id: 2, type: 'info',    text: 'May payroll processing complete' },
-  { id: 3, type: 'success', text: 'Rajesh Kumar approved overtime' },
-  { id: 4, type: 'danger',  text: 'TDS filing due in 3 days' },
-];
-const SEED_OFFSETS_MIN = [5, 60, 120, 180]; // minutes ago at first load
-
 function loadOrSeedNotifs(): StoredNotif[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as StoredNotif[];
   } catch { /* ignore */ }
-  // First visit — seed with real timestamps
-  const now = Date.now();
-  return SEED.map((s, i) => ({
-    ...s,
-    ts: now - SEED_OFFSETS_MIN[i] * 60 * 1000,
-    read: false,
-  }));
+  return [];
 }
 
 function saveNotifs(notifs: StoredNotif[]) {
@@ -105,8 +90,10 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
 
   // Persist to localStorage whenever notifications change
   useEffect(() => {
-    if (notifications.length > 0) saveNotifs(notifications);
-  }, [notifications]);
+    if (mounted) {
+      saveNotifs(notifications);
+    }
+  }, [notifications, mounted]);
 
   // Tick every 60 seconds to refresh "X ago" labels
   useEffect(() => {
@@ -126,6 +113,11 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
   const markAllRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     toast('success', 'All Read', 'All notifications marked as read.');
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    toast('success', 'Notifications Cleared', 'All notifications have been removed.');
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -243,46 +235,64 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
           }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Notifications</span>
-              {unreadCount > 0 && (
-                <button 
-                  onClick={markAllRead} 
-                  style={{ fontSize: '11px', color: 'var(--brand)', cursor: 'pointer', background: 'transparent', border: 'none', fontWeight: 600 }}
-                >
-                  Mark all read
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {unreadCount > 0 && (
+                  <button 
+                    onClick={markAllRead} 
+                    style={{ fontSize: '11px', color: 'var(--brand)', cursor: 'pointer', background: 'transparent', border: 'none', fontWeight: 600 }}
+                  >
+                    Mark all read
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button 
+                    onClick={clearAllNotifications} 
+                    style={{ fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer', background: 'transparent', border: 'none', fontWeight: 600, transition: 'var(--transition)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--danger)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
             </div>
             <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
-              {notifications.map(n => {
-                const isUnread = !n.read;
-                return (
-                  <div key={n.id} 
-                    onClick={() => markAsRead(n.id)}
-                    style={{
-                      padding: '14px 20px',
-                      borderBottom: '1px solid var(--border)',
-                      display: 'flex', gap: '12px', alignItems: 'flex-start',
-                      cursor: 'pointer', transition: 'var(--transition)',
-                      background: isUnread ? 'rgba(79, 142, 247, 0.04)' : 'transparent',
-                      borderLeft: isUnread ? `3px solid ${notifColors[n.type]}` : '3px solid transparent',
-                      opacity: isUnread ? 1 : 0.6,
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isUnread ? 'rgba(79, 142, 247, 0.04)' : 'transparent'; }}
-                  >
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: notifColors[n.type], flexShrink: 0, marginTop: '6px' }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: isUnread ? 600 : 400, lineHeight: 1.4 }}>{n.text}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{timeAgo(n.ts)}</div>
+              {notifications.length === 0 ? (
+                <div style={{ padding: '24px 20px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  No notifications yet
+                </div>
+              ) : (
+                notifications.map(n => {
+                  const isUnread = !n.read;
+                  return (
+                    <div key={n.id} 
+                      onClick={() => markAsRead(n.id)}
+                      style={{
+                        padding: '14px 20px',
+                        borderBottom: '1px solid var(--border)',
+                        display: 'flex', gap: '12px', alignItems: 'flex-start',
+                        cursor: 'pointer', transition: 'var(--transition)',
+                        background: isUnread ? 'rgba(79, 142, 247, 0.04)' : 'transparent',
+                        borderLeft: isUnread ? `3px solid ${notifColors[n.type]}` : '3px solid transparent',
+                        opacity: isUnread ? 1 : 0.6,
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isUnread ? 'rgba(79, 142, 247, 0.04)' : 'transparent'; }}
+                    >
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: notifColors[n.type], flexShrink: 0, marginTop: '6px' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: isUnread ? 600 : 400, lineHeight: 1.4 }}>{n.text}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{timeAgo(n.ts)}</div>
+                      </div>
+                      {isUnread && (
+                        <span title="Mark as read" style={{ color: 'var(--brand)', padding: '2px', alignSelf: 'center' }}>
+                          <Check size={14} />
+                        </span>
+                      )}
                     </div>
-                    {isUnread && (
-                      <span title="Mark as read" style={{ color: 'var(--brand)', padding: '2px', alignSelf: 'center' }}>
-                        <Check size={14} />
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         )}

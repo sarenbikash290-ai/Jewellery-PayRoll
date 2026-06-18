@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useApp, Employee } from '../AppContext';
-import { LayoutDashboard, Clock, Calendar, FileText, LogOut, Zap, User, Fingerprint, Banknote } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, FileText, LogOut, Zap, User, Fingerprint, Banknote, Mail, Phone, MapPin, DollarSign, Briefcase, X } from 'lucide-react';
 import EmpDashboard from './EmpDashboard';
 import EmpAttendance from './EmpAttendance';
 import EmpLeave from './EmpLeave';
@@ -19,6 +19,7 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
   const [activeModule, setActiveModule] = useState<ModuleType>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -56,7 +57,7 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
   const renderModule = () => {
     switch (activeModule) {
       case 'dashboard':
-        return <EmpDashboard employee={employee} />;
+        return <EmpDashboard employee={employee} onNavigate={setActiveModule} />;
       case 'attendance':
         return <EmpAttendance employee={employee} />;
       case 'leave':
@@ -64,7 +65,7 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
       case 'payslips':
         return <EmpPayslips employee={employee} />;
       default:
-        return <EmpDashboard employee={employee} />;
+        return <EmpDashboard employee={employee} onNavigate={setActiveModule} />;
     }
   };
 
@@ -151,18 +152,22 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '32px', height: '32px',
-                borderRadius: '50%',
-                background: '#FEF3C7',
-                border: '1px solid #FDE68A',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#D97706',
-                fontWeight: 700,
-                fontSize: '13px'
-              }}>
+              <div 
+                onClick={() => setShowProfileModal(true)}
+                style={{
+                  width: '32px', height: '32px',
+                  borderRadius: '50%',
+                  background: '#FEF3C7',
+                  border: '1px solid #FDE68A',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#D97706',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
                 {employee.name.charAt(0)}
               </div>
               <button
@@ -282,17 +287,21 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
             </div>
 
             {/* User Mini Profile */}
-            <div style={{
-              padding: sidebarOpen ? '16px 20px' : '0 20px',
-              borderBottom: sidebarOpen ? '1px solid var(--border)' : '1px solid transparent',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              maxHeight: sidebarOpen ? '80px' : '0px',
-              opacity: sidebarOpen ? 1 : 0,
-              transition: 'max-height 0.15s ease, opacity 0.12s ease, padding 0.15s ease',
-              overflow: 'hidden',
-            }}>
+            <div 
+              onClick={() => setShowProfileModal(true)}
+              style={{
+                padding: sidebarOpen ? '16px 20px' : '0 20px',
+                borderBottom: sidebarOpen ? '1px solid var(--border)' : '1px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                maxHeight: sidebarOpen ? '80px' : '0px',
+                opacity: sidebarOpen ? 1 : 0,
+                transition: 'max-height 0.15s ease, opacity 0.12s ease, padding 0.15s ease',
+                overflow: 'hidden',
+                cursor: 'pointer'
+              }}
+            >
               <div style={{
                 width: '36px',
                 height: '36px',
@@ -424,15 +433,19 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '36px', height: '36px',
-                  borderRadius: '50%', background: '#FEF3C7',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid #FDE68A',
-                  color: '#D97706',
-                  fontWeight: 700,
-                  fontSize: '14px'
-                }}>
+                <div 
+                  onClick={() => setShowProfileModal(true)}
+                  style={{
+                    width: '36px', height: '36px',
+                    borderRadius: '50%', background: '#FEF3C7',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '1px solid #FDE68A',
+                    color: '#D97706',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                >
                   {employee.name.charAt(0)}
                 </div>
               </div>
@@ -442,6 +455,152 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
             <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
               {renderModule()}
             </main>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          boxSizing: 'border-box',
+        }}>
+          <div className="glass-card" style={{
+            width: '100%',
+            maxWidth: '480px',
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.12)',
+            overflow: 'hidden',
+            border: '1px solid rgba(15, 23, 42, 0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '24px 28px 18px',
+              borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.3px' }}>My Profile</h3>
+                <p style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Your employment details and records</p>
+              </div>
+              <button 
+                onClick={() => setShowProfileModal(false)}
+                style={{
+                  width: '32px', height: '32px',
+                  borderRadius: '50%',
+                  background: '#F1F5F9',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#475569',
+                  transition: 'background 0.2s',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#E2E8F0'}
+                onMouseLeave={e => e.currentTarget.style.background = '#F1F5F9'}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Profile Card Header */}
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ 
+                  width: '56px', height: '56px', 
+                  background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', 
+                  borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '20px', fontWeight: 800, color: '#D97706',
+                  border: '1px solid #FCD34D'
+                }}>
+                  {employee.name.charAt(0)}
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>{employee.name}</h4>
+                  <p style={{ fontSize: '12.5px', color: '#64748B', marginTop: '1px' }}>{employee.role} · <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{employee.dept}</span></p>
+                  <span style={{ 
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', 
+                    padding: '2px 8px', borderRadius: '100px', marginTop: '6px',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    color: '#10B981',
+                    border: '1px solid rgba(16, 185, 129, 0.2)'
+                  }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10B981' }} /> Active Employee
+                  </span>
+                </div>
+              </div>
+
+              {/* Info Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {[
+                  { icon: User, label: 'Employee ID', value: employee.id },
+                  { icon: Briefcase, label: 'Job Type', value: employee.type },
+                  { icon: Mail, label: 'Email Address', value: employee.email },
+                  { icon: Phone, label: 'Phone Number', value: employee.phone },
+                  { icon: MapPin, label: 'Store Location', value: employee.location || 'Flagship Store' },
+                  { icon: Calendar, label: 'Date Joined', value: employee.joined },
+                  { icon: DollarSign, label: 'Base Salary', value: employee.salary },
+                ].map((f, i) => {
+                  const Icon = f.icon;
+                  return (
+                    <div key={i} style={{ 
+                      padding: '10px 14px', 
+                      background: '#F8FAFC', 
+                      borderRadius: '12px', 
+                      border: '1px solid rgba(15, 23, 42, 0.04)',
+                      gridColumn: f.label === 'Email Address' ? 'span 2' : 'span 1'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#64748B', marginBottom: '4px', fontWeight: 600 }}>
+                        <Icon size={11} color="var(--brand)" /> {f.label}
+                      </div>
+                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#0F172A', wordBreak: 'break-all' }}>{f.value}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ 
+              padding: '16px 28px 20px', 
+              borderTop: '1px solid rgba(15, 23, 42, 0.06)', 
+              display: 'flex', 
+              justifyContent: 'flex-end',
+              background: '#F8FAFC'
+            }}>
+              <button 
+                onClick={() => setShowProfileModal(false)}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  background: 'var(--brand)',
+                  color: '#fff',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(217, 119, 6, 0.2)',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#B45309'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--brand)'}
+              >
+                Close Profile
+              </button>
+            </div>
           </div>
         </div>
       )}

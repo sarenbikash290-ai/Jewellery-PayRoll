@@ -8,6 +8,7 @@ import {
 
 interface EmpDashboardProps {
   employee: Employee;
+  onNavigate?: (module: any) => void;
 }
 
 interface CardProps { children: React.ReactNode; style?: React.CSSProperties; }
@@ -15,8 +16,8 @@ const Card = ({ children, style = {} }: CardProps) => (
   <div className="glass-card" style={{ borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', ...style }}>{children}</div>
 );
 
-export default function EmpDashboard({ employee }: EmpDashboardProps) {
-  const { leaves, attendanceRecords } = useApp();
+export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps) {
+  const { leaves, attendanceRecords, toast } = useApp();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -127,35 +128,41 @@ export default function EmpDashboard({ employee }: EmpDashboardProps) {
         </div>
         
         <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-          <button style={{
-            flex: 1,
-            background: '#FCD34D',
-            color: '#0F172A',
-            fontWeight: 700,
-            fontSize: '12.5px',
-            padding: '10px 14px',
-            borderRadius: '10px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            cursor: 'pointer',
-            transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s'
-          }}>
+          <button 
+            onClick={() => onNavigate && onNavigate('attendance')}
+            style={{
+              flex: 1,
+              background: '#FCD34D',
+              color: '#0F172A',
+              fontWeight: 700,
+              fontSize: '12.5px',
+              padding: '10px 14px',
+              borderRadius: '10px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s'
+            }}
+          >
             <Fingerprint size={14} /> CLOCK IN NOW
           </button>
-          <button style={{
-            flex: 1,
-            background: 'transparent',
-            color: '#FFFFFF',
-            border: '1px solid rgba(255,255,255,0.2)',
-            fontWeight: 600,
-            fontSize: '12.5px',
-            padding: '10px 14px',
-            borderRadius: '10px',
-            cursor: 'pointer',
-            transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s'
-          }}>
+          <button 
+            onClick={() => toast('info', 'Shift Roster', 'Your shift roster is managed by the store manager. You are scheduled on the Main Showroom floor.')}
+            style={{
+              flex: 1,
+              background: 'transparent',
+              color: '#FFFFFF',
+              border: '1px solid rgba(255,255,255,0.2)',
+              fontWeight: 600,
+              fontSize: '12.5px',
+              padding: '10px 14px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s'
+            }}
+          >
             VIEW ROSTER
           </button>
         </div>
