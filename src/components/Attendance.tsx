@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from './AppContext';
+import { parseTimeToMinutes } from '@/utils/time';
 import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell } from 'lucide-react';
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
@@ -77,7 +78,8 @@ function LiveClock({ size = 14, weight = 700, showIcon = false }: { size?: numbe
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves'>('today');
-  const { employees, toast, leaves, updateLeave, openModal } = useApp();
+  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords } = useApp();
+  const currentDate = useMemo(() => new Date(), []);
 
   // Stable "today" — only recalculates when calendar date changes
   const todayDate = useMemo(() => {

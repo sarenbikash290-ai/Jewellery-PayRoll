@@ -185,6 +185,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Core data stores (dynamic LocalStorage synced)
   // Core data stores
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const employeesRef = useRef(employees);
+  useEffect(() => {
+    employeesRef.current = employees;
+  }, [employees]);
   const [incentives, setIncentives] = useState<Incentive[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [employeeSales, setEmployeeSales] = useState<Sale[]>([]);
@@ -441,7 +445,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const checkInKey = `${record.employeeId}-${record.date}-in-${record.checkIn}`;
             const checkOutKey = `${record.employeeId}-${record.date}-out-${record.checkOut}`;
 
-            const emp = employees.find(e => e.id === record.employeeId);
+            const emp = employeesRef.current.find(e => e.id === record.employeeId);
             const name = emp ? emp.name : record.employeeId;
 
             if (record.checkIn && !knownAttendanceKeys.current.has(checkInKey)) {
@@ -475,7 +479,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Failed to fetch attendance:', err);
     }
-  }, [employees, toast]);
+  }, [toast]);
 
   const fetchEmployees = useCallback(async () => {
     try {
