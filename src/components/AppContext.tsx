@@ -72,6 +72,31 @@ export interface AttendanceRecord {
   status: 'present' | 'late' | 'absent' | 'wfh';
 }
 
+export interface AttendanceAuditLog {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  attendanceDate: string;  // YYYY-MM-DD
+  previousStatus: string | null;
+  newStatus: string;
+  checkInBefore: string | null;
+  checkOutBefore: string | null;
+  checkInAfter: string | null;
+  checkOutAfter: string | null;
+  editedBy: string;
+  editTimestamp: string;   // ISO timestamp
+  reason: string | null;
+}
+
+export interface PayrollMonthLock {
+  id: string;
+  year: number;
+  month: number;  // 1-based
+  lockedBy: string;
+  lockedAt: string;  // ISO timestamp
+  notes: string | null;
+}
+
 
 // ---- UI Helper Types ----
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -146,12 +171,22 @@ interface AppCtx {
   applyLeave: (leave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => void;
   updateLeave: (id: string, status: 'approved' | 'rejected') => void;
   attendanceRecords: AttendanceRecord[];
-  markAttendance: (employeeId: string, type: 'checkIn' | 'checkOut') => void;
+  markAttendance: (employeeId: string, type: 'checkIn' | 'checkOut') => Promise<void>;
   changePin: (employeeId: string, oldPin: string, newPin: string) => Promise<boolean>;
   authorizedWifiIp: string;
   clientIp: string;
   updateAuthorizedWifiIp: (ip: string) => Promise<void>;
   logManualAttendance: (employeeId: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh') => Promise<void>;
+  // Attendance correction with audit trail
+  editAttendance: (employeeId: string, employeeName: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh', reason?: string) => Promise<{ ok: boolean; error?: string; lockReason?: string }>;
+  auditLogs: AttendanceAuditLog[];
+  fetchAuditLogs: () => Promise<void>;
+  // Payroll month locking
+  payrollLocks: PayrollMonthLock[];
+  lockPayrollMonth: (year: number, month: number, notes?: string) => Promise<{ ok: boolean; error?: string }>;
+  unlockPayrollMonth: (year: number, month: number) => Promise<{ ok: boolean; error?: string }>;
+  isMonthLocked: (year: number, month: number) => boolean;
+  isDateEditable: (dateStr: string) => { editable: boolean; reason?: string; lockType?: 'editWindow' | 'payrollLocked' };
 }
 
 const Ctx = createContext<AppCtx>({} as AppCtx);
@@ -395,6 +430,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return [];
   });
 
+  const [auditLogs, setAuditLogs] = useState<AttendanceAuditLog[]>([]);
+  const [payrollLocks, setPayrollLocks] = useState<PayrollMonthLock[]>([]);
+
 
   const [authorizedWifiIp, setAuthorizedWifiIp] = useState('127.0.0.1');
   const [clientIp, setClientIp] = useState('127.0.0.1');
@@ -533,6 +571,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Audit Log Fetching ────────────────────────────────────────────────────
+  const fetchAuditLogs = useCallback(async () => {
+    try {
+      const res = await fetch('/api/attendance/audit');
+      const data = await res.json();
+      if (data.ok && data.logs) {
+        setAuditLogs(data.logs);
+      }
+    } catch (err) {
+      console.error('Failed to fetch audit logs:', err);
+    }
+  }, []);
+
+  // ── Payroll Month Lock Fetch ──────────────────────────────────────────────
+  const fetchPayrollLocks = useCallback(async () => {
+    try {
+      const res = await fetch('/api/payroll-locks');
+      const data = await res.json();
+      if (data.ok && data.locks) {
+        setPayrollLocks(data.locks);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payroll locks:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeaves();
     fetchAttendance();
@@ -540,6 +604,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchIncentives();
     fetchCommissions();
     fetchSales();
+    fetchAuditLogs();
+    fetchPayrollLocks();
 
     const interval = setInterval(() => {
       fetchLeaves();
@@ -551,7 +617,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales]);
+  }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales, fetchAuditLogs, fetchPayrollLocks]);
 
   const applyLeave = useCallback(async (newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
     const emp = employees.find(e => e.id === newLeave.employeeId);
@@ -717,6 +783,135 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Attendance Correction with Audit Trail ────────────────────────────────
+  const editAttendance = useCallback(async (
+    employeeId: string,
+    employeeName: string,
+    date: string,
+    checkIn: string | null,
+    checkOut: string | null,
+    status: 'present' | 'late' | 'absent' | 'wfh',
+    reason?: string
+  ): Promise<{ ok: boolean; error?: string; lockReason?: string }> => {
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'editAttendance',
+          employeeId,
+          employeeName,
+          date,
+          checkIn,
+          checkOut,
+          status,
+          reason,
+        })
+      });
+      const data = await res.json();
+      if (data.ok && data.record) {
+        setAttendanceRecords(prev => {
+          const existingIdx = prev.findIndex(r => r.employeeId === employeeId && r.date === date);
+          let updated: AttendanceRecord[];
+          if (existingIdx > -1) {
+            updated = [...prev];
+            updated[existingIdx] = data.record;
+          } else {
+            updated = [...prev, data.record];
+          }
+          localStorage.setItem('hrpulse_attendance_records', JSON.stringify(updated));
+          return updated;
+        });
+        toast('success', 'Attendance Updated', `Attendance for ${date} has been corrected and logged.`);
+        // Refresh audit logs to reflect the new entry
+        fetchAuditLogs();
+        return { ok: true };
+      } else {
+        return { ok: false, error: data.error, lockReason: data.lockReason };
+      }
+    } catch (err: any) {
+      return { ok: false, error: err.message || 'Network error' };
+    }
+  }, [toast]);
+
+
+  // ── Payroll Month Lock Operations ─────────────────────────────────────────
+  const lockPayrollMonth = useCallback(async (year: number, month: number, notes?: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/payroll-locks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year, month, notes })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPayrollLocks(prev => [...prev, data.lock]);
+        toast('success', 'Payroll Month Locked', `${year}/${String(month).padStart(2, '0')} has been finalized and locked.`);
+        return { ok: true };
+      }
+      return { ok: false, error: data.error };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  }, [toast]);
+
+  const unlockPayrollMonth = useCallback(async (year: number, month: number): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/payroll-locks?year=${year}&month=${month}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) {
+        setPayrollLocks(prev => prev.filter(l => !(l.year === year && l.month === month)));
+        toast('warning', 'Payroll Month Unlocked', `${year}/${String(month).padStart(2, '0')} lock has been removed.`);
+        return { ok: true };
+      }
+      return { ok: false, error: data.error };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  }, [toast]);
+
+  // ── Helper: Check if a month is locked ───────────────────────────────────
+  const isMonthLocked = useCallback((year: number, month: number): boolean => {
+    return payrollLocks.some(l => l.year === year && l.month === month);
+  }, [payrollLocks]);
+
+  // ── Helper: Check if a date is editable (client-side pre-check) ──────────
+  // Server performs the authoritative check; this is for UI state only.
+  const isDateEditable = useCallback((dateStr: string): { editable: boolean; reason?: string; lockType?: 'editWindow' | 'payrollLocked' } => {
+    const targetDate = new Date(dateStr);
+    if (isNaN(targetDate.getTime())) return { editable: false, reason: 'Invalid date' };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    targetDate.setHours(0, 0, 0, 0);
+
+    // Future dates are not editable
+    if (targetDate > today) return { editable: false, reason: 'Future dates cannot be edited' };
+
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth() + 1;
+
+    if (isMonthLocked(year, month)) {
+      return {
+        editable: false,
+        lockType: 'payrollLocked',
+        reason: 'This payroll month has been finalized and attendance can no longer be modified.',
+      };
+    }
+
+    if (targetDate < sevenDaysAgo) {
+      return {
+        editable: false,
+        lockType: 'editWindow',
+        reason: 'The 7-day edit window for this attendance record has expired.',
+      };
+    }
+
+    return { editable: true };
+  }, [isMonthLocked]);
+
   return (
     <Ctx.Provider
       value={{
@@ -752,6 +947,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         clientIp,
         updateAuthorizedWifiIp,
         logManualAttendance,
+        editAttendance,
+        auditLogs,
+        fetchAuditLogs,
+        payrollLocks,
+        lockPayrollMonth,
+        unlockPayrollMonth,
+        isMonthLocked,
+        isDateEditable,
       }}
     >
       {children}

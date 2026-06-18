@@ -4,7 +4,7 @@ import { useApp } from './AppContext';
 import {
   Users, TrendingUp, TrendingDown, DollarSign, Clock,
   AlertCircle, CheckCircle, ArrowUpRight, MoreHorizontal,
-  UserCheck, UserX, Calendar, Zap
+  UserCheck, UserX, Calendar
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
@@ -595,46 +595,6 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-        {[
-          { icon: Zap, label: 'Run Payroll', desc: 'Process June salary', color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
-          { icon: UserCheck, label: 'Live Log Sync', desc: 'Sync biometric devices', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
-          { icon: DollarSign, label: 'View Payslips', desc: 'Download June slips', color: '#4F8EF7', bg: 'rgba(79,142,247,0.1)' },
-          { icon: Calendar, label: 'Schedule Shift', desc: 'Plan next week', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
-        ].map((action, i) => {
-          const Icon = action.icon;
-          const handleClick = () => {
-            if (i === 0) setActiveModule('payroll');
-            else if (i === 1) setActiveModule('attendance');
-            else if (i === 2) openModal('viewPayslip');
-            else if (i === 3) setActiveModule('attendance');
-          };
-          return (
-            <button key={i} 
-              onClick={handleClick}
-              style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-lg)',
-                padding: '20px',
-                display: 'flex', gap: '14px', alignItems: 'center',
-                cursor: 'pointer', transition: 'var(--transition)', textAlign: 'left',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = action.color; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}
-            >
-              <div style={{ width: '40px', height: '40px', background: action.bg, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon size={18} color={action.color} />
-              </div>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{action.label}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{action.desc}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

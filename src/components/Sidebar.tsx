@@ -2,17 +2,18 @@
 import {
   LayoutDashboard, Users, Clock, DollarSign, TrendingUp,
   BarChart3, Settings, ChevronRight, Zap, LogOut,
-  Shield
+  Shield, Lock
 } from 'lucide-react';
 
 const navItems = [
-  { id: 'dashboard',  icon: LayoutDashboard, label: 'Dashboard',    badge: null },
-  { id: 'employees',  icon: Users,           label: 'Employees',    badge: '247' },
-  { id: 'attendance', icon: Clock,           label: 'Attendance',   badge: null },
-  { id: 'payroll',    icon: DollarSign,      label: 'Payroll',      badge: null },
-  { id: 'incentives', icon: TrendingUp,      label: 'Incentives',   badge: 'New' },
-  { id: 'reports',    icon: BarChart3,       label: 'Reports',      badge: null },
-  { id: 'settings',   icon: Settings,        label: 'Settings',     badge: null },
+  { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard',      badge: null },
+  { id: 'employees',     icon: Users,           label: 'Employees',      badge: '247' },
+  { id: 'attendance',   icon: Clock,           label: 'Attendance',     badge: null },
+  { id: 'payroll',      icon: DollarSign,      label: 'Payroll',        badge: null },
+  { id: 'incentives',   icon: TrendingUp,      label: 'Incentives',     badge: 'New' },
+  { id: 'reports',      icon: BarChart3,       label: 'Reports',        badge: null },
+  { id: 'payroll-locks', icon: Lock,           label: 'Payroll Locks',  badge: null },
+  { id: 'settings',     icon: Settings,        label: 'Settings',       badge: null },
 ];
 
 interface SidebarProps {

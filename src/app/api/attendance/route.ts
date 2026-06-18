@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Check if it is a manual attendance logging action
+    // Check if it is a manual attendance logging action (legacy)
     if (body.action === 'manualAttendance') {
       if (session.role !== 'admin') {
         return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
@@ -176,6 +176,123 @@ export async function POST(request: Request) {
         checkIn: data.check_in,
         checkOut: data.check_out,
         status: data.status
+      };
+
+      return NextResponse.json({ ok: true, record });
+    }
+
+    // ── Secure Attendance Edit with Audit Trail ───────────────────────────────
+    if (body.action === 'editAttendance') {
+      // 1. Admin-only
+      if (session.role !== 'admin') {
+        return NextResponse.json({ ok: false, error: 'Unauthorized: Admin access required' }, { status: 403 });
+      }
+
+      const { employeeId, employeeName, date, checkIn, checkOut, status, reason } = body;
+      if (!employeeId || !date || !status) {
+        return NextResponse.json({ ok: false, error: 'Missing required fields: employeeId, date, status' }, { status: 400 });
+      }
+
+      const upperEmpId = employeeId.toUpperCase();
+
+      // 2. Validate the date format
+      const targetDate = new Date(date);
+      if (isNaN(targetDate.getTime())) {
+        return NextResponse.json({ ok: false, error: 'Invalid date format' }, { status: 400 });
+      }
+
+      // 3. Check 7-day edit window
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+      targetDate.setHours(0, 0, 0, 0);
+
+      if (targetDate < sevenDaysAgo) {
+        return NextResponse.json({
+          ok: false,
+          lockReason: 'editWindowExpired',
+          error: 'The 7-day edit window for this attendance record has expired. Records older than 7 days cannot be modified.'
+        }, { status: 403 });
+      }
+
+      // 4. Check payroll month lock
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = targetDate.getMonth() + 1; // 1-based
+
+      const { data: lockRecord } = await supabase
+        .from('payroll_month_locks')
+        .select('id, locked_by, locked_at')
+        .eq('year', targetYear)
+        .eq('month', targetMonth)
+        .maybeSingle();
+
+      if (lockRecord) {
+        return NextResponse.json({
+          ok: false,
+          lockReason: 'payrollLocked',
+          error: 'This payroll month has been finalized and attendance can no longer be modified.'
+        }, { status: 403 });
+      }
+
+      // 5. Fetch existing record for audit trail
+      const { data: existingRecord } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('employee_id', upperEmpId)
+        .eq('date', date)
+        .maybeSingle();
+
+      const previousStatus = existingRecord?.status || null;
+      const checkInBefore = existingRecord?.check_in || null;
+      const checkOutBefore = existingRecord?.check_out || null;
+
+      // 6. Upsert the attendance record
+      const { data: updatedRecord, error: upsertError } = await supabase
+        .from('attendance')
+        .upsert({
+          employee_id: upperEmpId,
+          date,
+          check_in: checkIn || null,
+          check_out: checkOut || null,
+          status,
+        }, { onConflict: 'employee_id,date' })
+        .select()
+        .single();
+
+      if (upsertError) {
+        console.error('Error editing attendance:', upsertError);
+        return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
+      }
+
+      // 7. Write immutable audit log entry
+      const { error: auditError } = await supabase
+        .from('attendance_audit_logs')
+        .insert({
+          employee_id: upperEmpId,
+          employee_name: employeeName || upperEmpId,
+          attendance_date: date,
+          previous_status: previousStatus,
+          new_status: status,
+          check_in_before: checkInBefore,
+          check_out_before: checkOutBefore,
+          check_in_after: checkIn || null,
+          check_out_after: checkOut || null,
+          edited_by: 'Admin',
+          reason: reason || null,
+        });
+
+      if (auditError) {
+        // Log the error but do NOT fail the request — the attendance edit succeeded
+        console.error('Warning: Audit log write failed:', auditError);
+      }
+
+      const record = {
+        employeeId: updatedRecord.employee_id,
+        date: updatedRecord.date,
+        checkIn: updatedRecord.check_in,
+        checkOut: updatedRecord.check_out,
+        status: updatedRecord.status,
       };
 
       return NextResponse.json({ ok: true, record });

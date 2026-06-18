@@ -2,7 +2,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from './AppContext';
 import { parseTimeToMinutes } from '@/utils/time';
-import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell } from 'lucide-react';
+import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell, Lock, Edit3, ShieldAlert, CheckCircle, ClipboardList, ChevronDown, AlertTriangle } from 'lucide-react';
+import type { AttendanceAuditLog } from './AppContext';
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
   present: { bg: 'rgba(16,185,129,0.12)', text: '#10B981', label: 'Present' },
@@ -77,9 +78,61 @@ function LiveClock({ size = 14, weight = 700, showIcon = false }: { size?: numbe
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
-  const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves'>('today');
-  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords } = useApp();
+  const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves' | 'audit'>('today');
+  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords, editAttendance, isDateEditable, isMonthLocked, auditLogs, fetchAuditLogs } = useApp();
   const currentDate = useMemo(() => new Date(), []);
+
+  // ── Edit Attendance Modal State ─────────────────────────────────────────────
+  const [editModal, setEditModal] = useState<{
+    open: boolean;
+    employeeId: string;
+    employeeName: string;
+    date: string;
+    currentStatus: string;
+    currentCheckIn: string | null;
+    currentCheckOut: string | null;
+    step: 'form' | 'confirm';
+  } | null>(null);
+
+  const [editStatus, setEditStatus] = useState<'present' | 'late' | 'absent' | 'wfh'>('present');
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const openEditModal = useCallback((employeeId: string, employeeName: string, date: string, currentStatus: string, currentCheckIn: string | null, currentCheckOut: string | null) => {
+    setEditStatus((currentStatus as 'present' | 'late' | 'absent' | 'wfh') || 'present');
+    setEditCheckIn(currentCheckIn || '');
+    setEditCheckOut(currentCheckOut || '');
+    setEditReason('');
+    setEditError('');
+    setEditModal({
+      open: true, employeeId, employeeName, date, currentStatus, currentCheckIn, currentCheckOut, step: 'form'
+    });
+  }, []);
+
+  const handleEditSubmit = useCallback(async () => {
+    if (!editModal) return;
+    setEditSubmitting(true);
+    setEditError('');
+    const result = await editAttendance(
+      editModal.employeeId,
+      editModal.employeeName,
+      editModal.date,
+      editCheckIn || null,
+      editCheckOut || null,
+      editStatus,
+      editReason.trim() || undefined
+    );
+    setEditSubmitting(false);
+    if (result.ok) {
+      setEditModal(null);
+    } else {
+      setEditError(result.error || 'Failed to update attendance.');
+      setEditModal(prev => prev ? { ...prev, step: 'form' } : null);
+    }
+  }, [editModal, editStatus, editCheckIn, editCheckOut, editReason, editAttendance]);
 
   // Stable "today" — only recalculates when calendar date changes
   const todayDate = useMemo(() => {
@@ -390,8 +443,9 @@ export default function Attendance() {
           { id: 'today', label: "Today's Log" },
           { id: 'calendar', label: 'Calendar' },
           { id: 'leaves', label: 'Leave Requests' },
+          { id: 'audit', label: 'Audit Log' },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as typeof activeTab)}
+          <button key={tab.id} onClick={() => { setActiveTab(tab.id as typeof activeTab); if (tab.id === 'audit') fetchAuditLogs(); }}
             style={{ padding: '8px 20px', borderRadius: '8px', background: activeTab === tab.id ? 'var(--brand)' : 'transparent', color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', whiteSpace: 'nowrap', border: 'none' }}>
             {tab.label}
           </button>
@@ -544,6 +598,11 @@ export default function Attendance() {
                 const dayOfWeek = isEmpty ? -1 : new Date(calYear, calMonth, cell.day).getDay();
                 const isSunday = dayOfWeek === 0;
 
+                // Lock indicators for calendar cells
+                const cellDateStr = !isEmpty ? `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}` : '';
+                const cellEditInfo = !isEmpty && !isFuture ? isDateEditable(cellDateStr) : null;
+                const cellPayrollLocked = !isEmpty && !isFuture && isMonthLocked(calYear, calMonth + 1);
+
                 return (
                   <div
                     key={i}
@@ -614,6 +673,13 @@ export default function Attendance() {
                     {isWeekend && !isEmpty && (
                       <div style={{ fontSize: '8px', color: isTodayCell ? 'rgba(255,255,255,0.6)' : 'var(--text-muted)', lineHeight: 1 }}>OFF</div>
                     )}
+                    {/* Lock badge on day cell */}
+                    {!isEmpty && !isFuture && !isWeekend && cellPayrollLocked && (
+                      <div title="Payroll Locked" style={{ fontSize: '7px', color: isTodayCell ? 'rgba(255,255,255,0.7)' : '#EF4444', lineHeight: 1 }}>🔒</div>
+                    )}
+                    {!isEmpty && !isFuture && !isWeekend && !cellPayrollLocked && cellEditInfo && !cellEditInfo.editable && cellEditInfo.lockType === 'editWindow' && (
+                      <div title="Edit window expired" style={{ fontSize: '7px', color: isTodayCell ? 'rgba(255,255,255,0.6)' : 'var(--text-muted)', lineHeight: 1 }}>🔐</div>
+                    )}
                   </div>
                 );
               })}
@@ -632,6 +698,12 @@ export default function Attendance() {
                   <div style={{ width: '8px', height: '8px', background: l.color, borderRadius: '50%' }} />{l.label}
                 </div>
               ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                <span>🔒</span> Payroll Locked
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                <span>🔐</span> Edit Window Expired
+              </div>
             </div>
           </Card>
 
@@ -719,12 +791,58 @@ export default function Attendance() {
                               <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{emp.dept}</div>
                             </div>
                           </div>
-                          {sc && (
-                            <span style={{
-                              fontSize: '10px', fontWeight: 700, padding: '2px 8px',
-                              borderRadius: '100px', background: sc.bg, color: sc.text
-                            }}>{sc.label}</span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {sc && (
+                              <span style={{
+                                fontSize: '10px', fontWeight: 700, padding: '2px 8px',
+                                borderRadius: '100px', background: sc.bg, color: sc.text
+                              }}>{sc.label}</span>
+                            )}
+                            {/* Edit Button for this employee+day */}
+                            {(() => {
+                              const selDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+                              const editInfo = isDateEditable(selDateStr);
+                              const realRecord = attendanceRecords.find(r => r.employeeId === emp.id && r.date === selDateStr);
+                              if (editInfo.editable) {
+                                return (
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      openEditModal(
+                                        emp.id, emp.name, selDateStr,
+                                        emp.status, realRecord?.checkIn || null, realRecord?.checkOut || null
+                                      );
+                                    }}
+                                    title="Edit attendance"
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '4px',
+                                      padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: 600,
+                                      background: 'rgba(79,142,247,0.12)', color: 'var(--brand)',
+                                      border: '1px solid rgba(79,142,247,0.25)', cursor: 'pointer'
+                                    }}
+                                  >
+                                    <Edit3 size={10} /> Edit
+                                  </button>
+                                );
+                              } else {
+                                return (
+                                  <span
+                                    title={editInfo.reason}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '3px',
+                                      padding: '3px 7px', borderRadius: '5px', fontSize: '9px', fontWeight: 600,
+                                      background: editInfo.lockType === 'payrollLocked' ? 'rgba(239,68,68,0.1)' : 'rgba(100,116,139,0.1)',
+                                      color: editInfo.lockType === 'payrollLocked' ? '#EF4444' : 'var(--text-muted)',
+                                      border: '1px solid transparent', cursor: 'default'
+                                    }}
+                                  >
+                                    <Lock size={8} />
+                                    {editInfo.lockType === 'payrollLocked' ? 'Finalized' : 'Read-only'}
+                                  </span>
+                                );
+                              }
+                            })()}
+                          </div>
                         </div>
                       );
                     })}
@@ -834,6 +952,270 @@ export default function Attendance() {
           </div>
         </Card>
       )}
+
+      {/* ─── Audit Log Tab ─── */}
+      {activeTab === 'audit' && (
+        <Card>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ClipboardList size={16} color="var(--brand)" /> Attendance Audit Log
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{auditLogs.length} entries</span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            {auditLogs.length === 0 ? (
+              <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <ClipboardList size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>No audit entries yet</div>
+                <div style={{ fontSize: '12px' }}>Attendance corrections made by admins will appear here.</div>
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                    {['Employee', 'Date', 'Previous Status', 'New Status', 'Check-In', 'Check-Out', 'Edited By', 'Timestamp', 'Reason'].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log, i) => {
+                    const prevColor = log.previousStatus ? (statusColors[log.previousStatus] || { bg: 'rgba(100,116,139,0.12)', text: '#64748B' }) : null;
+                    const newColor = statusColors[log.newStatus] || { bg: 'rgba(100,116,139,0.12)', text: '#64748B' };
+                    return (
+                      <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                      >
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '28px', height: '28px', background: avatarColors[i % avatarColors.length], borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{log.employeeName.charAt(0)}</div>
+                            <div>
+                              <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>{log.employeeName}</div>
+                              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{log.employeeId}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{log.attendanceDate}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {prevColor ? (
+                            <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 9px', borderRadius: '100px', background: prevColor.bg, color: prevColor.text }}>
+                              {log.previousStatus}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>New Record</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 9px', borderRadius: '100px', background: newColor.bg, color: newColor.text }}>
+                            {log.newStatus}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {log.checkInBefore && <span style={{ color: 'var(--text-secondary)' }}>{log.checkInBefore}</span>}
+                          {log.checkInBefore && log.checkInAfter && log.checkInBefore !== log.checkInAfter && (
+                            <> → <span style={{ color: '#10B981', fontWeight: 600 }}>{log.checkInAfter}</span></>
+                          )}
+                          {!log.checkInBefore && log.checkInAfter && <span style={{ color: '#10B981', fontWeight: 600 }}>{log.checkInAfter}</span>}
+                          {!log.checkInBefore && !log.checkInAfter && '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {log.checkOutBefore && <span style={{ color: 'var(--text-secondary)' }}>{log.checkOutBefore}</span>}
+                          {log.checkOutBefore && log.checkOutAfter && log.checkOutBefore !== log.checkOutAfter && (
+                            <> → <span style={{ color: '#10B981', fontWeight: 600 }}>{log.checkOutAfter}</span></>
+                          )}
+                          {!log.checkOutBefore && log.checkOutAfter && <span style={{ color: '#10B981', fontWeight: 600 }}>{log.checkOutAfter}</span>}
+                          {!log.checkOutBefore && !log.checkOutAfter && '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 8px', borderRadius: '100px', background: 'rgba(79,142,247,0.1)', color: 'var(--brand)' }}>
+                            {log.editedBy}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {new Date(log.editTimestamp).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          })}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-secondary)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.reason || ''}>
+                          {log.reason || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* ─── Edit Attendance Modal ─── */}
+      {editModal?.open && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: '16px', width: '480px', maxWidth: '95vw',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+            animation: 'slideInModal 0.2s ease'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px', borderBottom: '1px solid var(--border)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'linear-gradient(135deg, rgba(79,142,247,0.08) 0%, rgba(139,92,246,0.05) 100%)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(79,142,247,0.15)', border: '1px solid rgba(79,142,247,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Edit3 size={16} color="var(--brand)" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>Edit Attendance</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{editModal.employeeName} · {editModal.date}</div>
+                </div>
+              </div>
+              <button onClick={() => setEditModal(null)} style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              {editModal.step === 'form' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {editError && (
+                    <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <AlertTriangle size={15} color="#EF4444" style={{ flexShrink: 0, marginTop: '1px' }} />
+                      <span style={{ fontSize: '12px', color: '#EF4444', lineHeight: 1.5 }}>{editError}</span>
+                    </div>
+                  )}
+
+                  {/* Status */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>ATTENDANCE STATUS</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                      {(['present', 'late', 'absent', 'wfh'] as const).map(s => (
+                        <button key={s} onClick={() => setEditStatus(s)} style={{
+                          padding: '10px 4px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                          cursor: 'pointer', transition: 'all 0.15s',
+                          background: editStatus === s ? (statusColors[s]?.bg || 'rgba(79,142,247,0.12)') : 'var(--bg-elevated)',
+                          color: editStatus === s ? (statusColors[s]?.text || 'var(--brand)') : 'var(--text-secondary)',
+                          border: editStatus === s ? `1px solid ${statusColors[s]?.text || 'var(--brand)'}40` : '1px solid var(--border)'
+                        }}>
+                          {statusColors[s]?.label || s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Times */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>CHECK-IN TIME</label>
+                      <input
+                        type="time"
+                        value={editCheckIn}
+                        onChange={e => setEditCheckIn(e.target.value)}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                        onFocus={e => { e.target.style.borderColor = 'var(--border-brand)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'var(--border)'; }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>CHECK-OUT TIME</label>
+                      <input
+                        type="time"
+                        value={editCheckOut}
+                        onChange={e => setEditCheckOut(e.target.value)}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                        onFocus={e => { e.target.style.borderColor = 'var(--border-brand)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'var(--border)'; }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>REASON FOR CHANGE <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(recommended)</span></label>
+                    <textarea
+                      value={editReason}
+                      onChange={e => setEditReason(e.target.value)}
+                      placeholder="e.g. Biometric failure, manual correction requested by employee"
+                      rows={3}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '12px', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                      onFocus={e => { e.target.style.borderColor = 'var(--border-brand)'; }}
+                      onBlur={e => { e.target.style.borderColor = 'var(--border)'; }}
+                    />
+                  </div>
+
+                  {/* Audit Trail Notice */}
+                  <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <ShieldAlert size={13} color="var(--brand)" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>This change will be permanently logged in the audit trail and cannot be deleted.</span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setEditModal(null)} style={{ padding: '10px 20px', borderRadius: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={() => setEditModal(prev => prev ? { ...prev, step: 'confirm' } : null)} style={{ padding: '10px 20px', borderRadius: '8px', background: 'var(--brand)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(79,142,247,0.35)' }}>
+                      Review & Confirm
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Confirmation Step */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <AlertTriangle size={16} color="#F59E0B" />
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#F59E0B' }}>Confirm Attendance Change</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
+                      <div style={{ color: 'var(--text-muted)' }}>Employee</div>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{editModal.employeeName}</div>
+                      <div style={{ color: 'var(--text-muted)' }}>Date</div>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{editModal.date}</div>
+                      <div style={{ color: 'var(--text-muted)' }}>Status Change</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {editModal.currentStatus && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '100px', background: statusColors[editModal.currentStatus]?.bg, color: statusColors[editModal.currentStatus]?.text }}>{statusColors[editModal.currentStatus]?.label}</span>}
+                        <span style={{ color: 'var(--text-muted)' }}>→</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '100px', background: statusColors[editStatus]?.bg, color: statusColors[editStatus]?.text }}>{statusColors[editStatus]?.label}</span>
+                      </div>
+                      {(editCheckIn || editCheckOut) && <>
+                        <div style={{ color: 'var(--text-muted)' }}>Times</div>
+                        <div style={{ color: 'var(--text-primary)', fontSize: '11px' }}>{editCheckIn || '—'} → {editCheckOut || '—'}</div>
+                      </>}
+                      {editReason && <>
+                        <div style={{ color: 'var(--text-muted)' }}>Reason</div>
+                        <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '11px' }}>{editReason}</div>
+                      </>}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setEditModal(prev => prev ? { ...prev, step: 'form' } : null)} style={{ padding: '10px 20px', borderRadius: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>← Back</button>
+                    <button
+                      disabled={editSubmitting}
+                      onClick={handleEditSubmit}
+                      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px 24px', borderRadius: '8px', background: editSubmitting ? 'rgba(79,142,247,0.5)' : '#10B981', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: editSubmitting ? 'not-allowed' : 'pointer', boxShadow: editSubmitting ? 'none' : '0 4px 14px rgba(16,185,129,0.35)' }}
+                    >
+                      {editSubmitting ? <><div style={{ width: '13px', height: '13px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Saving…</> : <><CheckCircle size={14} />Confirm & Save</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideInModal { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

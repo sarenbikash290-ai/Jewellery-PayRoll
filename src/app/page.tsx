@@ -9,6 +9,7 @@ import Payroll from '@/components/Payroll';
 import Incentives from '@/components/Incentives';
 import Reports from '@/components/Reports';
 import GlobalModals from '@/components/GlobalModals';
+import PayrollLocks from '@/components/PayrollLocks';
 import LoginScreen, { checkAdminSession, logoutAdmin } from '@/components/LoginScreen';
 import { useState, useEffect } from 'react';
 
@@ -17,13 +18,14 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
 
   const renderModule = () => {
     switch (activeModule) {
-      case 'dashboard':   return <Dashboard />;
-      case 'employees':   return <Employees />;
-      case 'attendance':  return <Attendance />;
-      case 'payroll':     return <Payroll />;
-      case 'incentives':  return <Incentives />;
-      case 'reports':     return <Reports />;
-      default:            return <Dashboard />;
+      case 'dashboard':     return <Dashboard />;
+      case 'employees':     return <Employees />;
+      case 'attendance':    return <Attendance />;
+      case 'payroll':       return <Payroll />;
+      case 'incentives':    return <Incentives />;
+      case 'reports':       return <Reports />;
+      case 'payroll-locks': return <PayrollLocks />;
+      default:              return <Dashboard />;
     }
   };
 
