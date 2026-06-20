@@ -1,31 +1,37 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { writeJsonAtomic } from '@/utils/db';
 import { cookies } from 'next/headers';
 import { supabase } from '@/utils/supabase';
 
 export const dynamic = 'force-dynamic';
 
-const CONFIG_PATH = path.join(process.cwd(), 'src/app/api/attendance/config.json');
-
-function getAuthorizedWifiIp(): string {
+// ── Supabase-backed WiFi config (persists across Vercel serverless instances) ──
+async function getAuthorizedWifiIps(): Promise<string[]> {
   try {
-    if (fs.existsSync(CONFIG_PATH)) {
-      const data = fs.readFileSync(CONFIG_PATH, 'utf-8');
-      return JSON.parse(data).authorizedWifiIp || '127.0.0.1';
+    const { data } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'authorized_wifi_ips')
+      .maybeSingle();
+    if (data?.value) {
+      const parsed = JSON.parse(data.value);
+      return Array.isArray(parsed) ? parsed : [parsed];
     }
   } catch (e) {
-    console.error('Error reading WiFi config:', e);
+    console.error('Error reading WiFi config from Supabase:', e);
   }
-  return '127.0.0.1';
+  return ['127.0.0.1'];
 }
 
-function setAuthorizedWifiIp(ip: string) {
+async function setAuthorizedWifiIps(ips: string[]): Promise<void> {
   try {
-    writeJsonAtomic(CONFIG_PATH, { authorizedWifiIp: ip });
+    await supabase
+      .from('app_config')
+      .upsert(
+        { key: 'authorized_wifi_ips', value: JSON.stringify(ips), updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
   } catch (e) {
-    console.error('Error writing WiFi config:', e);
+    console.error('Error saving WiFi config to Supabase:', e);
   }
 }
 
@@ -44,6 +50,34 @@ function getIpv6Prefix(ip: string): string | null {
   const parts = ip.split(':');
   if (parts.length < 4) return null;
   return parts.slice(0, 4).join(':');
+}
+
+function extractClientIp(request: Request): string {
+  const vercelIp  = request.headers.get('x-vercel-forwarded-for');
+  const forwarded = request.headers.get('x-forwarded-for');
+  const realIp    = request.headers.get('x-real-ip');
+  const rawIp = vercelIp || forwarded || realIp;
+  if (rawIp) {
+    const parts = rawIp.split(',');
+    const ip = parts.map(p => p.trim()).find(p => p !== '127.0.0.1' && p !== '::1' && p !== '');
+    return ip || parts[0].trim();
+  }
+  return '127.0.0.1';
+}
+
+function ipMatchesAny(clientIp: string, authorizedIps: string[]): boolean {
+  const normalizedClient = normalizeIp(clientIp);
+  for (const authIp of authorizedIps) {
+    const normalizedAuth = normalizeIp(authIp);
+    if (normalizedClient === normalizedAuth) return true;
+    // IPv6 /64 prefix match (handles same-network devices with different suffix)
+    if (normalizedClient.includes(':') && normalizedAuth.includes(':')) {
+      const cp = getIpv6Prefix(normalizedClient);
+      const ap = getIpv6Prefix(normalizedAuth);
+      if (cp && ap && cp === ap) return true;
+    }
+  }
+  return false;
 }
 
 async function getSession() {
@@ -84,19 +118,10 @@ export async function GET(request: Request) {
     status: r.status
   }));
 
-  const forwarded = request.headers.get('x-forwarded-for');
-  const vercelIp = request.headers.get('x-vercel-forwarded-for');
-  const realIp = request.headers.get('x-real-ip');
-
-  let clientIp = '127.0.0.1';
-  const rawIp = vercelIp || forwarded || realIp;
-  if (rawIp) {
-    const parts = rawIp.split(',');
-    const ip = parts.map(p => p.trim()).find(p => p !== '127.0.0.1' && p !== '::1' && p !== '');
-    clientIp = ip || parts[0].trim();
-  }
-
-  const authorizedWifiIp = getAuthorizedWifiIp();
+  const clientIp = extractClientIp(request);
+  const authorizedIps = await getAuthorizedWifiIps();
+  // Return the first non-bypass IP for UI display (or 127.0.0.1 as fallback)
+  const authorizedWifiIp = authorizedIps.find(ip => normalizeIp(ip) !== '127.0.0.1') || '127.0.0.1';
 
   return NextResponse.json({ 
     ok: true, 
@@ -122,7 +147,23 @@ export async function POST(request: Request) {
       }
 
       const newIp = body.authorizedWifiIp || '127.0.0.1';
-      setAuthorizedWifiIp(newIp);
+
+      // Also capture the IP of this save request itself (may be IPv6 when typed value is IPv4)
+      // This ensures both IPv4 and IPv6 versions of the same connection are authorized.
+      const requestIp = extractClientIp(request);
+      const normalizedNew     = normalizeIp(newIp);
+      const normalizedRequest = normalizeIp(requestIp);
+
+      const ipsToSave = [normalizedNew];
+      if (
+        normalizedRequest &&
+        normalizedRequest !== '127.0.0.1' &&
+        normalizedRequest !== normalizedNew
+      ) {
+        ipsToSave.push(normalizedRequest);
+      }
+
+      await setAuthorizedWifiIps(ipsToSave);
       return NextResponse.json({ ok: true, authorizedWifiIp: newIp });
     }
 
@@ -312,39 +353,22 @@ export async function POST(request: Request) {
     }
 
     // Extract client public IP
-    const forwarded = request.headers.get('x-forwarded-for');
-    const vercelIp = request.headers.get('x-vercel-forwarded-for');
-    const realIp = request.headers.get('x-real-ip');
-
-    let clientIp = '127.0.0.1';
-    const rawIp = vercelIp || forwarded || realIp;
-    if (rawIp) {
-      const parts = rawIp.split(',');
-      const ip = parts.map(p => p.trim()).find(p => p !== '127.0.0.1' && p !== '::1' && p !== '');
-      clientIp = ip || parts[0].trim();
-    }
-
-    const authorizedWifiIp = getAuthorizedWifiIp();
+    const clientIp = extractClientIp(request);
     const normalizedClient = normalizeIp(clientIp);
-    const normalizedAuth = normalizeIp(authorizedWifiIp);
+
+    // Load all authorized IPs from Supabase (persists across Vercel instances)
+    const authorizedIps = await getAuthorizedWifiIps();
+    const authorizedWifiIp = authorizedIps.find(ip => normalizeIp(ip) !== '127.0.0.1') || '127.0.0.1';
 
     const isLocal = normalizedClient === '127.0.0.1';
-    const isAuthBypassed = normalizedAuth === '127.0.0.1' || normalizedAuth === '';
+    const isAuthBypassed = authorizedIps.every(ip => normalizeIp(ip) === '127.0.0.1' || normalizeIp(ip) === '');
 
-    let ipMatches = normalizedClient === normalizedAuth;
-
-    // If both are IPv6 addresses, compare the /64 prefix (first 4 segments)
-    if (!ipMatches && normalizedClient.includes(':') && normalizedAuth.includes(':')) {
-      const clientPrefix = getIpv6Prefix(normalizedClient);
-      const authPrefix = getIpv6Prefix(normalizedAuth);
-      if (clientPrefix && authPrefix && clientPrefix === authPrefix) {
-        ipMatches = true;
-      }
-    }
+    // Check client IP against ALL saved authorized IPs (handles IPv4 + IPv6 of same connection)
+    const ipMatches = ipMatchesAny(clientIp, authorizedIps);
 
     // Perform Geofencing Check
     if (!isAuthBypassed && !isLocal && !ipMatches) {
-      console.log(`[Geofencing Blocked] Client: ${clientIp} (${normalizedClient}), Auth IP: ${authorizedWifiIp} (${normalizedAuth})`);
+      console.log(`[Geofencing Blocked] Client: ${clientIp} (${normalizedClient}), Authorized IPs: ${authorizedIps.join(', ')}`);
       return NextResponse.json({ 
         ok: false, 
         error: `Outside authorized WiFi network. Device IP: ${clientIp}, Store WiFi: ${authorizedWifiIp}`, 
