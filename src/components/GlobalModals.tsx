@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 export default function GlobalModals() {
-  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions, advancePayments, auditLogs } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [wifiIpInput, setWifiIpInput] = useState('');
@@ -139,7 +139,253 @@ export default function GlobalModals() {
 
   const handleExport = (e: React.FormEvent) => {
     e.preventDefault();
-    toast('success', 'Data Export Initiated', 'Your report is being prepared. It will download automatically in a few seconds.');
+    const form = e.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+
+    const parsedSalary = (salStr: string) => {
+      const clean = salStr.replace(/[^\d]/g, '');
+      const val = parseInt(clean, 10);
+      return isNaN(val) ? 50000 : val;
+    };
+
+    const downloadFile = (filename: string, content: string, mimeType: string) => {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    if (modal.open === 'exportData') {
+      const format = data.get('format') as string || 'csv';
+      const includeMeta = data.get('metadata') === 'yes';
+
+      let filesDownloaded = 0;
+
+      // 1. Employee Registry
+      if (data.get('exp_emp')) {
+        if (format === 'json') {
+          downloadFile('employee_registry.json', JSON.stringify(employees, null, 2), 'application/json');
+        } else {
+          let csv = includeMeta ? '# HRPulse Employee Registry Export\n# Date: ' + new Date().toISOString() + '\n' : '';
+          csv += 'ID,Name,Email,Phone,Location,Department,Role,Joined,Status,Salary,Type\n';
+          employees.forEach(emp => {
+            csv += `"${emp.id}","${emp.name}","${emp.email}","${emp.phone}","${emp.location}","${emp.dept}","${emp.role}","${emp.joined}","${emp.status}","${emp.salary}","${emp.type}"\n`;
+          });
+          downloadFile('employee_registry.csv', csv, 'text/csv;charset=utf-8;');
+        }
+        filesDownloaded++;
+      }
+
+      // 2. Attendance Records
+      if (data.get('exp_att')) {
+        if (format === 'json') {
+          downloadFile('attendance_records.json', JSON.stringify(attendanceRecords, null, 2), 'application/json');
+        } else {
+          let csv = includeMeta ? '# HRPulse Attendance Records Export\n# Date: ' + new Date().toISOString() + '\n' : '';
+          csv += 'Employee ID,Date,Status,Check In,Check Out\n';
+          attendanceRecords.forEach(r => {
+            csv += `"${r.employeeId}","${r.date}","${r.status}","${r.checkIn || ''}","${r.checkOut || ''}"\n`;
+          });
+          downloadFile('attendance_records.csv', csv, 'text/csv;charset=utf-8;');
+        }
+        filesDownloaded++;
+      }
+
+      // 3. Payroll Breakups
+      if (data.get('exp_pay')) {
+        const payrollData = employees.map(emp => {
+          const salaryVal = parsedSalary(emp.salary || '50000');
+          const basic = Math.round(salaryVal * 0.6);
+          const hra = Math.round(basic * 0.4);
+          const allowances = Math.round(basic * 0.2);
+          const gross = basic + hra + allowances;
+
+          // LOP Days & Deduction
+          const absentDays = attendanceRecords.filter(
+            r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes('-06-') || r.date.startsWith('2026-06'))
+          ).length;
+
+          const unpaidLeavesCount = leaves.filter(
+            l => l.employeeId === emp.id && 
+                 l.status === 'approved' && 
+                 (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
+                 (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))
+          ).length;
+
+          const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
+          const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
+
+          // Incentives & Commissions
+          const empIncentives = incentives.filter(
+            inc => inc.employeeId === emp.id && 
+                   (inc.status === 'approved' || inc.status === 'paid') && 
+                   (inc.month.includes('Jun') || inc.month.includes('June'))
+          );
+          
+          const empCommissions = commissions.filter(
+            com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
+                   (com.status === 'approved' || com.status === 'paid') && 
+                   (com.month.includes('Jun') || com.month.includes('June'))
+          );
+
+          const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
+
+          const pf = Math.round(basic * 0.12);
+          const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
+          const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
+
+          // Advance Deductions
+          const empAdvances = advancePayments.filter(
+            adv => adv.employeeId === emp.id && 
+                   adv.status === 'pending' &&
+                   (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+          );
+          const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
+
+          const net = gross - pf - esi - tds - lopDeduction - advanceDeduction + totalIncentives;
+
+          return {
+            id: emp.id,
+            name: emp.name,
+            dept: emp.dept,
+            basic,
+            hra,
+            allowances,
+            gross,
+            incentives: totalIncentives,
+            pf,
+            esi,
+            tds,
+            lopDeduction,
+            advanceDeduction,
+            net
+          };
+        });
+
+        if (format === 'json') {
+          downloadFile('payroll_breakups.json', JSON.stringify(payrollData, null, 2), 'application/json');
+        } else {
+          let csv = includeMeta ? '# HRPulse Payroll Breakup Export\n# Date: ' + new Date().toISOString() + '\n' : '';
+          csv += 'Employee ID,Name,Department,Basic,HRA,Allowances,Gross,Incentives,PF,ESI,TDS,LOP,Advance,Net Pay\n';
+          payrollData.forEach(p => {
+            csv += `"${p.id}","${p.name}","${p.dept}",${p.basic},${p.hra},${p.allowances},${p.gross},${p.incentives},${p.pf},${p.esi},${p.tds},${p.lopDeduction},${p.advanceDeduction},${p.net}\n`;
+          });
+          downloadFile('payroll_breakups.csv', csv, 'text/csv;charset=utf-8;');
+        }
+        filesDownloaded++;
+      }
+
+      // 4. Incentives & Rules
+      if (data.get('exp_inc')) {
+        if (format === 'json') {
+          downloadFile('incentives.json', JSON.stringify({ incentives, commissions }, null, 2), 'application/json');
+        } else {
+          let csv = includeMeta ? '# HRPulse Incentives Export\n# Date: ' + new Date().toISOString() + '\n' : '';
+          csv += 'ID,Employee ID,Employee Name,Month,Amount,Status,Rule Type,Target\n';
+          incentives.forEach(i => {
+            csv += `"${i.id}","${i.employeeId}","${i.employeeName}","${i.month}",${i.amount},"${i.status}","${i.ruleType}",${i.target}\n`;
+          });
+          downloadFile('incentives.csv', csv, 'text/csv;charset=utf-8;');
+        }
+        filesDownloaded++;
+      }
+
+      // 5. Tax Deductions
+      if (data.get('exp_tax')) {
+        const taxData = employees.map(emp => {
+          const salaryVal = parsedSalary(emp.salary || '50000');
+          const basic = Math.round(salaryVal * 0.6);
+          const gross = basic * 1.6;
+          const pf = Math.round(basic * 0.12);
+          const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
+          const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
+          return { id: emp.id, name: emp.name, basic, pf, tds, esi };
+        });
+
+        if (format === 'json') {
+          downloadFile('tax_deductions.json', JSON.stringify(taxData, null, 2), 'application/json');
+        } else {
+          let csv = includeMeta ? '# HRPulse Tax Deductions Export\n# Date: ' + new Date().toISOString() + '\n' : '';
+          csv += 'Employee ID,Employee Name,Basic Salary,PF Deduction,TDS Deduction,ESI Deduction\n';
+          taxData.forEach(t => {
+            csv += `"${t.id}","${t.name}",${t.basic},${t.pf},${t.tds},${t.esi}\n`;
+          });
+          downloadFile('tax_deductions.csv', csv, 'text/csv;charset=utf-8;');
+        }
+        filesDownloaded++;
+      }
+
+      // 6. Audit Logs
+      if (data.get('exp_sys')) {
+        if (format === 'json') {
+          downloadFile('audit_logs.json', JSON.stringify(auditLogs, null, 2), 'application/json');
+        } else {
+          let csv = includeMeta ? '# HRPulse Audit Logs Export\n# Date: ' + new Date().toISOString() + '\n' : '';
+          csv += 'ID,Employee ID,Employee Name,Attendance Date,Previous Status,New Status,Check In Before,Check Out Before,Check In After,Check Out After,Edited By,Edit Timestamp,Reason\n';
+          auditLogs.forEach(log => {
+            csv += `"${log.id}","${log.employeeId}","${log.employeeName}","${log.attendanceDate}","${log.previousStatus || ''}","${log.newStatus}","${log.checkInBefore || ''}","${log.checkOutBefore || ''}","${log.checkInAfter || ''}","${log.checkOutAfter || ''}","${log.editedBy}","${log.editTimestamp}","${log.reason || ''}"\n`;
+          });
+          downloadFile('audit_logs.csv', csv, 'text/csv;charset=utf-8;');
+        }
+        filesDownloaded++;
+      }
+
+      if (filesDownloaded > 0) {
+        toast('success', 'Export Complete', `${filesDownloaded} data logs successfully compiled and downloaded.`);
+      } else {
+        toast('warning', 'No Modules Selected', 'Please check at least one data module to export.');
+      }
+    } else if (modal.open === 'customReport') {
+      const template = data.get('template') as string;
+      const format = data.get('format') as string;
+      const dept = data.get('dept') as string;
+
+      const filteredEmps = dept === 'All' ? employees : employees.filter(e => e.dept === dept);
+
+      if (template === 'payroll') {
+        let csv = `Employee ID,Name,Department,Salary\n`;
+        filteredEmps.forEach(e => {
+          csv += `"${e.id}","${e.name}","${e.dept}","${e.salary}"\n`;
+        });
+        downloadFile(`payroll_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
+      } else if (template === 'attendance') {
+        let csv = `Employee ID,Name,Date,Status\n`;
+        filteredEmps.forEach(e => {
+          const records = attendanceRecords.filter(r => r.employeeId === e.id);
+          records.forEach(r => {
+            csv += `"${e.id}","${e.name}","${r.date}","${r.status}"\n`;
+          });
+        });
+        downloadFile(`attendance_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
+      } else if (template === 'incentives') {
+        let csv = `Employee ID,Name,Month,Amount,Status\n`;
+        filteredEmps.forEach(e => {
+          const empIncs = incentives.filter(i => i.employeeId === e.id);
+          empIncs.forEach(i => {
+            csv += `"${e.id}","${e.name}","${i.month}",${i.amount},"${i.status}"\n`;
+          });
+        });
+        downloadFile(`incentives_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
+      } else if (template === 'tax') {
+        let csv = `Employee ID,Name,PF,TDS\n`;
+        filteredEmps.forEach(emp => {
+          const salaryVal = parsedSalary(emp.salary || '50000');
+          const basic = Math.round(salaryVal * 0.6);
+          const pf = Math.round(basic * 0.12);
+          const tds = basic > 45000 ? Math.round(basic * 0.1) : Math.round(basic * 0.05);
+          csv += `"${emp.id}","${emp.name}",${pf},${tds}\n`;
+        });
+        downloadFile(`tax_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
+      }
+
+      toast('success', 'Report Exported', 'Your custom report has been generated and downloaded.');
+    }
+
     closeModal();
   };
 
@@ -772,7 +1018,16 @@ export default function GlobalModals() {
       const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
       const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
       const pt = 200;
-      const totalDeductions = pf + esi + tds + pt + lopDeduction;
+
+      // Advance Deductions
+      const empAdvances = advancePayments.filter(
+        adv => adv.employeeId === emp.id && 
+               adv.status === 'pending' &&
+               (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+      );
+      const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
+
+      const totalDeductions = pf + esi + tds + pt + lopDeduction + advanceDeduction;
       const net = totalGrossEarnings - totalDeductions;
 
       const numberToWords = (num: number) => {
@@ -863,6 +1118,7 @@ export default function GlobalModals() {
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Tax Deducted at Source (TDS)</span> <span style={{ fontWeight: 600 }}>₹ {tds.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Professional Tax (PT)</span> <span style={{ fontWeight: 600 }}>₹ {pt.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e53e3e' }}><span>Loss of Pay (LOP)</span> <span style={{ fontWeight: 600 }}>-₹ {lopDeduction.toLocaleString('en-IN')}.00</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e53e3e' }}><span>Salary Advance</span> <span style={{ fontWeight: 600 }}>-₹ {advanceDeduction.toLocaleString('en-IN')}.00</span></div>
                   </div>
                 </div>
               </div>
@@ -986,7 +1242,7 @@ export default function GlobalModals() {
                   { id: 'exp_sys', label: 'Audit Logs' },
                 ].map(item => (
                   <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked style={{ accentColor: 'var(--brand)' }} />
+                    <input type="checkbox" name={item.id} defaultChecked style={{ accentColor: 'var(--brand)' }} />
                     {item.label}
                   </label>
                 ))}
@@ -996,7 +1252,7 @@ export default function GlobalModals() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Export Format</label>
-                <select className="form-input">
+                <select name="format" className="form-input">
                   <option value="csv">CSV (Comma Separated)</option>
                   <option value="xlsx">Excel Workbook</option>
                   <option value="json">JSON raw backup</option>
@@ -1004,7 +1260,7 @@ export default function GlobalModals() {
               </div>
               <div className="form-group">
                 <label>Include Metadata</label>
-                <select className="form-input">
+                <select name="metadata" className="form-input">
                   <option value="yes">Yes (System headers)</option>
                   <option value="no">No (Raw tables)</option>
                 </select>

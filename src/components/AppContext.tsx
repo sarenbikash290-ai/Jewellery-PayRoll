@@ -97,6 +97,16 @@ export interface PayrollMonthLock {
   notes: string | null;
 }
 
+export interface AdvancePayment {
+  id: string;
+  employeeId: string;
+  amount: number;
+  givenOn: string;      // YYYY-MM-DD
+  deductMonth: string;  // YYYY-MM e.g. "2026-06"
+  reason: string;
+  status: 'pending' | 'deducted' | 'partial';
+  createdAt: string;
+}
 
 // ---- UI Helper Types ----
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -187,6 +197,11 @@ interface AppCtx {
   unlockPayrollMonth: (year: number, month: number) => Promise<{ ok: boolean; error?: string }>;
   isMonthLocked: (year: number, month: number) => boolean;
   isDateEditable: (dateStr: string) => { editable: boolean; reason?: string; lockType?: 'editWindow' | 'payrollLocked' };
+  // Advance Payments
+  advancePayments: AdvancePayment[];
+  addAdvancePayment: (adv: Omit<AdvancePayment, 'id' | 'createdAt'>) => Promise<void>;
+  updateAdvancePaymentStatus: (id: string, status: 'pending' | 'deducted' | 'partial') => Promise<void>;
+  deleteAdvancePayment: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<AppCtx>({} as AppCtx);
@@ -227,6 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [incentives, setIncentives] = useState<Incentive[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [employeeSales, setEmployeeSales] = useState<Sale[]>([]);
+  const [advancePayments, setAdvancePayments] = useState<AdvancePayment[]>([]);
 
   // CRUD helpers
   const addEmployee = useCallback(async (emp: Omit<Employee, 'id'>) => {
@@ -597,6 +613,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Advance Payments Fetch ────────────────────────────────────────────────
+  const fetchAdvancePayments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/advance-payments');
+      const data = await res.json();
+      if (data.ok && data.advances) {
+        setAdvancePayments(data.advances);
+      }
+    } catch (err) {
+      console.error('Failed to fetch advance payments:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeaves();
     fetchAttendance();
@@ -606,6 +635,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchSales();
     fetchAuditLogs();
     fetchPayrollLocks();
+    fetchAdvancePayments();
 
     const interval = setInterval(() => {
       fetchLeaves();
@@ -614,10 +644,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       fetchIncentives();
       fetchCommissions();
       fetchSales();
+      fetchAdvancePayments();
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales, fetchAuditLogs, fetchPayrollLocks]);
+  }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales, fetchAuditLogs, fetchPayrollLocks, fetchAdvancePayments]);
 
   const applyLeave = useCallback(async (newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
     const emp = employees.find(e => e.id === newLeave.employeeId);
@@ -912,6 +943,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { editable: true };
   }, [isMonthLocked]);
 
+  // ── Advance Payment CRUD ──────────────────────────────────────────────────
+  const addAdvancePayment = useCallback(async (adv: Omit<AdvancePayment, 'id' | 'createdAt'>) => {
+    try {
+      const res = await fetch('/api/advance-payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(adv),
+      });
+      const data = await res.json();
+      if (data.ok && data.advance) {
+        setAdvancePayments(prev => [...prev, data.advance]);
+        toast('success', 'Advance Recorded', `₹${adv.amount.toLocaleString('en-IN')} advance recorded for employee.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Add Advance Failed', err.message || 'Could not record advance payment.');
+    }
+  }, [toast]);
+
+  const updateAdvancePaymentStatus = useCallback(async (id: string, status: 'pending' | 'deducted' | 'partial') => {
+    try {
+      const res = await fetch('/api/advance-payments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      });
+      const data = await res.json();
+      if (data.ok && data.advance) {
+        setAdvancePayments(prev => prev.map(a => a.id === id ? data.advance : a));
+        toast('success', 'Status Updated', `Advance payment marked as ${status}.`);
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Update Failed', err.message || 'Could not update advance status.');
+    }
+  }, [toast]);
+
+  const deleteAdvancePayment = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/advance-payments?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) {
+        setAdvancePayments(prev => prev.filter(a => a.id !== id));
+        toast('warning', 'Advance Deleted', 'Advance payment record removed.');
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Delete Failed', err.message || 'Could not delete advance payment.');
+    }
+  }, [toast]);
+
   return (
     <Ctx.Provider
       value={{
@@ -955,6 +1040,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         unlockPayrollMonth,
         isMonthLocked,
         isDateEditable,
+        // Advance Payments
+        advancePayments,
+        addAdvancePayment,
+        updateAdvancePaymentStatus,
+        deleteAdvancePayment,
       }}
     >
       {children}

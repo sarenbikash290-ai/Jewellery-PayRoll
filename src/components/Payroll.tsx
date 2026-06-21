@@ -15,7 +15,7 @@ export default function Payroll() {
   const [step, setStep] = useState(1);
   const [processing, setProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
-  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions } = useApp();
+  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments } = useApp();
 
   const parsedSalary = (salStr: string) => {
     const clean = salStr.replace(/[^\d]/g, '');
@@ -60,10 +60,18 @@ export default function Payroll() {
 
     const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
 
+    // Advance Deductions
+    const empAdvances = advancePayments.filter(
+      adv => adv.employeeId === emp.id && 
+             adv.status === 'pending' &&
+             (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+    );
+    const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
+
     const pf = Math.round(basic * 0.12);
     const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
     const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
-    const net = gross - pf - esi - tds - lopDeduction + totalIncentives;
+    const net = gross - pf - esi - tds - lopDeduction - advanceDeduction + totalIncentives;
 
     return {
       id: emp.id,
@@ -78,6 +86,7 @@ export default function Payroll() {
       esi,
       tds,
       lopDeduction,
+      advanceDeduction,
       net
     };
   });
@@ -88,6 +97,7 @@ export default function Payroll() {
   const totalESI   = payrollEmployees.reduce((s, e) => s + e.esi, 0);
   const totalTDS   = payrollEmployees.reduce((s, e) => s + e.tds, 0);
   const totalLOP   = payrollEmployees.reduce((s, e) => s + e.lopDeduction, 0);
+  const totalAdvance = payrollEmployees.reduce((s, e) => s + e.advanceDeduction, 0);
   const totalNet   = payrollEmployees.reduce((s, e) => s + e.net, 0);
 
   const fmt = (n: number) => `₹ ${n.toLocaleString('en-IN')}`;
@@ -236,7 +246,7 @@ export default function Payroll() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                {['Employee', 'Basic', 'HRA', 'Allowances', 'Gross', 'Incentives', 'PF', 'ESI', 'TDS', 'LOP', 'Net Pay', ''].map(h => (
+                {['Employee', 'Basic', 'HRA', 'Allowances', 'Gross', 'Incentives', 'PF', 'ESI', 'TDS', 'LOP', 'Advance', 'Net Pay', ''].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: h === '' ? 'center' : 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -266,6 +276,7 @@ export default function Payroll() {
                     <td key={j} style={{ padding: '14px 16px', fontSize: '12px', color: '#EF4444', whiteSpace: 'nowrap' }}>-{val.toLocaleString('en-IN')}</td>
                   ))}
                   <td style={{ padding: '14px 16px', fontSize: '12px', color: '#EF4444', whiteSpace: 'nowrap' }}>-{emp.lopDeduction.toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '12px', color: '#EF4444', whiteSpace: 'nowrap' }}>-{emp.advanceDeduction.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: '#10B981', whiteSpace: 'nowrap' }}>{emp.net.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                     <button 
@@ -293,6 +304,7 @@ export default function Payroll() {
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalESI.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalTDS.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalLOP.toLocaleString('en-IN')}</td>
+                <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalAdvance.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 800, color: '#10B981', whiteSpace: 'nowrap' }}>{totalNet.toLocaleString('en-IN')}</td>
                 <td></td>
               </tr>
