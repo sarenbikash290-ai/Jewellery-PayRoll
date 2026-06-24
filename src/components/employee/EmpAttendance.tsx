@@ -242,7 +242,9 @@ export default function EmpAttendance({ employee }: EmpAttendanceProps) {
             ) : (
               myRecords.map((r, idx) => {
                 const isLate = r.status === 'late';
-                const formattedDate = new Date(r.date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' });
+                const recordDate = new Date(r.date);
+                const isThursday = recordDate.getDay() === 4;
+                const formattedDate = recordDate.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' });
                 const [datePart, dayPart] = formattedDate.split(', ');
                 const uppercaseDate = `${dayPart.toUpperCase()}, ${datePart.toUpperCase()}`;
                 
@@ -261,7 +263,7 @@ export default function EmpAttendance({ employee }: EmpAttendanceProps) {
                         {uppercaseDate}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {isLate ? 'Late Shift Entry' : 'Full Day Shift'}
+                        {isThursday ? 'Overtime Shift' : isLate ? 'Late Shift Entry' : 'Full Day Shift'}
                       </div>
                     </div>
 

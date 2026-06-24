@@ -8,7 +8,11 @@ export function generatePayslip(employee: Employee, month: string) {
     format: 'a4',
   });
 
-  const parsedSalary = (salStr: string) => {
+  const parsedSalary = (salStr: any) => {
+    if (!salStr || typeof salStr !== 'string') {
+      if (typeof salStr === 'number') return salStr;
+      return 50000;
+    }
     const clean = salStr.replace(/[^\d]/g, '');
     const val = parseInt(clean, 10);
     return isNaN(val) ? 50000 : val;

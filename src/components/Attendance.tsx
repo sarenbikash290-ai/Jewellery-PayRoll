@@ -41,14 +41,10 @@ function getMockDayStatus(day: number, month: number, year: number): 'present' |
 
   if (date > today) return 'future';
   const dow = date.getDay();
-  if (dow === 0) return 'weekend'; // Sunday off
+  if (dow === 4) return 'weekend'; // Thursday off
 
-  // Deterministic mock based on date
-  const seed = (day * 7 + month * 31 + year) % 20;
-  if (seed < 12) return 'present';
-  if (seed < 16) return 'late';
-  if (seed < 18) return 'absent';
-  return 'wfh';
+  // In live production mode, default is absent unless a check-in is logged
+  return 'absent';
 }
 
 const dayStatusDotColor: Record<string, string> = {
@@ -231,16 +227,10 @@ export default function Attendance() {
         return { id: emp.id, name: emp.name, dept: emp.dept, status: 'absent' as const };
       }
 
-      // Otherwise, fallback to deterministic mock
-      const seed = (selectedDay * 7 + calMonth * 31 + calYear + idx * 3) % 20;
+      // Otherwise, fallback to absent or weekend (live status)
       const dow = new Date(calYear, calMonth, selectedDay).getDay();
-      if (dow === 0) return { id: emp.id, name: emp.name, dept: emp.dept, status: 'weekend' as const };
-      let status: 'present' | 'late' | 'absent' | 'wfh';
-      if (seed < 12) status = 'present';
-      else if (seed < 16) status = 'late';
-      else if (seed < 18) status = 'absent';
-      else status = 'wfh';
-      return { id: emp.id, name: emp.name, dept: emp.dept, status };
+      if (dow === 4) return { id: emp.id, name: emp.name, dept: emp.dept, status: 'weekend' as const };
+      return { id: emp.id, name: emp.name, dept: emp.dept, status: 'absent' as const };
     });
     const presentCount = statuses.filter(s => s.status === 'present').length;
     const lateCount = statuses.filter(s => s.status === 'late').length;
@@ -343,44 +333,72 @@ export default function Attendance() {
     const depts = [...new Set(employees.map(e => e.dept))];
     return depts.map(dept => {
       const deptEmps = employees.filter(e => e.dept === dept);
-      // deterministic 30-day present count per employee
-      let totalPresent = 0, totalDays = 0;
-      deptEmps.forEach((_, ei) => {
-        for (let ago = 0; ago < 26; ago++) {
-          const d = new Date(); d.setDate(d.getDate() - ago);
-          if (d.getDay() === 0) continue;
-          totalDays++;
-          const seed = (ei * 7 + ago * 13) % 10;
-          if (seed < 8) totalPresent++;
+      const deptEmpIds = new Set(deptEmps.map(e => e.id));
+      
+      // Calculate past 30 days working days (excluding Thursdays)
+      let totalWorkingDays = 0;
+      for (let ago = 0; ago < 30; ago++) {
+        const d = new Date(); d.setDate(d.getDate() - ago);
+        if (d.getDay() !== 4) {
+          totalWorkingDays++;
         }
-      });
-      const pct = totalDays > 0 ? Math.round((totalPresent / totalDays) * 100) : 0;
+      }
+      
+      const totalDays = totalWorkingDays * deptEmps.length;
+      
+      // Count actual check-ins in the last 30 days (present, late, wfh)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0,0,0,0);
+      
+      const presentCount = attendanceRecords.filter(r => {
+        const rDate = new Date(r.date);
+        return deptEmpIds.has(r.employeeId) && 
+               rDate >= thirtyDaysAgo && 
+               (r.status === 'present' || r.status === 'late' || r.status === 'wfh');
+      }).length;
+
+      const pct = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 0;
       return { dept, pct, count: deptEmps.length };
     });
-  }, [employees]);
+  }, [employees, attendanceRecords]);
 
   // ── Monthly report: per-employee stats for current month ───────────────────
   const monthlyReport = useMemo(() => {
     const daysInMonth = getDaysInMonth(todayDate.year, todayDate.month);
     const workingDaysSoFar = Array.from({ length: Math.min(todayDate.day, daysInMonth) }, (_, i) => i + 1)
-      .filter(d => new Date(todayDate.year, todayDate.month, d).getDay() !== 0).length;
+      .filter(d => new Date(todayDate.year, todayDate.month, d).getDay() !== 4).length;
 
-    return employees.map((emp, ei) => {
-      let present = 0, late = 0, absent = 0, wfh = 0;
+    const monthStr = `${todayDate.year}-${String(todayDate.month + 1).padStart(2, '0')}`;
+
+    return employees.map((emp) => {
+      const records = attendanceRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(monthStr));
+      const present = records.filter(r => r.status === 'present').length;
+      const late = records.filter(r => r.status === 'late').length;
+      const wfh = records.filter(r => r.status === 'wfh').length;
+      
+      // Calculate absent days: working days so far minus days with check-ins or approved leaves
+      const recordedDays = new Set(records.map(r => parseInt(r.date.split('-')[2], 10)));
+      let absentCount = records.filter(r => r.status === 'absent').length;
+      
       for (let d = 1; d <= Math.min(todayDate.day, daysInMonth); d++) {
-        const dow = new Date(todayDate.year, todayDate.month, d).getDay();
-        if (dow === 0) continue;
-        const seed = (ei * 7 + (todayDate.day - d) * 13) % 10;
-        if (seed < 6) present++;
-        else if (seed < 8) late++;
-        else if (seed === 8) { absent++; }
-        else wfh++;
+        const dateObj = new Date(todayDate.year, todayDate.month, d);
+        if (dateObj.getDay() === 4) continue; // skip Thursday off
+        
+        if (!recordedDays.has(d)) {
+          const dateStr = `${todayDate.year}-${String(todayDate.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const hasLeave = leaves.some(l => l.employeeId === emp.id && l.status === 'approved' && dateStr >= l.from && dateStr <= l.to);
+          if (!hasLeave) {
+            absentCount++;
+          }
+        }
       }
+
       const attendancePct = workingDaysSoFar > 0
         ? Math.round(((present + late + wfh) / workingDaysSoFar) * 100) : 0;
-      return { id: emp.id, name: emp.name, dept: emp.dept, present, late, absent, wfh, attendancePct };
+      return { id: emp.id, name: emp.name, dept: emp.dept, present, late, absent: absentCount, wfh, attendancePct };
     });
-  }, [employees, todayDate]);
+  }, [employees, todayDate, attendanceRecords, leaves]);
 
   // Header date string (stable, doesn't tick)
   const headerDate = `${DAY_NAMES_FULL[todayDate.dow]}, ${todayDate.day} ${MONTH_NAMES[todayDate.month]} ${todayDate.year}`;
@@ -582,7 +600,7 @@ export default function Attendance() {
               {DAY_NAMES_SHORT.map(d => (
                 <div key={d} style={{
                   textAlign: 'center', fontSize: '11px', fontWeight: 700,
-                  color: d === 'Sun' ? 'var(--danger)' : 'var(--text-muted)',
+                  color: d === 'Thu' ? 'var(--danger)' : 'var(--text-muted)',
                   letterSpacing: '1px', textTransform: 'uppercase', padding: '8px 0'
                 }}>{d}</div>
               ))}
@@ -596,7 +614,7 @@ export default function Attendance() {
                 const isWeekend = cell.status === 'weekend';
                 const dotColor = dayStatusDotColor[cell.status] || 'transparent';
                 const dayOfWeek = isEmpty ? -1 : new Date(calYear, calMonth, cell.day).getDay();
-                const isSunday = dayOfWeek === 0;
+                const isThursday = dayOfWeek === 4;
 
                 // Lock indicators for calendar cells
                 const cellDateStr = !isEmpty ? `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}` : '';
@@ -630,7 +648,7 @@ export default function Attendance() {
                           ? 'transparent'
                           : isFuture
                             ? 'var(--text-muted)'
-                            : isSunday
+                            : isThursday
                               ? 'var(--danger)'
                               : 'var(--text-secondary)',
                       cursor: !isEmpty && !isFuture ? 'pointer' : 'default',
@@ -741,7 +759,7 @@ export default function Attendance() {
               {selectedDaySummary.isWeekend ? (
                 <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <Calendar size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>Sunday — Weekly Off</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600 }}>Thursday — Weekly Off</div>
                   <div style={{ fontSize: '11px', marginTop: '4px' }}>No attendance recorded</div>
                 </div>
               ) : (
@@ -797,6 +815,12 @@ export default function Attendance() {
                                 fontSize: '10px', fontWeight: 700, padding: '2px 8px',
                                 borderRadius: '100px', background: sc.bg, color: sc.text
                               }}>{sc.label}</span>
+                            )}
+                            {emp.status !== 'weekend' && emp.status !== 'absent' && new Date(calYear, calMonth, selectedDay).getDay() === 4 && (
+                              <span style={{
+                                fontSize: '10px', fontWeight: 700, padding: '2px 8px',
+                                borderRadius: '100px', background: 'rgba(139, 92, 246, 0.12)', color: '#8B5CF6'
+                              }}>Overtime</span>
                             )}
                             {/* Edit Button for this employee+day */}
                             {(() => {

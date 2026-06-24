@@ -17,7 +17,7 @@ const Card = ({ children, style = {} }: CardProps) => (
 );
 
 export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps) {
-  const { leaves, attendanceRecords, toast } = useApp();
+  const { leaves, attendanceRecords, payrollLocks } = useApp();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -80,6 +80,82 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
       total: totalDays,
     };
   }, [myAttendance]);
+
+  const notificationsList = useMemo(() => {
+    const list: Array<{ id: string; type: 'payslip' | 'policy' | 'leave'; title: string; time: string; color: string; bg: string; icon: any }> = [];
+
+    // 1. Live Payslip Notification
+    if (payrollLocks && payrollLocks.length > 0) {
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const sortedLocks = [...payrollLocks].sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month));
+      const latestLock = sortedLocks[0];
+      
+      const parseJoinedDate = (joinedStr: string) => {
+        if (!joinedStr) return new Date(2000, 0, 1);
+        const parsed = Date.parse(joinedStr);
+        if (!isNaN(parsed)) return new Date(parsed);
+        const parts = joinedStr.trim().split(/\s+/);
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const monthsShort = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+          const monthsLong = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+          const mStr = parts[1].toLowerCase();
+          let monthIdx = monthsShort.indexOf(mStr);
+          if (monthIdx === -1) monthIdx = monthsLong.indexOf(mStr);
+          if (monthIdx === -1 && mStr.length >= 3) monthIdx = monthsShort.indexOf(mStr.substring(0, 3));
+          const year = parseInt(parts[2], 10);
+          if (!isNaN(day) && monthIdx > -1 && !isNaN(year)) return new Date(year, monthIdx, day);
+        }
+        return new Date(2000, 0, 1);
+      };
+      
+      const joinedDate = parseJoinedDate(employee.joined);
+      const lockDate = new Date(latestLock.year, latestLock.month - 1, 1);
+      
+      if (
+        lockDate.getFullYear() > joinedDate.getFullYear() ||
+        (lockDate.getFullYear() === joinedDate.getFullYear() && lockDate.getMonth() >= joinedDate.getMonth())
+      ) {
+        list.push({
+          id: `payslip-${latestLock.year}-${latestLock.month}`,
+          type: 'payslip',
+          title: `Payslip for ${months[latestLock.month - 1]} ${latestLock.year} is now available for download.`,
+          time: 'Released',
+          color: '#D97706',
+          bg: '#FEF3C7',
+          icon: Banknote
+        });
+      }
+    }
+
+    // 2. Dynamic Leave notifications (approved or rejected)
+    const sortedLeaves = [...myLeaves].sort((a, b) => new Date(b.appliedOn).getTime() - new Date(a.appliedOn).getTime());
+    sortedLeaves.slice(0, 2).forEach(leave => {
+      const isApproved = leave.status === 'approved';
+      list.push({
+        id: `leave-${leave.id}`,
+        type: 'leave',
+        title: `Your leave request for ${leave.from} has been ${leave.status} by the Store Manager.`,
+        time: `Applied: ${leave.appliedOn}`,
+        color: isApproved ? '#059669' : '#DC2626',
+        bg: isApproved ? '#D1FAE5' : '#FEE2E2',
+        icon: Calendar
+      });
+    });
+
+    // 3. General store policy
+    list.push({
+      id: 'policy-store',
+      type: 'policy',
+      title: 'New Store Policy: Updated guidelines for handling luxury watch inventory.',
+      time: '1 day ago',
+      color: '#0284C7',
+      bg: '#E0F2FE',
+      icon: Megaphone
+    });
+
+    return list;
+  }, [payrollLocks, myLeaves, employee.joined]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px' }}>
@@ -147,23 +223,6 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
             }}
           >
             <Fingerprint size={14} /> CLOCK IN NOW
-          </button>
-          <button 
-            onClick={() => toast('info', 'Shift Roster', 'Your shift roster is managed by the store manager. You are scheduled on the Main Showroom floor.')}
-            style={{
-              flex: 1,
-              background: 'transparent',
-              color: '#FFFFFF',
-              border: '1px solid rgba(255,255,255,0.2)',
-              fontWeight: 600,
-              fontSize: '12.5px',
-              padding: '10px 14px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              transition: 'transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s'
-            }}
-          >
-            VIEW ROSTER
           </button>
         </div>
       </div>
@@ -281,95 +340,40 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
             <Bell size={16} color="#D97706" /> Recent Notifications
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {myLeaves.length === 0 ? (
+            {notificationsList.length === 0 ? (
               <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
                 No notifications yet.
               </div>
             ) : (
-              <>
-                {/* Notification 1: Payslip */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(15, 23, 42, 0.05)',
-                  background: '#FFFFFF'
-                }}>
-                  <div style={{
-                    width: '30px', height: '30px', borderRadius: '50%',
-                    background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              notificationsList.map(notif => {
+                const Icon = notif.icon;
+                return (
+                  <div key={notif.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(15, 23, 42, 0.05)',
+                    background: '#FFFFFF'
                   }}>
-                    <Banknote size={14} color="#D97706" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                      Payslip for June 2025 is now available for download.
-                    </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      2 hours ago
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notification 2: Policy */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(15, 23, 42, 0.05)',
-                  background: '#FFFFFF'
-                }}>
-                  <div style={{
-                    width: '30px', height: '30px', borderRadius: '50%',
-                    background: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                  }}>
-                    <Megaphone size={14} color="#0284C7" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                      New Store Policy: Updated guidelines for handling luxury watch inventory.
-                    </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Yesterday, 4:15 PM
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notification 3: Leave Approved */}
-                {myLeaves.slice(0, 1).map((leave, idx) => {
-                  const isApproved = leave.status === 'approved';
-                  return (
-                    <div key={idx} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(15, 23, 42, 0.05)',
-                      background: '#FFFFFF'
+                    <div style={{
+                      width: '30px', height: '30px', borderRadius: '50%',
+                      background: notif.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                     }}>
-                      <div style={{
-                        width: '30px', height: '30px', borderRadius: '50%',
-                        background: isApproved ? '#D1FAE5' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                      }}>
-                        <Calendar size={14} color={isApproved ? '#059669' : '#DC2626'} />
+                      <Icon size={14} color={notif.color} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                        {notif.title}
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                          Your leave request for {leave.from} has been {leave.status} by the Store Manager.
-                        </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          Applied on: {leave.appliedOn}
-                        </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {notif.time}
                       </div>
                     </div>
-                  );
-                })}
-              </>
+                  </div>
+                );
+              })
             )}
           </div>
           <button style={{

@@ -36,12 +36,153 @@ const reportTemplates = [
 ];
 
 export default function Reports() {
-  const { openModal, toast, employees, incentives, commissions, attendanceRecords, leaves } = useApp();
+  const { openModal, toast, employees, incentives, commissions, attendanceRecords, leaves, advancePayments } = useApp();
 
-  const parsedSalary = (salStr: string) => {
+  const parsedSalary = (salStr: any) => {
+    if (!salStr || typeof salStr !== 'string') {
+      if (typeof salStr === 'number') return salStr;
+      return 50000;
+    }
     const clean = salStr.replace(/[^\d]/g, '');
     const val = parseInt(clean, 10);
     return isNaN(val) ? 50000 : val;
+  };
+
+  const downloadFile = (filename: string, content: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleQuickExport = (title: string) => {
+    if (title === 'Payroll Cost Report') {
+      const payrollData = employees.map(emp => {
+        const salaryVal = parsedSalary(emp.salary || '50000');
+        const basic = Math.round(salaryVal * 0.6);
+        const hra = Math.round(basic * 0.4);
+        const allowances = Math.round(basic * 0.2);
+        const gross = basic + hra + allowances;
+
+        const absentDays = attendanceRecords.filter(
+          r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes('-06-') || r.date.startsWith('2026-06') || r.date.startsWith('2025-06'))
+        ).length;
+
+        const unpaidLeavesCount = leaves.filter(
+          l => l.employeeId === emp.id && 
+               l.status === 'approved' && 
+               (l.from.includes('-06-') || l.from.startsWith('2026-06') || l.from.startsWith('2025-06')) &&
+               (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))
+        ).length;
+
+        const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
+        const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
+
+        const empIncentives = incentives.filter(
+          inc => inc.employeeId === emp.id && 
+                 (inc.status === 'approved' || inc.status === 'paid') && 
+                 (inc.month.includes('Jun') || inc.month.includes('June'))
+        );
+        
+        const empCommissions = commissions.filter(
+          com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
+                 (com.status === 'approved' || com.status === 'paid') && 
+                 (com.month.includes('Jun') || com.month.includes('June'))
+        );
+
+        const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
+
+        const pf = Math.round(basic * 0.12);
+        const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
+        const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
+
+        const empAdvances = advancePayments ? advancePayments.filter(
+          adv => adv.employeeId === emp.id && 
+                 adv.status === 'pending' &&
+                 (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+        ) : [];
+        const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
+
+        const net = gross - pf - esi - tds - lopDeduction - advanceDeduction + totalIncentives;
+
+        return {
+          id: emp.id,
+          name: emp.name,
+          dept: emp.dept,
+          basic,
+          hra,
+          allowances,
+          gross,
+          incentives: totalIncentives,
+          pf,
+          esi,
+          tds,
+          lopDeduction,
+          advanceDeduction,
+          net
+        };
+      });
+
+      let csv = 'Employee ID,Name,Department,Basic,HRA,Allowances,Gross,Incentives,PF,ESI,TDS,LOP Deduction,Advance Deduction,Net Pay\n';
+      payrollData.forEach(p => {
+        csv += `"${p.id}","${p.name}","${p.dept}",${p.basic},${p.hra},${p.allowances},${p.gross},${p.incentives},${p.pf},${p.esi},${p.tds},${p.lopDeduction},${p.advanceDeduction},${p.net}\n`;
+      });
+      downloadFile('payroll_cost_report.csv', csv, 'text/csv;charset=utf-8;');
+      toast('success', 'Payroll Cost Report Downloaded', 'The Payroll Cost Report CSV file has been generated and downloaded.');
+    } else if (title === 'Headcount Report') {
+      let csv = 'ID,Name,Email,Phone,Location,Department,Role,Joined,Status,Salary,Type\n';
+      employees.forEach(emp => {
+        csv += `"${emp.id}","${emp.name}","${emp.email}","${emp.phone}","${emp.location}","${emp.dept}","${emp.role}","${emp.joined}","${emp.status}","${emp.salary}","${emp.type}"\n`;
+      });
+      downloadFile('headcount_report.csv', csv, 'text/csv;charset=utf-8;');
+      toast('success', 'Headcount Report Downloaded', 'The Headcount Report CSV file has been generated and downloaded.');
+    } else if (title === 'Attendance Summary') {
+      let csv = 'Employee ID,Employee Name,Total Present/WFH,Total Late,Total Absent,Total Unpaid Leaves\n';
+      employees.forEach(emp => {
+        const present = attendanceRecords.filter(r => r.employeeId === emp.id && (r.status === 'present' || r.status === 'wfh')).length;
+        const late = attendanceRecords.filter(r => r.employeeId === emp.id && r.status === 'late').length;
+        const absent = attendanceRecords.filter(r => r.employeeId === emp.id && r.status === 'absent').length;
+        const unpaidLeaves = leaves.filter(l => l.employeeId === emp.id && l.status === 'approved' && (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))).length;
+        csv += `"${emp.id}","${emp.name}",${present},${late},${absent},${unpaidLeaves}\n`;
+      });
+      downloadFile('attendance_summary.csv', csv, 'text/csv;charset=utf-8;');
+      toast('success', 'Attendance Summary Downloaded', 'The Attendance Summary CSV file has been generated and downloaded.');
+    } else if (title === 'Incentive Payout Report') {
+      let csv = 'Incentive ID,Employee ID,Employee Name,Month,Amount,Status,Rule Type,Target\n';
+      incentives.forEach(i => {
+        csv += `"${i.id}","${i.employeeId}","${i.employeeName}","${i.month}",${i.amount},"${i.status}","${i.ruleType}",${i.target}\n`;
+      });
+      downloadFile('incentive_payout_report.csv', csv, 'text/csv;charset=utf-8;');
+      toast('success', 'Incentive Payout Report Downloaded', 'The Incentive Payout Report CSV file has been generated and downloaded.');
+    } else if (title === 'Tax & Compliance Report') {
+      let csv = 'Employee ID,Employee Name,Basic Salary,PF Deduction,TDS Deduction,ESI Deduction\n';
+      employees.forEach(emp => {
+        const salaryVal = parsedSalary(emp.salary || '50000');
+        const basic = Math.round(salaryVal * 0.6);
+        const gross = basic * 1.6;
+        const pf = Math.round(basic * 0.12);
+        const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
+        const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
+        csv += `"${emp.id}","${emp.name}",${basic},${pf},${tds},${esi}\n`;
+      });
+      downloadFile('tax_and_compliance_report.csv', csv, 'text/csv;charset=utf-8;');
+      toast('success', 'Tax & Compliance Report Downloaded', 'The Tax & Compliance Report CSV file has been generated and downloaded.');
+    } else if (title === 'Attrition & Hiring Report') {
+      let csv = 'Department,Active Employees,Inactive/Terminated,Total Hired\n';
+      const depts = Array.from(new Set(employees.map(e => e.dept)));
+      depts.forEach(dept => {
+        const active = employees.filter(e => e.dept === dept && e.status === 'active').length;
+        const inactive = employees.filter(e => e.dept === dept && e.status === 'inactive').length;
+        csv += `"${dept}",${active},${inactive},${active + inactive}\n`;
+      });
+      downloadFile('attrition_and_hiring_report.csv', csv, 'text/csv;charset=utf-8;');
+      toast('success', 'Attrition & Hiring Report Downloaded', 'The Attrition & Hiring Report CSV file has been generated and downloaded.');
+    }
   };
 
   // Group by active departments: "Sales", "Gold Crafting", "Store Ops", "Accounts"
@@ -304,7 +445,7 @@ export default function Reports() {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{rpt.format}</span>
                       <button 
-                        onClick={() => toast('success', 'Report Exported', `${rpt.title} successfully exported as ${rpt.format}.`)}
+                        onClick={() => handleQuickExport(rpt.title)}
                         style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: rpt.color, background: `${rpt.color}12`, padding: '4px 10px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', border: 'none' }}
                       >
                         <Download size={12} /> Export

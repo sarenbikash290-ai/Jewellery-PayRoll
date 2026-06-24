@@ -142,7 +142,11 @@ export default function GlobalModals() {
     const form = e.currentTarget as HTMLFormElement;
     const data = new FormData(form);
 
-    const parsedSalary = (salStr: string) => {
+    const parsedSalary = (salStr: any) => {
+      if (!salStr || typeof salStr !== 'string') {
+        if (typeof salStr === 'number') return salStr;
+        return 50000;
+      }
       const clean = salStr.replace(/[^\d]/g, '');
       const val = parseInt(clean, 10);
       return isNaN(val) ? 50000 : val;
@@ -1359,9 +1363,9 @@ export default function GlobalModals() {
                 </div>
                 <div className="form-group">
                   <label>Weekly Offs</label>
-                  <select className="form-input" defaultValue="sunday">
-                    <option value="sunday">Sundays Only</option>
-                    <option value="sat-sun">Saturday & Sunday</option>
+                  <select className="form-input" defaultValue="thursday">
+                    <option value="thursday">Thursdays Only</option>
+                    <option value="sat-thu">Saturday & Thursday</option>
                   </select>
                 </div>
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
@@ -1546,12 +1550,12 @@ export default function GlobalModals() {
             e.preventDefault();
             const employeeName = formData.employeeName || 'Employee';
             // Look up the actual employee to get the correct ID and dept
-            const matchedEmp = modal.data ? undefined : undefined; // placeholder for context reference
+            const matchedEmp = employees.find(e => e.name === employeeName);
             const empLookup = employeeName;
             const incentiveData = {
-              employeeId: formData.employeeId || 'EMP001',
+              employeeId: matchedEmp?.id || formData.employeeId || 'EMP001',
               employeeName: employeeName,
-              dept: formData.dept || 'Sales',
+              dept: matchedEmp?.dept || formData.dept || 'Sales',
               ruleType: formData.ruleType || 'Performance Bonus',
               amount: parseInt(formData.amount || '5000'),
               target: parseInt(formData.target || '500000'),
@@ -1573,16 +1577,22 @@ export default function GlobalModals() {
               <label>Employee Name</label>
               <select 
                 value={formData.employeeName || ''} 
-                onChange={e => handleInputChange('employeeName', e.target.value)}
+                onChange={e => {
+                  const empName = e.target.value;
+                  const emp = employees.find(x => x.name === empName);
+                  handleInputChange('employeeName', empName);
+                  if (emp) {
+                    handleInputChange('employeeId', emp.id);
+                    handleInputChange('dept', emp.dept);
+                  }
+                }}
                 required
                 className="form-input"
               >
                 <option value="">Select Employee</option>
-                <option value="Ananya Sharma">Ananya Sharma (Sales)</option>
-                <option value="Arjun Kumar">Arjun Kumar (Sales)</option>
-                <option value="Priya Nair">Priya Nair (Sales)</option>
-                <option value="Dev Patel">Dev Patel (Operations)</option>
-                <option value="Rohan Mehta">Rohan Mehta (Engineering)</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.name}>{emp.name} ({emp.dept})</option>
+                ))}
               </select>
             </div>
 

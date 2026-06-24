@@ -15,9 +15,13 @@ export default function Payroll() {
   const [step, setStep] = useState(1);
   const [processing, setProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
-  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments } = useApp();
+  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth } = useApp();
 
-  const parsedSalary = (salStr: string) => {
+  const parsedSalary = (salStr: any) => {
+    if (!salStr || typeof salStr !== 'string') {
+      if (typeof salStr === 'number') return salStr;
+      return 50000;
+    }
     const clean = salStr.replace(/[^\d]/g, '');
     const val = parseInt(clean, 10);
     return isNaN(val) ? 50000 : val;
@@ -102,14 +106,16 @@ export default function Payroll() {
 
   const fmt = (n: number) => `₹ ${n.toLocaleString('en-IN')}`;
 
-  const runPayroll = () => {
+  const runPayroll = async () => {
     setProcessing(true);
-    setTimeout(() => { 
-      setProcessing(false); 
+    const result = await lockPayrollMonth(2025, 6, "June 2025 payroll run finalized");
+    setProcessing(false);
+    if (result.ok) {
       setProcessed(true); 
       setStep(3); 
-      toast('success', 'Payroll Run Complete', 'June 2025 payroll run has been executed successfully.');
-    }, 2500);
+    } else {
+      toast('error', 'Payroll Run Failed', result.error || 'Could not finalize payroll month.');
+    }
   };
 
   const downloadPayrollCSV = () => {

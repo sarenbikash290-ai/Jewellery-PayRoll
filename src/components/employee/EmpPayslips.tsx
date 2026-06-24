@@ -9,7 +9,7 @@ interface EmpPayslipsProps {
 }
 
 export default function EmpPayslips({ employee }: EmpPayslipsProps) {
-  const { toast } = useApp();
+  const { toast, payrollLocks } = useApp();
   const [downloading, setDownloading] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -40,11 +40,78 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
     return { gross, deductions: pf + esi + tds, net };
   }, [employee]);
 
-  const payslipsList = [
-    { month: 'June 2025', status: 'released' },
-    { month: 'May 2025', status: 'released' },
-    { month: 'April 2025', status: 'released' }
-  ];
+  const parseJoinedDate = (joinedStr: string) => {
+    if (!joinedStr) return new Date(2000, 0, 1);
+    const parsed = Date.parse(joinedStr);
+    if (!isNaN(parsed)) return new Date(parsed);
+
+    const parts = joinedStr.trim().split(/\s+/);
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const monthsShort = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const monthsLong = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const mStr = parts[1].toLowerCase();
+      let monthIdx = monthsShort.indexOf(mStr);
+      if (monthIdx === -1) {
+        monthIdx = monthsLong.indexOf(mStr);
+      }
+      if (monthIdx === -1 && mStr.length >= 3) {
+        monthIdx = monthsShort.indexOf(mStr.substring(0, 3));
+      }
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && monthIdx > -1 && !isNaN(year)) {
+        return new Date(year, monthIdx, day);
+      }
+    }
+    return new Date(2000, 0, 1);
+  };
+
+  const parsePayslipMonth = (monthStr: string) => {
+    const parts = monthStr.trim().split(/\s+/);
+    if (parts.length === 2) {
+      const monthsLong = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const monthsShort = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const mStr = parts[0].toLowerCase();
+      let monthIdx = monthsLong.indexOf(mStr);
+      if (monthIdx === -1) {
+        monthIdx = monthsShort.indexOf(mStr);
+      }
+      if (monthIdx === -1 && mStr.length >= 3) {
+        monthIdx = monthsShort.indexOf(mStr.substring(0, 3));
+      }
+      const year = parseInt(parts[1], 10);
+      if (monthIdx > -1 && !isNaN(year)) {
+        return new Date(year, monthIdx, 1);
+      }
+    }
+    return new Date(2000, 0, 1);
+  };
+
+  const filteredPayslips = useMemo(() => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    // Convert locks to payslip format
+    const lockedPayslips = payrollLocks.map(lock => ({
+      month: `${months[lock.month - 1]} ${lock.year}`,
+      status: 'released' as const
+    }));
+
+    // Filter by join date eligibility
+    const eligible = lockedPayslips.filter(slip => {
+      const payslipDate = parsePayslipMonth(slip.month);
+      const joinedDate = parseJoinedDate(employee.joined);
+      return (
+        payslipDate.getFullYear() > joinedDate.getFullYear() ||
+        (payslipDate.getFullYear() === joinedDate.getFullYear() &&
+         payslipDate.getMonth() >= joinedDate.getMonth())
+      );
+    });
+
+    // Sort by date descending
+    return eligible.sort((a, b) => {
+      return parsePayslipMonth(b.month).getTime() - parsePayslipMonth(a.month).getTime();
+    });
+  }, [payrollLocks, employee.joined]);
 
   const handleDownload = (month: string) => {
     setDownloading(month);
@@ -77,7 +144,12 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
 
       {/* Payslips Cards List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '16px' }}>
-        {payslipsList.map((slip, i) => (
+        {filteredPayslips.length === 0 ? (
+          <div className="glass-card" style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-secondary)', background: '#FFFFFF', borderRadius: '16px', border: '1px solid rgba(15,23,42,0.06)' }}>
+            No payslips available. Payslips are generated at the end of each working month starting from your joined month ({employee.joined}).
+          </div>
+        ) : (
+          filteredPayslips.map((slip, i) => (
           <div key={i} className="glass-card" style={{
             flexDirection: 'column',
             alignItems: 'stretch',
@@ -164,7 +236,7 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
               {downloading === slip.month ? 'Generating...' : 'Download PDF'}
             </button>
           </div>
-        ))}
+        )))}
       </div>
 
       <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', background: 'rgba(217,119,6,0.05)', border: '1px solid rgba(217,119,6,0.12)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '11px', alignItems: 'center' }}>

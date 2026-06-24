@@ -28,7 +28,7 @@ interface EmpRow {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const avatarColors = ['#F59E0B','#8B9AB5','#92400E','#4A5568','#4F8EF7','#10B981','#EF4444','#06B6D4'];
+const avatarColors = ['#F59E0B', '#8B9AB5', '#92400E', '#4A5568', '#4F8EF7', '#10B981', '#EF4444', '#06B6D4'];
 type TabType = 'incentives' | 'commissions' | 'rules' | 'disputes';
 type DetailTab = 'overview' | 'addSale' | 'monthly' | 'allSales';
 
@@ -129,375 +129,375 @@ function EmployeeDetailPanel({
         cursor: 'default'
       }}
     >
-  <div
-    onClick={e => e.stopPropagation()}
-    style={{
-      width: '100%', maxWidth: '860px',
-      background: 'var(--bg-card)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh'
-    }}
-  >
-      {/* Header */}
-      <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', background: 'linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-            <div style={{
-              width: '48px', height: '48px',
-              background: `linear-gradient(135deg, ${avatarColors[0]}, ${avatarColors[4]})`,
-              borderRadius: '12px', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#fff'
-            }}>
-              {emp.name.charAt(0)}
-            </div>
-            <div>
-              <div style={{ fontSize: '17px', fontWeight: 700, color: '#fff' }}>{emp.name}</div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{emp.role} · {emp.dept}</div>
-              <span style={{
-                display: 'inline-block', fontSize: '10px', fontWeight: 700,
-                padding: '2px 8px', borderRadius: '100px', marginTop: '6px',
-                background: emp.status === 'active' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
-                color: emp.status === 'active' ? '#10B981' : '#EF4444'
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '860px',
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh'
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', background: 'linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+              <div style={{
+                width: '48px', height: '48px',
+                background: `linear-gradient(135deg, ${avatarColors[0]}, ${avatarColors[4]})`,
+                borderRadius: '12px', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#fff'
               }}>
-                {emp.status.toUpperCase()}
-              </span>
-            </div>
-          </div>
-          <button onClick={onClose} style={{
-            background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px',
-            color: '#fff', cursor: 'pointer', padding: '6px', display: 'flex'
-          }}>
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Quick stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '16px' }}>
-          {[
-            { label: 'Salary', value: `₹${(emp.salary/1000).toFixed(0)}K`, color: '#4F8EF7' },
-            { label: 'This Month Sales', value: `₹${(currentMonthTotal/1000).toFixed(0)}K`, color: '#10B981' },
-            { label: 'Incentive', value: `₹${fmt(emp.incentive)}`, color: '#F59E0B' },
-          ].map((s, i) => (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '8px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Target progress */}
-        <div style={{ marginTop: '14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px' }}>
-            <span>Target Progress</span>
-            <span style={{ color: perfColor, fontWeight: 700 }}>{achievement.toFixed(0)}% of ₹{(emp.target/100000).toFixed(1)}L</span>
-          </div>
-          <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', width: `${Math.min(achievement, 100)}%`,
-              background: achievement >= 100 ? '#10B981' : achievement >= 60 ? '#4F8EF7' : '#F59E0B',
-              borderRadius: '3px', transition: 'width 0.8s ease'
-            }} />
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '2px', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0, overflowX: 'auto' }}>
-        {detailTabs.map(t => {
-          const Icon = t.icon;
-          return (
-            <button key={t.id} onClick={() => setDetailTab(t.id)} style={{
-              display: 'flex', alignItems: 'center', gap: '5px',
-              padding: '6px 14px', borderRadius: '6px', whiteSpace: 'nowrap',
-              background: detailTab === t.id ? 'var(--brand)' : 'transparent',
-              color: detailTab === t.id ? '#fff' : 'var(--text-secondary)',
-              fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s'
-            }}>
-              <Icon size={13} /> {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-
-        {/* ── Overview Tab ── */}
-        {detailTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Employee Info */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {[
-                { icon: Mail, label: 'Email', value: emp.email },
-                { icon: Phone, label: 'Phone', value: emp.phone },
-                { icon: MapPin, label: 'Location', value: emp.location },
-                { icon: Calendar, label: 'Joined', value: emp.joined },
-                { icon: Briefcase, label: 'Role', value: emp.role },
-                { icon: DollarSign, label: 'Gross Salary', value: `₹${fmt(emp.salary)}` },
-              ].map((f, i) => {
-                const Icon = f.icon;
-                return (
-                  <div key={i} style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px' }}>
-                      <Icon size={12} /> {f.label}
-                    </div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{f.value}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Incentive Info */}
-            {incentiveInfo && (
-              <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#10B981', marginBottom: '10px' }}>🎯 Incentive Details</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Type: </span><span style={{ fontWeight: 600 }}>{incentiveInfo.ruleType}</span></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Month: </span><span style={{ fontWeight: 600 }}>{incentiveInfo.month}</span></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Amount: </span><span style={{ fontWeight: 700, color: '#10B981' }}>₹{fmt(incentiveInfo.amount)}</span></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>Status: </span>
-                    <span style={{ fontWeight: 700, color: incentiveInfo.status === 'paid' ? '#10B981' : '#F59E0B' }}>
-                      {incentiveInfo.status === 'paid' ? '✓ Paid' : '⏳ Pending'}
-                    </span>
-                  </div>
-                </div>
+                {emp.name.charAt(0)}
               </div>
-            )}
-
-            {/* Product breakdown this month */}
-            {productBreakdown.length > 0 ? (
               <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  This Month — Product Sales
-                </div>
-                {productBreakdown.map(([prod, amt], i) => (
-                  <div key={i} style={{ marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                      <span style={{ color: 'var(--text-primary)' }}>{prod}</span>
-                      <span style={{ fontWeight: 700, color: '#4F8EF7' }}>₹{fmt(amt)}</span>
-                    </div>
-                    <div style={{ height: '4px', background: 'var(--bg-elevated)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
-                        width: `${(amt / (currentMonthTotal || 1)) * 100}%`,
-                        background: `hsl(${200 + i * 20}, 80%, 60%)`,
-                        borderRadius: '2px', transition: 'width 0.6s ease'
-                      }} />
-                    </div>
-                  </div>
-                ))}
+                <div style={{ fontSize: '17px', fontWeight: 700, color: '#fff' }}>{emp.name}</div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{emp.role} · {emp.dept}</div>
+                <span style={{
+                  display: 'inline-block', fontSize: '10px', fontWeight: 700,
+                  padding: '2px 8px', borderRadius: '100px', marginTop: '6px',
+                  background: emp.status === 'active' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                  color: emp.status === 'active' ? '#10B981' : '#EF4444'
+                }}>
+                  {emp.status.toUpperCase()}
+                </span>
               </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px', background: 'var(--bg-secondary)', borderRadius: '10px' }}>
-                <Package size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-                <div>No sales recorded this month</div>
-                <button onClick={() => setDetailTab('addSale')} style={{
-                  marginTop: '10px', padding: '6px 16px', background: 'var(--brand)', border: 'none',
-                  borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                }}>Add First Sale</button>
-              </div>
-            )}
+            </div>
+            <button onClick={onClose} style={{
+              background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px',
+              color: '#fff', cursor: 'pointer', padding: '6px', display: 'flex'
+            }}>
+              <X size={18} />
+            </button>
           </div>
-        )}
 
-        {/* ── Add Sale Tab ── */}
-        {detailTab === 'addSale' && (
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>Record a Sale</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Adding for {emp.name}</div>
+          {/* Quick stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '16px' }}>
+            {[
+              { label: 'Salary', value: `₹${(emp.salary / 1000).toFixed(0)}K`, color: '#4F8EF7' },
+              { label: 'This Month Sales', value: `₹${(currentMonthTotal / 1000).toFixed(0)}K`, color: '#10B981' },
+              { label: 'Incentive', value: `₹${fmt(emp.incentive)}`, color: '#F59E0B' },
+            ].map((s, i) => (
+              <div key={i} style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
 
-            <form onSubmit={handleAddSale} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Product / Item</label>
-                <select
-                  value={saleForm.product}
-                  onChange={e => setSaleForm(p => ({ ...p, product: e.target.value }))}
-                  className="form-input"
-                  style={{ fontSize: '13px' }}
-                >
-                  {PRODUCTS.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
+          {/* Target progress */}
+          <div style={{ marginTop: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px' }}>
+              <span>Target Progress</span>
+              <span style={{ color: perfColor, fontWeight: 700 }}>{achievement.toFixed(0)}% of ₹{(emp.target / 100000).toFixed(1)}L</span>
+            </div>
+            <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${Math.min(achievement, 100)}%`,
+                background: achievement >= 100 ? '#10B981' : achievement >= 60 ? '#4F8EF7' : '#F59E0B',
+                borderRadius: '3px', transition: 'width 0.8s ease'
+              }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '2px', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0, overflowX: 'auto' }}>
+          {detailTabs.map(t => {
+            const Icon = t.icon;
+            return (
+              <button key={t.id} onClick={() => setDetailTab(t.id)} style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '6px 14px', borderRadius: '6px', whiteSpace: 'nowrap',
+                background: detailTab === t.id ? 'var(--brand)' : 'transparent',
+                color: detailTab === t.id ? '#fff' : 'var(--text-secondary)',
+                fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s'
+              }}>
+                <Icon size={13} /> {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+
+          {/* ── Overview Tab ── */}
+          {detailTab === 'overview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Employee Info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {[
+                  { icon: Mail, label: 'Email', value: emp.email },
+                  { icon: Phone, label: 'Phone', value: emp.phone },
+                  { icon: MapPin, label: 'Location', value: emp.location },
+                  { icon: Calendar, label: 'Joined', value: emp.joined },
+                  { icon: Briefcase, label: 'Role', value: emp.role },
+                  { icon: DollarSign, label: 'Gross Salary', value: `₹${fmt(emp.salary)}` },
+                ].map((f, i) => {
+                  const Icon = f.icon;
+                  return (
+                    <div key={i} style={{ padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px' }}>
+                        <Icon size={12} /> {f.label}
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{f.value}</div>
+                    </div>
+                  );
+                })}
               </div>
 
-              <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Sale Amount (₹)</label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 700 }}>₹</span>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    value={saleForm.amount}
-                    onChange={e => setSaleForm(p => ({ ...p, amount: e.target.value }))}
-                    placeholder="e.g. 45000"
-                    className="form-input"
-                    style={{ paddingLeft: '28px', fontSize: '13px' }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Sale Date</label>
-                <input
-                  type="date"
-                  value={saleForm.date}
-                  onChange={e => setSaleForm(p => ({ ...p, date: e.target.value }))}
-                  className="form-input"
-                  style={{ fontSize: '13px' }}
-                />
-              </div>
-
-              {/* Live preview */}
-              {saleForm.amount && (
-                <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '12px', fontSize: '12px' }}>
-                  <div style={{ fontWeight: 700, color: '#10B981', marginBottom: '6px' }}>📊 Live Preview After Adding</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>New Monthly Total</span>
-                    <span style={{ fontWeight: 700 }}>₹{fmt(currentMonthTotal + parseFloat(saleForm.amount || '0'))}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Target Achievement</span>
-                    <span style={{ fontWeight: 700, color: '#10B981' }}>
-                      {emp.target > 0 ? (((currentMonthTotal + parseFloat(saleForm.amount || '0')) / emp.target) * 100).toFixed(1) : 'N/A'}%
-                    </span>
+              {/* Incentive Info */}
+              {incentiveInfo && (
+                <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#10B981', marginBottom: '10px' }}>🎯 Incentive Details</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Type: </span><span style={{ fontWeight: 600 }}>{incentiveInfo.ruleType}</span></div>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Month: </span><span style={{ fontWeight: 600 }}>{incentiveInfo.month}</span></div>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Amount: </span><span style={{ fontWeight: 700, color: '#10B981' }}>₹{fmt(incentiveInfo.amount)}</span></div>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Status: </span>
+                      <span style={{ fontWeight: 700, color: incentiveInfo.status === 'paid' ? '#10B981' : '#F59E0B' }}>
+                        {incentiveInfo.status === 'paid' ? '✓ Paid' : '⏳ Pending'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
 
-              <button type="submit" style={{
-                padding: '11px', background: 'var(--brand)', border: 'none', borderRadius: '8px',
-                color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                boxShadow: 'var(--shadow-brand)'
-              }}>
-                <Plus size={16} /> Add Sale Record
-              </button>
-            </form>
-
-            {/* Recent sales quick view */}
-            {mySales.slice(0, 3).length > 0 && (
-              <div style={{ marginTop: '24px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>Recent Sales</div>
-                {mySales.slice(0, 3).map((s, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px', border: '1px solid var(--border)' }}>
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{s.product}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(s.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                    </div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#10B981' }}>₹{fmt(s.amount)}</div>
+              {/* Product breakdown this month */}
+              {productBreakdown.length > 0 ? (
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    This Month — Product Sales
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Monthly History Tab ── */}
-        {detailTab === 'monthly' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Monthly Sales History</div>
-            {monthlySummary.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '13px', background: 'var(--bg-secondary)', borderRadius: '10px' }}>
-                <BarChart2 size={32} style={{ opacity: 0.3, marginBottom: '8px', display: 'block', margin: '0 auto 8px' }} />
-                No sales history yet
-              </div>
-            ) : monthlySummary.map((m, i) => (
-              <div key={i} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
-                {/* Month header */}
-                <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', background: i === 0 ? 'rgba(79,142,247,0.06)' : 'transparent' }}>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{m.month}</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>{m.count} sale{m.count !== 1 ? 's' : ''}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#4F8EF7' }}>₹{fmt(m.total)}</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
-                      {emp.target > 0 ? `${((m.total / emp.target) * 100).toFixed(0)}% of target` : 'No target'}
-                    </div>
-                  </div>
-                </div>
-                {/* Product breakdown */}
-                <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {Object.entries(m.products).sort((a, b) => b[1] - a[1]).map(([prod, amt], j) => (
-                    <div key={j} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: `hsl(${200 + j * 25}, 75%, 60%)`, flexShrink: 0 }} />
-                        {prod}
+                  {productBreakdown.map(([prod, amt], i) => (
+                    <div key={i} style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                        <span style={{ color: 'var(--text-primary)' }}>{prod}</span>
+                        <span style={{ fontWeight: 700, color: '#4F8EF7' }}>₹{fmt(amt)}</span>
                       </div>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>₹{fmt(amt)}</div>
+                      <div style={{ height: '4px', background: 'var(--bg-elevated)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${(amt / (currentMonthTotal || 1)) * 100}%`,
+                          background: `hsl(${200 + i * 20}, 80%, 60%)`,
+                          borderRadius: '2px', transition: 'width 0.6s ease'
+                        }} />
+                      </div>
                     </div>
                   ))}
                 </div>
-                {/* Progress bar */}
-                {emp.target > 0 && (
-                  <div style={{ padding: '0 14px 10px' }}>
-                    <div style={{ height: '4px', background: 'var(--bg-elevated)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
-                        width: `${Math.min((m.total / emp.target) * 100, 100)}%`,
-                        background: m.total >= emp.target ? '#10B981' : '#4F8EF7',
-                        borderRadius: '2px'
-                      }} />
+              ) : (
+                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px', background: 'var(--bg-secondary)', borderRadius: '10px' }}>
+                  <Package size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
+                  <div>No sales recorded this month</div>
+                  <button onClick={() => setDetailTab('addSale')} style={{
+                    marginTop: '10px', padding: '6px 16px', background: 'var(--brand)', border: 'none',
+                    borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+                  }}>Add First Sale</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Add Sale Tab ── */}
+          {detailTab === 'addSale' && (
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>Record a Sale</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Adding for {emp.name}</div>
+
+              <form onSubmit={handleAddSale} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Product / Item</label>
+                  <select
+                    value={saleForm.product}
+                    onChange={e => setSaleForm(p => ({ ...p, product: e.target.value }))}
+                    className="form-input"
+                    style={{ fontSize: '13px' }}
+                  >
+                    {PRODUCTS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Sale Amount (₹)</label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 700 }}>₹</span>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={saleForm.amount}
+                      onChange={e => setSaleForm(p => ({ ...p, amount: e.target.value }))}
+                      placeholder="e.g. 45000"
+                      className="form-input"
+                      style={{ paddingLeft: '28px', fontSize: '13px' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Sale Date</label>
+                  <input
+                    type="date"
+                    value={saleForm.date}
+                    onChange={e => setSaleForm(p => ({ ...p, date: e.target.value }))}
+                    className="form-input"
+                    style={{ fontSize: '13px' }}
+                  />
+                </div>
+
+                {/* Live preview */}
+                {saleForm.amount && (
+                  <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '12px', fontSize: '12px' }}>
+                    <div style={{ fontWeight: 700, color: '#10B981', marginBottom: '6px' }}>📊 Live Preview After Adding</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>New Monthly Total</span>
+                      <span style={{ fontWeight: 700 }}>₹{fmt(currentMonthTotal + parseFloat(saleForm.amount || '0'))}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Target Achievement</span>
+                      <span style={{ fontWeight: 700, color: '#10B981' }}>
+                        {emp.target > 0 ? (((currentMonthTotal + parseFloat(saleForm.amount || '0')) / emp.target) * 100).toFixed(1) : 'N/A'}%
+                      </span>
                     </div>
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* ── All Sales Tab ── */}
-        {detailTab === 'allSales' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>All Sale Transactions</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{mySales.length} total</div>
-            </div>
-            {mySales.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '13px', background: 'var(--bg-secondary)', borderRadius: '10px' }}>
-                <ShoppingBag size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />
-                No sales recorded yet
-              </div>
-            ) : (
-                              <div>
-                {mySales.map((s, i) => {
-                  const d = new Date(s.date + 'T00:00:00');
-                  return (
-                    <div key={i} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: '8px',
-                      border: '1px solid var(--border)'
-                    }}>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <div style={{
-                          width: '32px', height: '32px', borderRadius: '8px',
-                          background: `hsl(${(i * 37) % 360}, 60%, 55%)`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                        }}>
-                          <ShoppingBag size={14} color="#fff" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{s.product}</div>
-                          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
-                            {d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </div>
+                <button type="submit" style={{
+                  padding: '11px', background: 'var(--brand)', border: 'none', borderRadius: '8px',
+                  color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  boxShadow: 'var(--shadow-brand)'
+                }}>
+                  <Plus size={16} /> Add Sale Record
+                </button>
+              </form>
+
+              {/* Recent sales quick view */}
+              {mySales.slice(0, 3).length > 0 && (
+                <div style={{ marginTop: '24px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>Recent Sales</div>
+                  {mySales.slice(0, 3).map((s, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px', border: '1px solid var(--border)' }}>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{s.product}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(s.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                       </div>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#10B981' }}>₹{fmt(s.amount)}</div>
                     </div>
-                  );
-                })}
-                <div style={{ marginTop: '8px', padding: '12px', background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>Grand Total</span>
-                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#4F8EF7' }}>₹{fmt(mySales.reduce((s, x) => s + x.amount, 0))}</span>
+                  ))}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
+          {/* ── Monthly History Tab ── */}
+          {detailTab === 'monthly' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Monthly Sales History</div>
+              {monthlySummary.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '13px', background: 'var(--bg-secondary)', borderRadius: '10px' }}>
+                  <BarChart2 size={32} style={{ opacity: 0.3, marginBottom: '8px', display: 'block', margin: '0 auto 8px' }} />
+                  No sales history yet
+                </div>
+              ) : monthlySummary.map((m, i) => (
+                <div key={i} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                  {/* Month header */}
+                  <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', background: i === 0 ? 'rgba(79,142,247,0.06)' : 'transparent' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{m.month}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>{m.count} sale{m.count !== 1 ? 's' : ''}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 800, color: '#4F8EF7' }}>₹{fmt(m.total)}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        {emp.target > 0 ? `${((m.total / emp.target) * 100).toFixed(0)}% of target` : 'No target'}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Product breakdown */}
+                  <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {Object.entries(m.products).sort((a, b) => b[1] - a[1]).map(([prod, amt], j) => (
+                      <div key={j} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: `hsl(${200 + j * 25}, 75%, 60%)`, flexShrink: 0 }} />
+                          {prod}
+                        </div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>₹{fmt(amt)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Progress bar */}
+                  {emp.target > 0 && (
+                    <div style={{ padding: '0 14px 10px' }}>
+                      <div style={{ height: '4px', background: 'var(--bg-elevated)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.min((m.total / emp.target) * 100, 100)}%`,
+                          background: m.total >= emp.target ? '#10B981' : '#4F8EF7',
+                          borderRadius: '2px'
+                        }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── All Sales Tab ── */}
+          {detailTab === 'allSales' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>All Sale Transactions</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{mySales.length} total</div>
+              </div>
+              {mySales.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '13px', background: 'var(--bg-secondary)', borderRadius: '10px' }}>
+                  <ShoppingBag size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />
+                  No sales recorded yet
+                </div>
+              ) : (
+                <div>
+                  {mySales.map((s, i) => {
+                    const d = new Date(s.date + 'T00:00:00');
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: '8px',
+                        border: '1px solid var(--border)'
+                      }}>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '8px',
+                            background: `hsl(${(i * 37) % 360}, 60%, 55%)`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                          }}>
+                            <ShoppingBag size={14} color="#fff" />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{s.product}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                              {d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#10B981' }}>₹{fmt(s.amount)}</div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginTop: '8px', padding: '12px', background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>Grand Total</span>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#4F8EF7' }}>₹{fmt(mySales.reduce((s, x) => s + x.amount, 0))}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
       </div>
-    </div>
     </div>
   );
 }
@@ -513,7 +513,8 @@ export default function Incentives() {
     const monthlySales = employeeSales.filter(s => s.employeeId === emp.id).reduce((sum, s) => sum + s.amount, 0);
     const incentiveObj = incentives.find(i => i.employeeId === emp.id);
     const incentive = incentiveObj ? incentiveObj.amount : 0;
-    const salary = Number(emp.salary.replace(/[₹,\s]/g, '')) || 0;
+    const salaryStr = typeof emp.salary === 'string' ? emp.salary : (typeof emp.salary === 'number' ? String(emp.salary) : '0');
+    const salary = Number(salaryStr.replace(/[₹,\s]/g, '')) || 0;
     const target = incentiveObj?.target || 0;
     const performance = target > 0 && monthlySales >= target ? 'Exceeding' : 'On-track';
     const incStatus = incentiveObj ? incentiveObj.status : 'pending';
@@ -629,8 +630,8 @@ export default function Incentives() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px', width: 'fit-content' }}>
         {[
-          { id: 'incentives', label: '🎁 Incentives (Employees)' },
-          { id: 'commissions', label: '👑 Commissions (Leads)' },
+          { id: 'incentives', label: '🎁 Incentives' },
+          { id: 'commissions', label: '👑 Commissions' },
           { id: 'rules', label: '⚙️ Rules' },
           { id: 'disputes', label: '⚠️ Disputes' },
         ].map(t => (
