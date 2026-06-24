@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const { name, dept, role, email, phone, location, status, joined, salary, type } = body;
+    const { name, dept, role, email, phone, location, status, joined, salary, type, bank_name, bank_account_no, ifsc_code, pan_no, pf_no } = body;
 
     if (!name || !dept || !role || !email || !phone || !location || !joined || !salary || !type) {
       return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 });
@@ -67,7 +67,8 @@ export async function POST(request: Request) {
       .from('employees')
       .insert({
         id: nextId, name, dept, role, email, phone, location, 
-        status: status || 'active', joined, salary, type
+        status: status || 'active', joined, salary, type,
+        bank_name, bank_account_no, ifsc_code, pan_no, pf_no
       })
       .select()
       .single();
@@ -98,7 +99,7 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, name, dept, role, email, phone, location, status, joined, salary, type } = body;
+    const { id, name, dept, role, email, phone, location, status, joined, salary, type, bank_name, bank_account_no, ifsc_code, pan_no, pf_no } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Missing employee ID' }, { status: 400 });
@@ -106,7 +107,7 @@ export async function PATCH(request: Request) {
 
     const { data: updatedEmp, error } = await supabase
       .from('employees')
-      .update({ name, dept, role, email, phone, location, status, joined, salary, type })
+      .update({ name, dept, role, email, phone, location, status, joined, salary, type, bank_name, bank_account_no, ifsc_code, pan_no, pf_no })
       .eq('id', id)
       .select()
       .single();

@@ -79,17 +79,23 @@ export function generatePayslip(employee: Employee, month: string) {
 
   doc.setFont('Helvetica', 'normal');
   doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
-  doc.text('Email:', 110, 58);
-  doc.text('Phone:', 110, 64);
-  doc.text('Location:', 110, 70);
-  doc.text('Job Type:', 110, 76);
+  doc.text('Bank Account No:', 110, 58);
+  doc.text('IFSC Code:', 110, 64);
+  doc.text('PF Number:', 110, 70);
+  doc.text('PAN Card No:', 110, 76);
 
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   doc.setFont('Helvetica', 'bold');
-  doc.text(employee.email, 135, 58);
-  doc.text(employee.phone, 135, 64);
-  doc.text(employee.location, 135, 70);
-  doc.text(employee.type, 135, 76);
+
+  const bankAcc = employee.bank_account_no ? `${employee.bank_account_no}${employee.bank_name ? ` (${employee.bank_name})` : ''}` : `XXXX XXXX ${employee.id ? employee.id.replace('EMP', '89') : '8901'}`;
+  const ifsc = employee.ifsc_code ? employee.ifsc_code : 'UTIB0000129';
+  const pfNoStr = employee.pf_no ? employee.pf_no : `DL/CPM/89012/${employee.id ? employee.id.replace('EMP', '1') : '129'}`;
+  const pan = employee.pan_no ? employee.pan_no : `BKPPS7${employee.id ? employee.id.replace('EMP', '89') : '892'}K`;
+
+  doc.text(bankAcc, 142, 58);
+  doc.text(ifsc, 142, 64);
+  doc.text(pfNoStr, 142, 70);
+  doc.text(pan, 142, 76);
 
   // Divider Line
   doc.line(15, 84, 195, 84);

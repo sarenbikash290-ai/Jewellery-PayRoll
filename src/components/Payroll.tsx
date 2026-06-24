@@ -112,6 +112,77 @@ export default function Payroll() {
     }, 2500);
   };
 
+  const downloadPayrollCSV = () => {
+    // CSV headers
+    const headers = [
+      'Employee ID',
+      'Name',
+      'Department',
+      'Basic Salary (INR)',
+      'HRA (INR)',
+      'Allowances (INR)',
+      'Gross Salary (INR)',
+      'Incentives & Commissions (INR)',
+      'LOP Deduction (INR)',
+      'Salary Advance Deduction (INR)',
+      'PF (INR)',
+      'ESI (INR)',
+      'TDS (INR)',
+      'Net Payable (INR)',
+      'Bank Name',
+      'Bank Account Number',
+      'IFSC Code',
+      'PAN Number',
+      'PF Number'
+    ];
+
+    // CSV rows
+    const rows = payrollEmployees.map(pe => {
+      const empDetails = employees.find(e => e.id === pe.id);
+      return [
+        pe.id,
+        pe.name,
+        pe.dept,
+        pe.basic,
+        pe.hra,
+        pe.allowances,
+        pe.gross,
+        pe.incentives,
+        pe.lopDeduction,
+        pe.advanceDeduction,
+        pe.pf,
+        pe.esi,
+        pe.tds,
+        pe.net,
+        empDetails?.bank_name || 'N/A',
+        empDetails?.bank_account_no ? `"${empDetails.bank_account_no}"` : 'N/A',
+        empDetails?.ifsc_code || 'N/A',
+        empDetails?.pan_no || 'N/A',
+        empDetails?.pf_no || 'N/A'
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => {
+        const strVal = String(val).replace(/"/g, '""');
+        return strVal.includes(',') ? `"${strVal}"` : strVal;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `HRPulse_Payroll_Summary_June_2025.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast('success', 'Export Complete', 'Payroll summary CSV sheet downloaded successfully.');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -199,7 +270,7 @@ export default function Payroll() {
                 <AlertCircle size={18} color="#F59E0B" style={{ flexShrink: 0 }} />
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#F59E0B' }}>Final Approval Required</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>You're about to process <strong style={{ color: 'var(--text-primary)' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> in net payroll for {employees.length} employees. This action will initiate bank transfers.</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>You're about to process <strong style={{ color: 'var(--text-primary)' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> in net payroll for {employees.length} employees. This action will lock the payroll records for this month.</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -216,13 +287,13 @@ export default function Payroll() {
                 <CheckCircle size={28} color="#10B981" />
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Payroll Processed! 🎉</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>June 2025 payroll of <strong style={{ color: '#10B981' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> has been processed. Payslips are being emailed to all employees.</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>June 2025 payroll of <strong style={{ color: '#10B981' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> has been processed. Payslips are now available for employees to view and download.</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                 <button 
-                  onClick={() => toast('success', 'Bank File Exported', 'NEFT/ACH batch transfer file for June 2025 has been generated.')}
+                  onClick={downloadPayrollCSV}
                   style={{ padding: '10px 20px', background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
-                  <Download size={14} /> Download Bank File
+                  <Download size={14} /> Download Bank Transfer Sheet (CSV)
                 </button>
                 <button onClick={() => { setStep(1); setProcessed(false); }} style={{ padding: '10px 20px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Reset</button>
               </div>

@@ -15,11 +15,21 @@ interface EmployeePortalProps {
 type ModuleType = 'dashboard' | 'attendance' | 'leave' | 'payslips';
 
 export default function EmployeePortal({ empSession, onLogout }: EmployeePortalProps) {
-  const { employees } = useApp();
+  const { employees, updateEmployeeProfile } = useApp();
   const [activeModule, setActiveModule] = useState<ModuleType>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileTab, setProfileTab] = useState<'info' | 'bank'>('info');
+
+  const [bankForm, setBankForm] = useState({
+    bank_name: '',
+    bank_account_no: '',
+    ifsc_code: '',
+    pan_no: '',
+    pf_no: ''
+  });
+  const [isSavingBank, setIsSavingBank] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -46,6 +56,27 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
       type: 'Full-time'
     };
   }, [employees, empSession]);
+
+  useEffect(() => {
+    if (showProfileModal) {
+      setProfileTab('info');
+      setBankForm({
+        bank_name: employee.bank_name || '',
+        bank_account_no: employee.bank_account_no || '',
+        ifsc_code: employee.ifsc_code || '',
+        pan_no: employee.pan_no || '',
+        pf_no: employee.pf_no || ''
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showProfileModal]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingBank(true);
+    await updateEmployeeProfile(bankForm);
+    setIsSavingBank(false);
+  };
 
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -515,6 +546,36 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
               </button>
             </div>
 
+            {/* Modal Tabs */}
+            <div style={{ display: 'flex', gap: '8px', padding: '0 28px', borderBottom: '1px solid rgba(15, 23, 42, 0.06)' }}>
+              {[
+                { id: 'info', label: 'Employment Info' },
+                { id: 'bank', label: 'Bank & Tax Settings' },
+              ].map(tab => {
+                const active = profileTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setProfileTab(tab.id as 'info' | 'bank')}
+                    style={{
+                      padding: '10px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: active ? '2px solid var(--brand)' : '2px solid transparent',
+                      color: active ? 'var(--brand)' : '#64748B',
+                      fontSize: '13px',
+                      fontWeight: active ? 700 : 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Modal Body */}
             <div style={{ padding: '24px 28px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {/* Profile Card Header */}
@@ -544,34 +605,120 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
                 </div>
               </div>
 
-              {/* Info Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                {[
-                  { icon: User, label: 'Employee ID', value: employee.id },
-                  { icon: Briefcase, label: 'Job Type', value: employee.type },
-                  { icon: Mail, label: 'Email Address', value: employee.email },
-                  { icon: Phone, label: 'Phone Number', value: employee.phone },
-                  { icon: MapPin, label: 'Store Location', value: employee.location || 'Flagship Store' },
-                  { icon: Calendar, label: 'Date Joined', value: employee.joined },
-                  { icon: DollarSign, label: 'Base Salary', value: employee.salary },
-                ].map((f, i) => {
-                  const Icon = f.icon;
-                  return (
-                    <div key={i} style={{ 
-                      padding: '10px 14px', 
-                      background: '#F8FAFC', 
-                      borderRadius: '12px', 
-                      border: '1px solid rgba(15, 23, 42, 0.04)',
-                      gridColumn: f.label === 'Email Address' ? 'span 2' : 'span 1'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#64748B', marginBottom: '4px', fontWeight: 600 }}>
-                        <Icon size={11} color="var(--brand)" /> {f.label}
+              {profileTab === 'info' ? (
+                /* Info Grid */
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {[
+                    { icon: User, label: 'Employee ID', value: employee.id },
+                    { icon: Briefcase, label: 'Job Type', value: employee.type },
+                    { icon: Mail, label: 'Email Address', value: employee.email },
+                    { icon: Phone, label: 'Phone Number', value: employee.phone },
+                    { icon: MapPin, label: 'Store Location', value: employee.location || 'Flagship Store' },
+                    { icon: Calendar, label: 'Date Joined', value: employee.joined },
+                    { icon: DollarSign, label: 'Base Salary', value: employee.salary },
+                  ].map((f, i) => {
+                    const Icon = f.icon;
+                    return (
+                      <div key={i} style={{ 
+                        padding: '10px 14px', 
+                        background: '#F8FAFC', 
+                        borderRadius: '12px', 
+                        border: '1px solid rgba(15, 23, 42, 0.04)',
+                        gridColumn: f.label === 'Email Address' ? 'span 2' : 'span 1'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#64748B', marginBottom: '4px', fontWeight: 600 }}>
+                          <Icon size={11} color="var(--brand)" /> {f.label}
+                        </div>
+                        <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#0F172A', wordBreak: 'break-all' }}>{f.value}</div>
                       </div>
-                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#0F172A', wordBreak: 'break-all' }}>{f.value}</div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Bank & Tax Details Form */
+                <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', marginBottom: '6px', display: 'block' }}>Bank Name</label>
+                      <input
+                        type="text"
+                        value={bankForm.bank_name}
+                        onChange={e => setBankForm(p => ({ ...p, bank_name: e.target.value }))}
+                        placeholder="e.g. State Bank of India"
+                        className="input-glass"
+                        style={{ width: '100%', padding: '10px 12px', fontSize: '13px', borderRadius: '10px', boxSizing: 'border-box' }}
+                      />
                     </div>
-                  );
-                })}
-              </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', marginBottom: '6px', display: 'block' }}>Bank Account Number</label>
+                      <input
+                        type="text"
+                        value={bankForm.bank_account_no}
+                        onChange={e => setBankForm(p => ({ ...p, bank_account_no: e.target.value }))}
+                        placeholder="e.g. 30291089201"
+                        className="input-glass"
+                        style={{ width: '100%', padding: '10px 12px', fontSize: '13px', borderRadius: '10px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', marginBottom: '6px', display: 'block' }}>IFSC Code</label>
+                      <input
+                        type="text"
+                        value={bankForm.ifsc_code}
+                        onChange={e => setBankForm(p => ({ ...p, ifsc_code: e.target.value }))}
+                        placeholder="e.g. SBIN0001239"
+                        className="input-glass"
+                        style={{ width: '100%', padding: '10px 12px', fontSize: '13px', borderRadius: '10px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', marginBottom: '6px', display: 'block' }}>PAN Number</label>
+                      <input
+                        type="text"
+                        value={bankForm.pan_no}
+                        onChange={e => setBankForm(p => ({ ...p, pan_no: e.target.value }))}
+                        placeholder="e.g. ABCDE1234F"
+                        className="input-glass"
+                        style={{ width: '100%', padding: '10px 12px', fontSize: '13px', borderRadius: '10px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', marginBottom: '6px', display: 'block' }}>PF Number</label>
+                      <input
+                        type="text"
+                        value={bankForm.pf_no}
+                        onChange={e => setBankForm(p => ({ ...p, pf_no: e.target.value }))}
+                        placeholder="e.g. DL/CPM/89012/123"
+                        className="input-glass"
+                        style={{ width: '100%', padding: '10px 12px', fontSize: '13px', borderRadius: '10px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSavingBank}
+                    style={{
+                      marginTop: '10px',
+                      padding: '11px',
+                      background: 'var(--brand)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: isSavingBank ? 'default' : 'pointer',
+                      boxShadow: '0 4px 12px rgba(217, 119, 6, 0.2)',
+                      transition: 'background 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {isSavingBank ? 'Saving Details...' : 'Save Bank Details'}
+                  </button>
+                </form>
+              )}
             </div>
 
             {/* Modal Footer */}

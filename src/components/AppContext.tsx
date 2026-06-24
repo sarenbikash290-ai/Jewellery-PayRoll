@@ -15,6 +15,11 @@ export interface Employee {
   joined: string;
   salary: string;
   type: string;
+  bank_name?: string;
+  bank_account_no?: string;
+  ifsc_code?: string;
+  pan_no?: string;
+  pf_no?: string;
 }
 
 export interface Incentive {
@@ -202,6 +207,8 @@ interface AppCtx {
   addAdvancePayment: (adv: Omit<AdvancePayment, 'id' | 'createdAt'>) => Promise<void>;
   updateAdvancePaymentStatus: (id: string, status: 'pending' | 'deducted' | 'partial') => Promise<void>;
   deleteAdvancePayment: (id: string) => Promise<void>;
+  // Employee Profile update
+  updateEmployeeProfile: (profile: { bank_name?: string; bank_account_no?: string; ifsc_code?: string; pan_no?: string; pf_no?: string }) => Promise<void>;
 }
 
 const Ctx = createContext<AppCtx>({} as AppCtx);
@@ -997,6 +1004,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
+  const updateEmployeeProfile = useCallback(async (profile: { bank_name?: string; bank_account_no?: string; ifsc_code?: string; pan_no?: string; pf_no?: string }) => {
+    try {
+      const res = await fetch('/api/employee/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
+      const data = await res.json();
+      if (data.ok && data.employee) {
+        setEmployees(prev => prev.map(e => e.id === data.employee.id ? data.employee : e));
+        toast('success', 'Profile Updated', 'Your bank and tax details have been updated successfully.');
+      } else {
+        throw new Error(data.error || 'Server error');
+      }
+    } catch (err: any) {
+      toast('error', 'Update Failed', err.message || 'Could not update profile.');
+    }
+  }, [toast]);
+
   return (
     <Ctx.Provider
       value={{
@@ -1045,11 +1071,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addAdvancePayment,
         updateAdvancePaymentStatus,
         deleteAdvancePayment,
+        updateEmployeeProfile,
       }}
     >
       {children}
       {/* Toast Container */}
-      <div className="toast-container" style={{ position: 'fixed', bottom: '28px', right: '28px', zIndex: 200, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div className="toast-container" style={{ position: 'fixed', bottom: '28px', right: '28px', zIndex: 99999, display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {toasts.map(t => (
           <Toast key={t.id} item={t} onDismiss={() => dismiss(t.id)} />
         ))}

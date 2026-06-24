@@ -847,6 +847,42 @@ export default function GlobalModals() {
               </button>
               <button 
                 type="button" 
+                onClick={async () => {
+                  if (confirm(`Are you sure you want to reset the login PIN for ${emp.name} to the default '1234'?`)) {
+                    try {
+                      const res = await fetch('/api/auth/employee', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'resetPinByAdmin', employeeId: emp.id })
+                      });
+                      const data = await res.json();
+                      if (data.ok) {
+                        toast('success', 'PIN Reset Successful', `${emp.name}'s login PIN has been reset back to default '1234'.`);
+                      } else {
+                        toast('error', 'PIN Reset Failed', data.error || 'Could not reset PIN.');
+                      }
+                    } catch {
+                      toast('error', 'Error', 'Failed to communicate with the server.');
+                    }
+                  }
+                }}
+                style={{ 
+                  padding: '8px 16px', 
+                  fontSize: '13px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: 'rgba(217, 119, 6, 0.1)', 
+                  border: '1px solid rgba(217, 119, 6, 0.3)', 
+                  borderRadius: '8px', 
+                  color: '#D97706',
+                  cursor: 'pointer' 
+                }}
+              >
+                <Shield size={14} /> Reset PIN
+              </button>
+              <button 
+                type="button" 
                 onClick={() => {
                   closeModal();
                   setTimeout(() => openModal('editEmployee', emp), 150);
@@ -1090,10 +1126,10 @@ export default function GlobalModals() {
                   <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Department:</span> <span style={{ color: '#0d131f' }}>{emp.dept}</span></div>
                 </div>
                 <div>
-                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Bank Account No:</span> <span style={{ color: '#0d131f' }}>XXXX XXXX {emp.id ? emp.id.replace('EMP', '89') : '8901'}</span></div>
-                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>IFSC Code:</span> <span style={{ color: '#0d131f' }}>UTIB0000129</span></div>
-                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PF Number:</span> <span style={{ color: '#0d131f' }}>DL/CPM/89012/{emp.id ? emp.id.replace('EMP', '1') : '129'}</span></div>
-                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PAN Card No:</span> <span style={{ color: '#0d131f' }}>BKPPS7{emp.id ? emp.id.replace('EMP', '89') : '892'}K</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Bank Account No:</span> <span style={{ color: '#0d131f', fontWeight: 700 }}>{emp.bank_account_no ? `${emp.bank_account_no}${emp.bank_name ? ` (${emp.bank_name})` : ''}` : `XXXX XXXX ${emp.id ? emp.id.replace('EMP', '89') : '8901'}`}</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>IFSC Code:</span> <span style={{ color: '#0d131f' }}>{emp.ifsc_code ? emp.ifsc_code : 'UTIB0000129'}</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PF Number:</span> <span style={{ color: '#0d131f' }}>{emp.pf_no ? emp.pf_no : `DL/CPM/89012/${emp.id ? emp.id.replace('EMP', '1') : '129'}`}</span></div>
+                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PAN Card No:</span> <span style={{ color: '#0d131f' }}>{emp.pan_no ? emp.pan_no : `BKPPS7${emp.id ? emp.id.replace('EMP', '89') : '892'}K`}</span></div>
                 </div>
               </div>
 

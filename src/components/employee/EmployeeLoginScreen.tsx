@@ -1,48 +1,94 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../AppContext';
-import { Lock, User, AlertCircle, ShieldCheck, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Lock, Phone, AlertCircle, ShieldCheck, KeyRound, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 interface EmployeeLoginScreenProps {
   onSuccess: (empSession: { empId: string; name: string }) => void;
 }
 
-type ScreenType = 'login' | 'changePin' | 'success';
+type ScreenType = 'login' | 'otp' | 'changePin' | 'success';
 
 export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenProps) {
-  const { employees, toast } = useApp();
+  const { toast } = useApp();
   const [screen, setScreen] = useState<ScreenType>('login');
   const [mounted, setMounted] = useState(false);
   const [shake, setShake] = useState(false);
 
-  // Login inputs
+  // Auth identifiers
   const [empId, setEmpId] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
+
+  // Screen 1: Login inputs
+  const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Change PIN inputs
+  // Screen 2: OTP inputs
+  const [otp, setOtp] = useState('');
+  const [timer, setTimer] = useState(600); // 10 minutes
+
+  // Screen 3: Change PIN inputs
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState('');
 
-  const idRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const otpRef = useRef<HTMLInputElement>(null);
   const newPinRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
-    idRef.current?.focus();
+    phoneRef.current?.focus();
   }, []);
+
+  // Handle countdown timer on OTP screen
+  useEffect(() => {
+    if (screen !== 'otp') return;
+    const interval = setInterval(() => {
+      setTimer((t) => {
+        if (t <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [screen]);
+
+  // Focus transition helper
+  useEffect(() => {
+    if (screen === 'otp') {
+      setTimeout(() => otpRef.current?.focus(), 150);
+    }
+  }, [screen]);
 
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => setShake(false), 600);
   };
 
+  const fmtTimer = (s: number) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+
+  // Mask phone number (e.g. +91 98765 43210 -> ******3210)
+  const maskPhone = (ph: string) => {
+    const clean = ph.replace(/[^\d]/g, '');
+    if (clean.length < 4) return '***';
+    return `******${clean.slice(-4)}`;
+  };
+
+  // 1. Submit Phone + PIN -> Send OTP
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!empId.trim() || !pin) {
-      setLoginError('Please fill in both fields.');
+    if (!phone.trim() || !pin) {
+      setLoginError('Please enter both your phone number and 4-digit PIN.');
       return;
     }
 
@@ -50,33 +96,33 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
     setLoginError('');
 
     try {
-      // Verify PIN via server directly
       const res = await fetch('/api/auth/employee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', employeeId: empId.trim(), pin })
+        body: JSON.stringify({ action: 'sendOtp', phone: phone.trim(), pin })
       });
       const data = await res.json();
       if (!data.ok) {
         setLoading(false);
-        setLoginError(data.error || 'Incorrect PIN. Please try again.');
+        setLoginError(data.error || 'Incorrect credentials. Please try again.');
         triggerShake();
         setPin('');
         return;
       }
 
       setLoading(false);
-      // Check if it is default pin
-      if (pin === '1234') {
-        toast('warning', 'Default PIN Detected', 'Please change your default PIN before logging in.');
-        setScreen('changePin');
-        setTimeout(() => newPinRef.current?.focus(), 150);
+      setEmpId(data.employeeId);
+      setOtpToken(data.token);
+      setMaskedEmail(data.maskedEmail || '');
+      setOtp('');
+      setScreen('otp');
+      setTimer(600);
+
+      if (data.emailSent) {
+        toast('success', 'OTP Sent to Email', `Verification code sent to registered email ${data.maskedEmail}.`);
       } else {
-        // Complete login
-        setScreen('success');
-        setTimeout(() => {
-          onSuccess({ empId: data.employee.id, name: data.employee.name });
-        }, 1200);
+        console.log('[DEMO MODE] Verification code:', data.otp);
+        toast('warning', 'Demo Mode active', `Email settings unconfigured. Demo OTP is: ${data.otp}`);
       }
     } catch {
       setLoading(false);
@@ -85,6 +131,86 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
     }
   };
 
+  // 2. Submit OTP -> Verify OTP
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length !== 6) {
+      setLoginError('Please enter the full 6-digit OTP code.');
+      triggerShake();
+      return;
+    }
+
+    setLoading(true);
+    setLoginError('');
+
+    try {
+      const res = await fetch('/api/auth/employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', token: otpToken, otp })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setLoading(false);
+        setLoginError(data.error || 'Incorrect OTP code. Please try again.');
+        triggerShake();
+        setOtp('');
+        return;
+      }
+
+      setLoading(false);
+      // Check if employee is using the default PIN
+      if (pin === '1234') {
+        toast('warning', 'Default PIN Detected', 'Please update your default PIN now to protect your profile.');
+        setScreen('changePin');
+        setTimeout(() => newPinRef.current?.focus(), 150);
+      } else {
+        setScreen('success');
+        setTimeout(() => {
+          onSuccess({ empId: data.employee.id, name: data.employee.name });
+        }, 1200);
+      }
+    } catch {
+      setLoading(false);
+      setLoginError('OTP verification failed.');
+      triggerShake();
+    }
+  };
+
+  // 3. Resend OTP Action
+  const handleResendOtp = async () => {
+    setLoading(true);
+    setLoginError('');
+    try {
+      const res = await fetch('/api/auth/employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sendOtp', phone: phone.trim(), pin })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setLoading(false);
+        setLoginError(data.error || 'Failed to resend OTP.');
+        return;
+      }
+      setLoading(false);
+      setOtpToken(data.token);
+      setMaskedEmail(data.maskedEmail || '');
+      setOtp('');
+      setTimer(600);
+      if (data.emailSent) {
+        toast('success', 'OTP Resent', `A new verification code has been sent to ${data.maskedEmail}.`);
+      } else {
+        console.log('[DEMO MODE] Verification code (Resent):', data.otp);
+        toast('warning', 'Demo Mode active', `New demo OTP is: ${data.otp}`);
+      }
+    } catch {
+      setLoading(false);
+      setLoginError('Server connection failed.');
+    }
+  };
+
+  // 4. Change Default PIN Action
   const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPin.length !== 4 || confirmPin.length !== 4) {
@@ -112,7 +238,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'changePin',
-          employeeId: empId.trim(),
+          employeeId: empId,
           oldPin: '1234',
           newPin
         })
@@ -122,7 +248,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
         setScreen('success');
         toast('success', 'PIN Updated', 'Your PIN has been changed successfully.');
         setTimeout(() => {
-          onSuccess({ empId: empId.trim().toUpperCase(), name: data.employee?.name || 'Employee' });
+          onSuccess({ empId: empId.toUpperCase(), name: data.employee?.name || 'Employee' });
         }, 1200);
       } else {
         setPinError(data.error || 'Failed to update PIN.');
@@ -132,6 +258,13 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
       setPinError('Server communication failed.');
       triggerShake();
     }
+  };
+
+  const handleBackToLogin = () => {
+    setScreen('login');
+    setPin('');
+    setOtp('');
+    setLoginError('');
   };
 
   const baseInput: React.CSSProperties = {
@@ -176,8 +309,8 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
       }}
     >
       {/* Background Blobs */}
-      <div style={{ position:'absolute', width:'500px', height:'500px', borderRadius:'50%', background:'radial-gradient(circle,rgba(79,142,247,0.05) 0%,transparent 70%)', top:'-100px', left:'-100px', pointerEvents:'none' }} />
-      <div style={{ position:'absolute', width:'400px', height:'400px', borderRadius:'50%', background:'radial-gradient(circle,rgba(79,142,247,0.03) 0%,transparent 70%)', bottom:'-80px', right:'-80px', pointerEvents:'none' }} />
+      <div style={{ position: 'absolute', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(79,142,247,0.05) 0%,transparent 70%)', top: '-100px', left: '-100px', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(79,142,247,0.03) 0%,transparent 70%)', bottom: '-80px', right: '-80px', pointerEvents: 'none' }} />
 
       <div
         style={{
@@ -203,7 +336,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
             {screen === 'success' ? <CheckCircle2 size={26} color="#fff" /> : screen === 'changePin' ? <KeyRound size={26} color="#fff" /> : <ShieldCheck size={26} color="#fff" />}
           </div>
           <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: '4px' }}>
-            {screen === 'success' ? 'Authenticated!' : screen === 'changePin' ? 'Change Default PIN' : 'Employee Portal'}
+            {screen === 'success' ? 'Authenticated!' : screen === 'otp' ? 'Verification Code' : screen === 'changePin' ? 'Change Default PIN' : 'Employee Portal'}
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase' }}>
             SAI Jewellers · Employee Portal
@@ -211,34 +344,37 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
           <div style={{ marginTop: '8px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
             {screen === 'success'
               ? 'Loading your dashboard...'
-              : screen === 'changePin'
-                ? 'Your account is using the default PIN. Please set a new 4-digit PIN.'
-                : 'Enter your Employee ID and 4-digit PIN to sign in'}
+              : screen === 'otp'
+                ? `OTP sent to +91 ${maskPhone(phone)} ${maskedEmail ? `& email ${maskedEmail}` : ''}`
+                : screen === 'changePin'
+                  ? 'Your account is using the default PIN. Please set a new 4-digit PIN.'
+                  : 'Enter your Phone Number and 4-digit PIN to sign in'}
           </div>
         </div>
 
         {/* Forms */}
         <div style={{ padding: '28px 40px 36px' }}>
+          {loginError && screen !== 'changePin' && (
+            <div style={{ display: 'flex', gap: '10px', padding: '12px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--danger)', fontSize: '12.5px', lineHeight: '1.4', marginBottom: '16px' }}>
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          {/* SCREEN 1: Phone + PIN Entry */}
           {screen === 'login' && (
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {loginError && (
-                <div style={{ display: 'flex', gap: '10px', padding: '12px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--danger)', fontSize: '12.5px', lineHeight: '1.4' }}>
-                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              {/* ID Input */}
+              {/* Phone Input */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>EMPLOYEE ID</label>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>PHONE NUMBER</label>
                 <div style={{ position: 'relative' }}>
-                  <User size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '15px', top: '16px' }} />
+                  <Phone size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '15px', top: '16px' }} />
                   <input
-                    ref={idRef}
+                    ref={phoneRef}
                     type="text"
-                    placeholder="e.g. EMP001"
-                    value={empId}
-                    onChange={(e) => setEmpId(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     style={baseInput}
                     disabled={loading}
                   />
@@ -293,10 +429,95 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
             </form>
           )}
 
+          {/* SCREEN 2: OTP Verification */}
+          {screen === 'otp' && (
+            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>6-DIGIT OTP CODE</label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '15px', top: '16px' }} />
+                  <input
+                    ref={otpRef}
+                    type="text"
+                    maxLength={6}
+                    placeholder="••••••"
+                    value={otp}
+                    onChange={(e) => {
+                      if (/^\d*$/.test(e.target.value)) setOtp(e.target.value);
+                    }}
+                    style={{ ...baseInput, letterSpacing: '12px', fontSize: '16px', textAlign: 'center', paddingLeft: '16px' }}
+                    disabled={loading}
+                  />
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>⏱ Resend in {fmtTimer(timer)}</span>
+                  {timer === 0 && (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={loading}
+                      style={{ background: 'none', border: 'none', color: 'var(--brand)', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                    >
+                      Resend OTP
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={handleBackToLogin}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '12px',
+                    padding: '13px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <ArrowLeft size={14} /> Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    flex: 2,
+                    background: 'var(--brand)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '13px',
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    cursor: loading ? 'default' : 'pointer',
+                    boxShadow: 'var(--shadow-brand)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: loading ? 0.75 : 1,
+                  }}
+                >
+                  {loading ? 'Verifying...' : 'Verify OTP'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* SCREEN 3: Change PIN (If default '1234') */}
           {screen === 'changePin' && (
             <form onSubmit={handleChangePin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               {pinError && (
-                <div style={{ display: 'flex', gap: '10px', padding: '12px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--danger)', fontSize: '12.5px', lineHeight: '1.4' }}>
+                <div style={{ display: 'flex', gap: '10px', padding: '12px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--danger)', fontSize: '12.5px', lineHeight: '1.4', marginBottom: '10px' }}>
                   <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
                   <span>{pinError}</span>
                 </div>
@@ -359,6 +580,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
             </form>
           )}
 
+          {/* SCREEN 4: Authenticated Success */}
           {screen === 'success' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 0', gap: '12px' }}>
               <div style={{ width: '24px', height: '24px', border: '2px solid rgba(15,23,42,0.1)', borderTopColor: '#10B981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -367,7 +589,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
           )}
         </div>
       </div>
-      
+
       {/* Embedded CSS Animations for Login */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes shake {
