@@ -99,8 +99,8 @@ export default function GlobalModals() {
     
     const empData = {
       name,
-      dept: formData.dept || 'Sales',
-      role: formData.role || 'Sales Representative',
+      dept: formData.role || 'Staff',
+      role: formData.role || 'Staff',
       email,
       phone,
       location: formData.location || '',
@@ -525,18 +525,6 @@ export default function GlobalModals() {
 
             {activeTab === 'job' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Department</label>
-                  <select 
-                    value={formData.dept || 'Sales'} 
-                    onChange={e => handleInputChange('dept', e.target.value)}
-                    className="form-input"
-                  >
-                    {['Sales', 'Engineering', 'HR', 'Finance', 'Operations'].map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className="form-group">
                   <label>Job Title / Role</label>
                   <div style={{ position: 'relative' }}>
@@ -1380,7 +1368,39 @@ export default function GlobalModals() {
                     />
                     <button
                       type="button"
-                      onClick={() => setWifiIpInput(clientIp)}
+                      onClick={async () => {
+                        toast('info', 'Detecting IPs', 'Fetching public IPv4 and IPv6 addresses...');
+                        const ips = new Set<string>();
+                        
+                        try {
+                          const res = await fetch('https://api4.ipify.org?format=json');
+                          const data = await res.json();
+                          if (data.ip) ips.add(data.ip);
+                        } catch (e) {
+                          console.log('Failed to fetch IPv4:', e);
+                        }
+
+                        try {
+                          const res = await fetch('https://api6.ipify.org?format=json');
+                          const data = await res.json();
+                          if (data.ip) ips.add(data.ip);
+                        } catch (e) {
+                          console.log('Failed to fetch IPv6:', e);
+                        }
+
+                        if (clientIp && clientIp !== '127.0.0.1') {
+                          ips.add(clientIp);
+                        }
+
+                        if (ips.size > 0) {
+                          const detected = Array.from(ips).join(', ');
+                          setWifiIpInput(detected);
+                          toast('success', 'IPs Detected', `Found: ${detected}`);
+                        } else {
+                          setWifiIpInput('127.0.0.1');
+                          toast('warning', 'Detection Failed', 'Using loopback address 127.0.0.1');
+                        }
+                      }}
                       style={{
                         padding: '8px 14px',
                         background: 'rgba(79, 142, 247, 0.1)',
@@ -1393,16 +1413,16 @@ export default function GlobalModals() {
                         whiteSpace: 'nowrap'
                       }}
                     >
-                      Use Current IP ({clientIp})
+                      Detect Store IPs
                     </button>
                   </div>
                   <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
                     Employees will only be allowed to log attendance when their device requests come from this public IP.
                   </span>
                 </div>
-                {/* System Reset Operations */}
                 <div style={{ gridColumn: 'span 2', marginTop: '10px', padding: '16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px dashed rgba(239, 68, 68, 0.3)', borderRadius: '8px' }}>
                   <label style={{ color: '#EF4444', fontWeight: 700, display: 'block', marginBottom: '6px', fontSize: '13px' }}>System Maintenance</label>
+
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
                     Clear all locally cached data (employees roster, attendance, leaves, incentives, commissions, and notifications) to start with a fresh database.
                   </p>

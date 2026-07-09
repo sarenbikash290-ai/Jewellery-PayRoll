@@ -120,8 +120,8 @@ export async function GET(request: Request) {
 
   const clientIp = extractClientIp(request);
   const authorizedIps = await getAuthorizedWifiIps();
-  // Return the first non-bypass IP for UI display (or 127.0.0.1 as fallback)
-  const authorizedWifiIp = authorizedIps.find(ip => normalizeIp(ip) !== '127.0.0.1') || '127.0.0.1';
+  const nonBypassIps = authorizedIps.filter(ip => normalizeIp(ip) !== '127.0.0.1');
+  const authorizedWifiIp = nonBypassIps.length > 0 ? nonBypassIps.join(', ') : '127.0.0.1';
 
   return NextResponse.json({ 
     ok: true, 
@@ -148,23 +148,28 @@ export async function POST(request: Request) {
 
       const newIp = body.authorizedWifiIp || '127.0.0.1';
 
-      // Also capture the IP of this save request itself (may be IPv6 when typed value is IPv4)
-      // This ensures both IPv4 and IPv6 versions of the same connection are authorized.
+      // Capture request IP
       const requestIp = extractClientIp(request);
-      const normalizedNew     = normalizeIp(newIp);
       const normalizedRequest = normalizeIp(requestIp);
 
-      const ipsToSave = [normalizedNew];
+      // Split comma separated list of inputs
+      const inputIps = newIp.split(',').map((ip: string) => ip.trim()).filter(Boolean);
+      const ipsToSave = [...inputIps];
+
       if (
         normalizedRequest &&
         normalizedRequest !== '127.0.0.1' &&
-        normalizedRequest !== normalizedNew
+        !ipsToSave.map(normalizeIp).includes(normalizedRequest)
       ) {
-        ipsToSave.push(normalizedRequest);
+        ipsToSave.push(requestIp);
       }
 
       await setAuthorizedWifiIps(ipsToSave);
-      return NextResponse.json({ ok: true, authorizedWifiIp: newIp });
+
+      const nonBypassIps = ipsToSave.filter(ip => normalizeIp(ip) !== '127.0.0.1');
+      const authorizedWifiIp = nonBypassIps.length > 0 ? nonBypassIps.join(', ') : '127.0.0.1';
+
+      return NextResponse.json({ ok: true, authorizedWifiIp });
     }
 
     // Check if it is a database reset action
@@ -358,7 +363,8 @@ export async function POST(request: Request) {
 
     // Load all authorized IPs from Supabase (persists across Vercel instances)
     const authorizedIps = await getAuthorizedWifiIps();
-    const authorizedWifiIp = authorizedIps.find(ip => normalizeIp(ip) !== '127.0.0.1') || '127.0.0.1';
+    const nonBypassIps = authorizedIps.filter(ip => normalizeIp(ip) !== '127.0.0.1');
+    const authorizedWifiIp = nonBypassIps.length > 0 ? nonBypassIps.join(', ') : '127.0.0.1';
 
     const isLocal = normalizedClient === '127.0.0.1';
     const isAuthBypassed = authorizedIps.every(ip => normalizeIp(ip) === '127.0.0.1' || normalizeIp(ip) === '');

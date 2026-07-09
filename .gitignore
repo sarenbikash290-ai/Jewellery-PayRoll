@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ppt
+/pptx/*
+SAI_Jewellers_HR_Payroll.pptx

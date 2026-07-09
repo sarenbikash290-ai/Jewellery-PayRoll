@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import PWARegistration from "@/components/PWARegistration";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "HRPulse — HR & Payroll Management Platform",
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         {children}
         <PWARegistration />
+        <Analytics />
       </body>
     </html>
   );
