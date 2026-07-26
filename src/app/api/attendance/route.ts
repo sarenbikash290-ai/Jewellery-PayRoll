@@ -123,11 +123,27 @@ export async function GET(request: Request) {
   const nonBypassIps = authorizedIps.filter(ip => normalizeIp(ip) !== '127.0.0.1');
   const authorizedWifiIp = nonBypassIps.length > 0 ? nonBypassIps.join(', ') : '127.0.0.1';
 
+  // Fetch monthly sales target
+  let monthlySalesTarget = 500000;
+  try {
+    const { data: targetData } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'monthly_sales_target')
+      .maybeSingle();
+    if (targetData?.value) {
+      monthlySalesTarget = parseInt(targetData.value, 10) || 500000;
+    }
+  } catch (e) {
+    console.error('Error fetching sales target from Supabase:', e);
+  }
+
   return NextResponse.json({ 
     ok: true, 
     attendanceRecords, 
     clientIp, 
-    authorizedWifiIp 
+    authorizedWifiIp,
+    monthlySalesTarget
   });
 }
 
@@ -170,6 +186,33 @@ export async function POST(request: Request) {
       const authorizedWifiIp = nonBypassIps.length > 0 ? nonBypassIps.join(', ') : '127.0.0.1';
 
       return NextResponse.json({ ok: true, authorizedWifiIp });
+    }
+
+    // Check if it is a sales target update action
+    if (body.action === 'updateSalesTarget') {
+      if (session.role !== 'admin') {
+        return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
+      }
+
+      const targetVal = parseInt(body.monthlySalesTarget, 10);
+      if (isNaN(targetVal) || targetVal <= 0) {
+        return NextResponse.json({ ok: false, error: 'Invalid sales target value' }, { status: 400 });
+      }
+
+      // Save to Supabase app_config
+      const { error } = await supabase
+        .from('app_config')
+        .upsert(
+          { key: 'monthly_sales_target', value: String(targetVal), updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        );
+
+      if (error) {
+        console.error('Error saving sales target to Supabase:', error);
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ ok: true, monthlySalesTarget: targetVal });
     }
 
     // Check if it is a database reset action
@@ -216,6 +259,34 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
       }
 
+      // Fetch employee name for audit log
+      const { data: empData } = await supabase
+        .from('employees')
+        .select('name')
+        .eq('id', upperEmpId)
+        .maybeSingle();
+      const employeeName = empData?.name || upperEmpId;
+
+      // Write immutable audit log entry for manual logging
+      const { error: auditError } = await supabase
+        .from('attendance_audit_logs')
+        .insert({
+          employee_id: upperEmpId,
+          employee_name: employeeName,
+          attendance_date: date,
+          previous_status: null,
+          new_status: status,
+          check_in_before: null,
+          check_out_before: null,
+          check_in_after: checkIn || null,
+          check_out_after: checkOut || null,
+          edited_by: 'Admin',
+          reason: 'Manual Attendance Logged'
+        });
+      if (auditError) {
+        console.error('Warning: Audit log write failed for manual attendance:', auditError);
+      }
+
       const record = {
         employeeId: data.employee_id,
         date: data.date,
@@ -242,17 +313,19 @@ export async function POST(request: Request) {
       const upperEmpId = employeeId.toUpperCase();
 
       // 2. Validate the date format
-      const targetDate = new Date(date);
+      const [tyr, tmo, tdy] = date.split('-').map(Number);
+      const targetDate = new Date(tyr, tmo - 1, tdy);
       if (isNaN(targetDate.getTime())) {
         return NextResponse.json({ ok: false, error: 'Invalid date format' }, { status: 400 });
       }
 
       // 3. Check 7-day edit window
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const kolkataTodayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const [yr, mo, dy] = kolkataTodayStr.split('-').map(Number);
+      const today = new Date(yr, mo - 1, dy); // Local midnight of today in Kolkata
+      
       const sevenDaysAgo = new Date(today);
       sevenDaysAgo.setDate(today.getDate() - 7);
-      targetDate.setHours(0, 0, 0, 0);
 
       if (targetDate < sevenDaysAgo) {
         return NextResponse.json({
@@ -383,14 +456,14 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    const todayStr = (() => {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    })();
-    const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const now = new Date();
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+    const timeStr = now.toLocaleTimeString('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
 
     // Fetch existing attendance record for today
     const { data: existing, error: fetchErr } = await supabase

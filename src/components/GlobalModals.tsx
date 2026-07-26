@@ -10,10 +10,11 @@ import {
 } from 'lucide-react';
 
 export default function GlobalModals() {
-  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions, advancePayments, auditLogs } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, monthlySalesTarget, updateMonthlySalesTarget, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions, advancePayments, auditLogs } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [wifiIpInput, setWifiIpInput] = useState('');
+  const [salesTargetInput, setSalesTargetInput] = useState(500000);
 
   // Manual attendance states
   const [showManualForm, setShowManualForm] = useState(false);
@@ -33,6 +34,7 @@ export default function GlobalModals() {
     if (modal.open === 'settings') {
       setActiveTab('business');
       setWifiIpInput(authorizedWifiIp);
+      setSalesTargetInput(monthlySalesTarget);
     } else {
       setActiveTab('basic');
     }
@@ -396,6 +398,7 @@ export default function GlobalModals() {
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateAuthorizedWifiIp(wifiIpInput);
+    updateMonthlySalesTarget(salesTargetInput);
     closeModal();
   };
 
@@ -1355,6 +1358,15 @@ export default function GlobalModals() {
                     <option value="thursday">Thursdays Only</option>
                     <option value="sat-thu">Saturday & Thursday</option>
                   </select>
+                </div>
+                <div className="form-group">
+                  <label>Monthly Sales Target (₹)</label>
+                  <input 
+                    type="number" 
+                    value={salesTargetInput} 
+                    onChange={e => setSalesTargetInput(parseInt(e.target.value, 10) || 0)} 
+                    className="form-input" 
+                  />
                 </div>
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label>Authorized Store WiFi Static Public IP</label>

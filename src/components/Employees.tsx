@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from './AppContext';
-import { Search, Filter, Plus, Download, Mail, Phone, MapPin, ChevronDown, Users, UserCheck, UserX, TrendingUp } from 'lucide-react';
+import { Search, Filter, Plus, Download, Mail, Phone, MapPin, ChevronDown, Users, UserCheck, UserX, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 const deptColors: Record<string, string> = {
   Sales: '#10B981', Engineering: '#4F8EF7', HR: '#8B5CF6',
@@ -18,8 +18,19 @@ export default function Employees() {
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState('All');
   const [view, setView] = useState<'table' | 'grid'>('table');
+  const [sortField, setSortField] = useState<string>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selected, setSelected] = useState<string | null>(null);
   const { employees, openModal } = useApp();
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   const filtered = employees.filter(e => {
     const matchSearch = e.name.toLowerCase().includes(search.toLowerCase()) || e.role.toLowerCase().includes(search.toLowerCase());
@@ -27,7 +38,39 @@ export default function Employees() {
     return matchSearch && matchDept;
   });
 
-  const selectedEmp = employees.find(e => e.id === selected);
+  const sorted = [...filtered].sort((a, b) => {
+    let comparison = 0;
+    if (sortField === 'name') {
+      comparison = a.name.localeCompare(b.name);
+    } else if (sortField === 'dept') {
+      comparison = a.dept.localeCompare(b.dept);
+    } else if (sortField === 'role') {
+      comparison = a.role.localeCompare(b.role);
+    } else if (sortField === 'salary') {
+      const salA = parseInt(a.salary.replace(/[^0-9]/g, ''), 10) || 0;
+      const salB = parseInt(b.salary.replace(/[^0-9]/g, ''), 10) || 0;
+      comparison = salA - salB;
+    } else if (sortField === 'joined') {
+      const dateA = new Date(a.joined).getTime() || 0;
+      const dateB = new Date(b.joined).getTime() || 0;
+      comparison = dateA - dateB;
+    } else if (sortField === 'id') {
+      comparison = a.id.localeCompare(b.id);
+    } else if (sortField === 'status') {
+      comparison = a.status.localeCompare(b.status);
+    }
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  const tableHeaders = [
+    { key: 'name', label: 'Employee' },
+    { key: 'dept', label: 'Department' },
+    { key: 'role', label: 'Role' },
+    { key: 'location', label: 'Location' },
+    { key: 'salary', label: 'Salary' },
+    { key: 'joined', label: 'Joined' },
+    { key: 'status', label: 'Status' },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -94,6 +137,8 @@ export default function Employees() {
             onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border)'; }}
           />
         </div>
+
+        {/* Department Filter */}
         <select
           value={dept}
           onChange={e => setDept(e.target.value)}
@@ -103,6 +148,28 @@ export default function Employees() {
             <option key={d} value={d} style={{ background: 'var(--bg-card)' }}>{d}</option>
           ))}
         </select>
+
+        {/* Sort Options */}
+        <select
+          value={`${sortField}-${sortOrder}`}
+          onChange={e => {
+            const [field, order] = e.target.value.split('-');
+            setSortField(field);
+            setSortOrder(order as 'asc' | 'desc');
+          }}
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 16px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+        >
+          <option value="name-asc" style={{ background: 'var(--bg-card)' }}>Sort: Name (A-Z)</option>
+          <option value="name-desc" style={{ background: 'var(--bg-card)' }}>Sort: Name (Z-A)</option>
+          <option value="joined-desc" style={{ background: 'var(--bg-card)' }}>Sort: Joined (Newest)</option>
+          <option value="joined-asc" style={{ background: 'var(--bg-card)' }}>Sort: Joined (Oldest)</option>
+          <option value="salary-desc" style={{ background: 'var(--bg-card)' }}>Sort: Salary (High to Low)</option>
+          <option value="salary-asc" style={{ background: 'var(--bg-card)' }}>Sort: Salary (Low to High)</option>
+          <option value="dept-asc" style={{ background: 'var(--bg-card)' }}>Sort: Department (A-Z)</option>
+          <option value="id-asc" style={{ background: 'var(--bg-card)' }}>Sort: Employee ID</option>
+        </select>
+
+        {/* View Toggle */}
         <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px' }}>
           {(['table', 'grid'] as const).map(v => (
             <button key={v} onClick={() => setView(v)} style={{ padding: '6px 14px', borderRadius: '6px', background: view === v ? 'var(--brand)' : 'transparent', color: view === v ? '#fff' : 'var(--text-muted)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', textTransform: 'capitalize' }}>{v}</button>
@@ -113,7 +180,7 @@ export default function Employees() {
       {/* Grid / Table */}
       {view === 'grid' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-          {filtered.map((emp, i) => (
+          {sorted.map((emp, i) => (
             <Card key={emp.id} style={{ padding: '24px', cursor: 'pointer', transition: 'var(--transition)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = deptColors[emp.dept] || 'var(--brand)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}
@@ -143,13 +210,42 @@ export default function Employees() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  {['Employee', 'Department', 'Role', 'Location', 'Salary', 'Joined', 'Status'].map(h => (
-                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                  {tableHeaders.map(col => {
+                    const isSorted = sortField === col.key;
+                    return (
+                      <th
+                        key={col.key}
+                        onClick={() => handleSort(col.key)}
+                        style={{
+                          padding: '12px 20px',
+                          textAlign: 'left',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: isSorted ? 'var(--brand)' : 'var(--text-muted)',
+                          letterSpacing: '1px',
+                          textTransform: 'uppercase',
+                          borderBottom: '1px solid var(--border)',
+                          whiteSpace: 'nowrap',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          transition: 'color 0.2s',
+                        }}
+                      >
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{col.label}</span>
+                          {isSorted ? (
+                            sortOrder === 'asc' ? <ArrowUp size={13} color="var(--brand)" /> : <ArrowDown size={13} color="var(--brand)" />
+                          ) : (
+                            <ArrowUpDown size={12} style={{ opacity: 0.3 }} />
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((emp, i) => (
+                {sorted.map((emp, i) => (
                   <tr key={emp.id}
                     style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)', cursor: 'pointer' }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
@@ -188,9 +284,9 @@ export default function Employees() {
 
           {/* Pagination */}
           <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Showing {filtered.length} of {employees.length} employees</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Showing {sorted.length} of {employees.length} employees</span>
             <div style={{ display: 'flex', gap: '6px' }}>
-              {Array.from({ length: Math.ceil(filtered.length / 10) || 1 }).map((_, idx) => (
+              {Array.from({ length: Math.ceil(sorted.length / 10) || 1 }).map((_, idx) => (
                 <button key={idx} style={{
                   width: '32px', height: '32px', borderRadius: '6px',
                   background: idx === 0 ? 'var(--brand)' : 'var(--bg-elevated)',
@@ -206,3 +302,4 @@ export default function Employees() {
     </div>
   );
 }
+

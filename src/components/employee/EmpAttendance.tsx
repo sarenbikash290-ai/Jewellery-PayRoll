@@ -81,17 +81,115 @@ export default function EmpAttendance({ employee }: EmpAttendanceProps) {
     }
   };
 
+  const [period, setPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+
+  // Filtered employee attendance records based on selected period
+  const filteredRecords = useMemo(() => {
+    const now = new Date();
+    return myRecords.filter(r => {
+      const recDate = new Date(r.date);
+      if (period === 'weekly') {
+        const diffDays = Math.ceil(Math.abs(now.getTime() - recDate.getTime()) / (1000 * 60 * 60 * 24));
+        return diffDays <= 7;
+      } else if (period === 'yearly') {
+        return recDate.getFullYear() === now.getFullYear();
+      } else {
+        // monthly
+        return recDate.getMonth() === now.getMonth() && recDate.getFullYear() === now.getFullYear();
+      }
+    });
+  }, [myRecords, period]);
+
+  // Summary Metrics for selected period
+  const periodStats = useMemo(() => {
+    const totalPresent = filteredRecords.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+    const totalLate = filteredRecords.filter(r => r.status === 'late').length;
+    let totalMinutes = 0;
+    filteredRecords.forEach(r => {
+      if (r.checkIn && r.checkOut) {
+        try {
+          const diff = parseTimeToMinutes(r.checkOut) - parseTimeToMinutes(r.checkIn);
+          if (diff > 0) totalMinutes += diff;
+        } catch {}
+      }
+    });
+    const totalHours = (totalMinutes / 60).toFixed(1);
+    const onTimeRate = totalPresent > 0 ? Math.round(((totalPresent - totalLate) / totalPresent) * 100) : 100;
+
+    return { totalPresent, totalLate, totalHours, onTimeRate };
+  }, [filteredRecords]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px' }}>
       
-      {/* Header Titles */}
-      <div>
-        <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-          Mark Attendance
-        </h1>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px' }}>
-          Verify your identity to log your shift checks securely.
-        </p>
+      {/* Header Titles & Period Toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+            My Attendance Portal
+          </h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+            Track your weekly, monthly, and yearly attendance logs and shift hours.
+          </p>
+        </div>
+
+        {/* Period Selector Toggle */}
+        <div style={{ display: 'flex', background: '#F1F5F9', padding: '4px', borderRadius: '10px', gap: '4px' }}>
+          {(['weekly', 'monthly', 'yearly'] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: 'none',
+                background: period === p ? '#FFFFFF' : 'transparent',
+                color: period === p ? '#0F172A' : '#64748B',
+                fontSize: '12px',
+                fontWeight: period === p ? 700 : 500,
+                boxShadow: period === p ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                textTransform: 'capitalize',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Attendance Summary Cards for Selected Period */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px' }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid rgba(15,23,42,0.06)', borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckCircle size={20} color="#10B981" />
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Present Days ({period})</div>
+            <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{periodStats.totalPresent} Days</div>
+          </div>
+        </div>
+
+        <div style={{ background: '#FFFFFF', border: '1px solid rgba(15,23,42,0.06)', borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(79,142,247,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Clock size={20} color="#4F8EF7" />
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Hours Logged ({period})</div>
+            <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{periodStats.totalHours} hrs</div>
+          </div>
+        </div>
+
+        <div style={{ background: '#FFFFFF', border: '1px solid rgba(15,23,42,0.06)', borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <UserCheck size={20} color="#F59E0B" />
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Punctuality Rate</div>
+            <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{periodStats.onTimeRate}%</div>
+          </div>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px' }}>
@@ -228,19 +326,19 @@ export default function EmpAttendance({ employee }: EmpAttendanceProps) {
         {/* Attendance Log History */}
         <Card style={{ background: '#FFFFFF' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-              <CalendarIcon size={16} color="#D97706" /> History (This Month)
+            <h3 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+              <CalendarIcon size={16} color="#D97706" /> Attendance History ({period})
             </h3>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#D97706', cursor: 'pointer' }}>View Full Report</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#D97706', cursor: 'pointer' }}>{filteredRecords.length} Records</span>
           </div>
           
-          <div style={{ overflowY: 'auto', maxHeight: '240px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {myRecords.length === 0 ? (
+          <div style={{ overflowY: 'auto', maxHeight: '280px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {filteredRecords.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px', fontSize: '12.5px' }}>
-                No attendance logs found.
+                No attendance logs found for this {period} period.
               </div>
             ) : (
-              myRecords.map((r, idx) => {
+              filteredRecords.map((r, idx) => {
                 const isLate = r.status === 'late';
                 const recordDate = new Date(r.date);
                 const isThursday = recordDate.getDay() === 4;

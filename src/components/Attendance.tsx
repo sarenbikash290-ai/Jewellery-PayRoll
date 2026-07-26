@@ -2,7 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from './AppContext';
 import { parseTimeToMinutes } from '@/utils/time';
-import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell, Lock, Edit3, ShieldAlert, CheckCircle, ClipboardList, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell, Lock, Edit3, ShieldAlert, CheckCircle, ClipboardList, ChevronDown, AlertTriangle, Search, FileText } from 'lucide-react';
 import type { AttendanceAuditLog } from './AppContext';
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
@@ -72,11 +72,115 @@ function LiveClock({ size = 14, weight = 700, showIcon = false }: { size?: numbe
   );
 }
 
+const compareValues = (valA: unknown, valB: unknown, order: 'asc' | 'desc') => {
+  const normalize = (v: unknown) => (v === null || v === undefined) ? '' : v;
+  const a = normalize(valA);
+  const b = normalize(valB);
+
+  if (typeof a === 'number' && typeof b === 'number') {
+    return order === 'asc' ? a - b : b - a;
+  }
+
+  return order === 'asc'
+    ? String(a).localeCompare(String(b))
+    : String(b).localeCompare(String(a));
+};
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves' | 'audit'>('today');
-  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords, editAttendance, isDateEditable, isMonthLocked, auditLogs, fetchAuditLogs } = useApp();
+  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords, editAttendance, isDateEditable, isMonthLocked, auditLogs, fetchAuditLogs, pendingSubTab } = useApp();
+
+  // Auto-switch to a specific tab when navigated with a sub-tab request
+  useEffect(() => {
+    if (pendingSubTab && ['today', 'calendar', 'leaves', 'audit'].includes(pendingSubTab)) {
+      setActiveTab(pendingSubTab as typeof activeTab);
+    }
+  }, [pendingSubTab]);
+
   const currentDate = useMemo(() => new Date(), []);
+
+  // --- Sorting & Filtering States ---
+  // Today's Log
+  const [todaySearch, setTodaySearch] = useState('');
+  const [todayStatusFilter, setTodayStatusFilter] = useState('all');
+  const [todaySortField, setTodaySortField] = useState('name');
+  const [todaySortOrder, setTodaySortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Leave Requests
+  const [leaveSearch, setLeaveSearch] = useState('');
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState('all');
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState('all');
+  const [leaveSortField, setLeaveSortField] = useState('appliedOn');
+  const [leaveSortOrder, setLeaveSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // Audit Log
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditSortField, setAuditSortField] = useState('editTimestamp');
+  const [auditSortOrder, setAuditSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  const handleTodaySort = (field: string) => {
+    if (todaySortField === field) {
+      setTodaySortOrder(todaySortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setTodaySortField(field);
+      setTodaySortOrder('asc');
+    }
+  };
+
+  const handleLeaveSort = (field: string) => {
+    if (leaveSortField === field) {
+      setLeaveSortOrder(leaveSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setLeaveSortField(field);
+      setLeaveSortOrder(field === 'appliedOn' || field === 'from' || field === 'to' ? 'desc' : 'asc');
+    }
+  };
+
+  const handleAuditSort = (field: string) => {
+    if (auditSortField === field) {
+      setAuditSortOrder(auditSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setAuditSortField(field);
+      setAuditSortOrder(field === 'editTimestamp' || field === 'attendanceDate' ? 'desc' : 'asc');
+    }
+  };
+
+  const renderSortHeader = (
+    label: string,
+    field: string,
+    currentField: string,
+    order: 'asc' | 'desc',
+    onSort: (field: string) => void,
+    padding = '12px 20px'
+  ) => {
+    const isSorted = field === currentField;
+    return (
+      <th
+        onClick={() => onSort(field)}
+        style={{
+          padding,
+          textAlign: 'left',
+          fontSize: '11px',
+          fontWeight: 700,
+          color: isSorted ? 'var(--brand)' : 'var(--text-muted)',
+          letterSpacing: '1px',
+          textTransform: 'uppercase',
+          borderBottom: '1px solid var(--border)',
+          whiteSpace: 'nowrap',
+          cursor: 'pointer',
+          userSelect: 'none'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {label}
+          {isSorted ? (order === 'asc' ? ' ↑' : ' ↓') : <span style={{ color: 'var(--text-muted)', opacity: 0.3 }}> ↕</span>}
+        </div>
+      </th>
+    );
+  };
+
+  const [selectedReasonModal, setSelectedReasonModal] = useState<{ open: boolean; title: string; reason: string; applicant?: string; dates?: string; type?: string } | null>(null);
 
   // ── Edit Attendance Modal State ─────────────────────────────────────────────
   const [editModal, setEditModal] = useState<{
@@ -275,6 +379,8 @@ export default function Attendance() {
         } catch { }
       }
 
+      const isManual = auditLogs.some(log => log.employeeId === emp.id && log.attendanceDate === todayStr);
+
       return {
         id: emp.id,
         name: emp.name,
@@ -284,9 +390,9 @@ export default function Attendance() {
         status: realRecord.status,
         hours,
         leave: todayLeave ? todayLeave.type : null,
-        source: 'Mobile App',
-        icon: MapPin,
-        color: '#4F8EF7'
+        source: isManual ? 'Manual' : 'Mobile App',
+        icon: isManual ? Edit3 : MapPin,
+        color: isManual ? '#F59E0B' : '#4F8EF7'
       };
     }
 
@@ -328,13 +434,77 @@ export default function Attendance() {
     return attendanceData.filter(e => !e.checkIn && e.status !== 'wfh');
   }, [attendanceData]);
 
+  const processedAttendanceData = useMemo(() => {
+    let result = [...attendanceData];
+    if (todaySearch) {
+      const q = todaySearch.toLowerCase();
+      result = result.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        r.dept.toLowerCase().includes(q) ||
+        r.id.toLowerCase().includes(q)
+      );
+    }
+    if (todayStatusFilter !== 'all') {
+      result = result.filter(r => r.status === todayStatusFilter);
+    }
+    result.sort((a, b) => {
+      const valA = a[todaySortField as keyof typeof a];
+      const valB = b[todaySortField as keyof typeof b];
+      return compareValues(valA, valB, todaySortOrder);
+    });
+    return result;
+  }, [attendanceData, todaySearch, todayStatusFilter, todaySortField, todaySortOrder]);
+
+  const processedLeaves = useMemo(() => {
+    let result = [...leaves];
+    if (leaveSearch) {
+      const q = leaveSearch.toLowerCase();
+      result = result.filter(r =>
+        r.employeeName.toLowerCase().includes(q) ||
+        r.employeeId.toLowerCase().includes(q) ||
+        r.reason.toLowerCase().includes(q)
+      );
+    }
+    if (leaveStatusFilter !== 'all') {
+      result = result.filter(r => r.status === leaveStatusFilter);
+    }
+    if (leaveTypeFilter !== 'all') {
+      result = result.filter(r => r.type === leaveTypeFilter);
+    }
+    result.sort((a, b) => {
+      const valA = a[leaveSortField as keyof typeof a];
+      const valB = b[leaveSortField as keyof typeof b];
+      return compareValues(valA, valB, leaveSortOrder);
+    });
+    return result;
+  }, [leaves, leaveSearch, leaveStatusFilter, leaveTypeFilter, leaveSortField, leaveSortOrder]);
+
+  const processedAuditLogs = useMemo(() => {
+    let result = [...auditLogs];
+    if (auditSearch) {
+      const q = auditSearch.toLowerCase();
+      result = result.filter(r =>
+        r.employeeName.toLowerCase().includes(q) ||
+        r.employeeId.toLowerCase().includes(q) ||
+        r.editedBy.toLowerCase().includes(q) ||
+        (r.reason?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    result.sort((a, b) => {
+      const valA = a[auditSortField as keyof typeof a];
+      const valB = b[auditSortField as keyof typeof b];
+      return compareValues(valA, valB, auditSortOrder);
+    });
+    return result;
+  }, [auditLogs, auditSearch, auditSortField, auditSortOrder]);
+
   // ── Analytics: last 30 days dept-wise & per-employee stats ─────────────────
   const analyticsData = useMemo(() => {
     const depts = [...new Set(employees.map(e => e.dept))];
     return depts.map(dept => {
       const deptEmps = employees.filter(e => e.dept === dept);
       const deptEmpIds = new Set(deptEmps.map(e => e.id));
-      
+
       // Calculate past 30 days working days (excluding Thursdays)
       let totalWorkingDays = 0;
       for (let ago = 0; ago < 30; ago++) {
@@ -343,19 +513,19 @@ export default function Attendance() {
           totalWorkingDays++;
         }
       }
-      
+
       const totalDays = totalWorkingDays * deptEmps.length;
-      
+
       // Count actual check-ins in the last 30 days (present, late, wfh)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      thirtyDaysAgo.setHours(0,0,0,0);
-      
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
+
       const presentCount = attendanceRecords.filter(r => {
         const rDate = new Date(r.date);
-        return deptEmpIds.has(r.employeeId) && 
-               rDate >= thirtyDaysAgo && 
-               (r.status === 'present' || r.status === 'late' || r.status === 'wfh');
+        return deptEmpIds.has(r.employeeId) &&
+          rDate >= thirtyDaysAgo &&
+          (r.status === 'present' || r.status === 'late' || r.status === 'wfh');
       }).length;
 
       const pct = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 0;
@@ -376,15 +546,15 @@ export default function Attendance() {
       const present = records.filter(r => r.status === 'present').length;
       const late = records.filter(r => r.status === 'late').length;
       const wfh = records.filter(r => r.status === 'wfh').length;
-      
+
       // Calculate absent days: working days so far minus days with check-ins or approved leaves
       const recordedDays = new Set(records.map(r => parseInt(r.date.split('-')[2], 10)));
       let absentCount = records.filter(r => r.status === 'absent').length;
-      
+
       for (let d = 1; d <= Math.min(todayDate.day, daysInMonth); d++) {
         const dateObj = new Date(todayDate.year, todayDate.month, d);
         if (dateObj.getDay() === 4) continue; // skip Thursday off
-        
+
         if (!recordedDays.has(d)) {
           const dateStr = `${todayDate.year}-${String(todayDate.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const hasLeave = leaves.some(l => l.employeeId === emp.id && l.status === 'approved' && dateStr >= l.from && dateStr <= l.to);
@@ -417,13 +587,6 @@ export default function Attendance() {
           }}>
             <LiveClock size={14} weight={700} showIcon />
           </div>
-          <button
-            onClick={() => toast('info', 'Live Biometric Sync', 'Biometric & GPS sync is active. Attendance updates in real-time.')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', color: '#10B981', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-          >
-            <div style={{ width: '8px', height: '8px', background: '#10B981', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} />
-            Live Sync
-          </button>
         </div>
       </div>
 
@@ -456,19 +619,34 @@ export default function Attendance() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px', width: 'fit-content' }}>
-        {[
-          { id: 'today', label: "Today's Log" },
-          { id: 'calendar', label: 'Calendar' },
-          { id: 'leaves', label: 'Leave Requests' },
-          { id: 'audit', label: 'Audit Log' },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => { setActiveTab(tab.id as typeof activeTab); if (tab.id === 'audit') fetchAuditLogs(); }}
-            style={{ padding: '8px 20px', borderRadius: '8px', background: activeTab === tab.id ? 'var(--brand)' : 'transparent', color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', whiteSpace: 'nowrap', border: 'none' }}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {(() => {
+        const pendingLeavesCount = leaves.filter(l => l.status === 'pending').length;
+        return (
+          <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px', width: 'fit-content' }}>
+            {[
+              { id: 'today', label: "Today's Log" },
+              { id: 'calendar', label: 'Calendar' },
+              { id: 'leaves', label: 'Leave Requests', badge: pendingLeavesCount },
+              { id: 'audit', label: 'Audit Log' },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => { setActiveTab(tab.id as typeof activeTab); if (tab.id === 'audit') fetchAuditLogs(); }}
+                style={{ padding: '8px 20px', borderRadius: '8px', background: activeTab === tab.id ? 'var(--brand)' : 'transparent', color: activeTab === tab.id ? '#fff' : 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', whiteSpace: 'nowrap', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {tab.label}
+                {'badge' in tab && tab.badge! > 0 && (
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700,
+                    padding: '1px 6px', borderRadius: '100px', lineHeight: '16px', minWidth: '18px', textAlign: 'center',
+                    background: activeTab === tab.id ? 'rgba(255,255,255,0.25)' : 'rgba(239,68,68,0.12)',
+                    color: activeTab === tab.id ? '#fff' : '#EF4444',
+                  }}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Today's Log */}
       {activeTab === 'today' && (
@@ -477,66 +655,103 @@ export default function Attendance() {
             <span style={{ fontSize: '14px', fontWeight: 600 }}>Live Attendance — {headerDate}</span>
             <LiveClock size={12} weight={600} />
           </div>
+          {/* Toolbar */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                value={todaySearch}
+                onChange={e => setTodaySearch(e.target.value)}
+                placeholder="Search employee, ID or department..."
+                style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px 8px 36px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+                onFocus={e => { (e.target as HTMLElement).style.borderColor = 'var(--brand)'; }}
+                onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border)'; }}
+              />
+            </div>
+            <select
+              value={todayStatusFilter}
+              onChange={e => setTodayStatusFilter(e.target.value)}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="present">Present</option>
+              <option value="late">Late</option>
+              <option value="absent">Absent</option>
+              <option value="wfh">WFH</option>
+            </select>
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  {['Employee', 'Dept', 'Check In', 'Check Out', 'Hours', 'Marking Source', 'Leave Type', 'Status'].map(h => (
-                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                  {renderSortHeader('Employee', 'name', todaySortField, todaySortOrder, handleTodaySort)}
+                  {renderSortHeader('Dept', 'dept', todaySortField, todaySortOrder, handleTodaySort)}
+                  {renderSortHeader('Check In', 'checkIn', todaySortField, todaySortOrder, handleTodaySort)}
+                  {renderSortHeader('Check Out', 'checkOut', todaySortField, todaySortOrder, handleTodaySort)}
+                  {renderSortHeader('Hours', 'hours', todaySortField, todaySortOrder, handleTodaySort)}
+                  {renderSortHeader('Marking Source', 'source', todaySortField, todaySortOrder, handleTodaySort)}
+                  {renderSortHeader('Leave Type', 'leave', todaySortField, todaySortOrder, handleTodaySort)}
+                  {renderSortHeader('Status', 'status', todaySortField, todaySortOrder, handleTodaySort)}
                 </tr>
               </thead>
               <tbody>
-                {attendanceData.map((emp, i) => {
-                  const SrcIcon = emp.icon;
-                  return (
-                    <tr key={emp.id} style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)', cursor: 'pointer' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                      onClick={() => {
-                        const fullEmp = employees.find(e => e.id === emp.id);
-                        if (fullEmp) openModal('viewEmployee', fullEmp);
-                      }}
-                    >
-                      <td style={{ padding: '14px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '32px', height: '32px', background: avatarColors[i % avatarColors.length], borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{emp.name.charAt(0)}</div>
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{emp.id}</div>
+                {processedAttendanceData.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      No matching records found.
+                    </td>
+                  </tr>
+                ) : (
+                  processedAttendanceData.map((emp, i) => {
+                    const SrcIcon = emp.icon;
+                    return (
+                      <tr key={emp.id} style={{ borderBottom: '1px solid var(--border)', transition: 'var(--transition)', cursor: 'pointer' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                        onClick={() => {
+                          const fullEmp = employees.find(e => e.id === emp.id);
+                          if (fullEmp) openModal('viewEmployee', fullEmp);
+                        }}
+                      >
+                        <td style={{ padding: '14px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '32px', height: '32px', background: avatarColors[i % avatarColors.length], borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{emp.name.charAt(0)}</div>
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{emp.id}</div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '14px 20px', fontSize: '12px', color: 'var(--text-secondary)' }}>{emp.dept}</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: emp.checkIn ? 500 : 400, color: emp.checkIn ? '#10B981' : 'var(--text-muted)' }}>{emp.checkIn || '—'}</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', color: emp.checkOut ? 'var(--text-primary)' : 'var(--text-muted)' }}>{emp.checkOut || (emp.status === 'present' || emp.status === 'late' ? '...' : '—')}</td>
-                      <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: emp.hours ? 'var(--text-primary)' : 'var(--text-muted)' }}>{emp.hours ? `${emp.hours}h` : '—'}</td>
-                      <td style={{ padding: '14px 20px' }}>
-                        {emp.source !== '—' && SrcIcon ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600,
-                            padding: '4px 10px', borderRadius: '100px',
-                            background: `${emp.color}18`, color: emp.color,
-                            border: `1px solid ${emp.color}25`
-                          }}>
-                            <SrcIcon size={12} />
-                            {emp.source}
+                        </td>
+                        <td style={{ padding: '14px 20px', fontSize: '12px', color: 'var(--text-secondary)' }}>{emp.dept}</td>
+                        <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: emp.checkIn ? 500 : 400, color: emp.checkIn ? '#10B981' : 'var(--text-muted)' }}>{emp.checkIn || '—'}</td>
+                        <td style={{ padding: '14px 20px', fontSize: '13px', color: emp.checkOut ? 'var(--text-primary)' : 'var(--text-muted)' }}>{emp.checkOut || (emp.status === 'present' || emp.status === 'late' ? '...' : '—')}</td>
+                        <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: emp.hours ? 'var(--text-primary)' : 'var(--text-muted)' }}>{emp.hours ? `${emp.hours}h` : '—'}</td>
+                        <td style={{ padding: '14px 20px' }}>
+                          {emp.source !== '—' && SrcIcon ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600,
+                              padding: '4px 10px', borderRadius: '100px',
+                              background: `${emp.color}18`, color: emp.color,
+                              border: `1px solid ${emp.color}25`
+                            }}>
+                              <SrcIcon size={12} />
+                              {emp.source}
+                            </span>
+                          ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '14px 20px' }}>
+                          {emp.leave ? (
+                            <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: `${leaveColors[emp.leave]}18`, color: leaveColors[emp.leave] }}>{emp.leave}</span>
+                          ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: statusColors[emp.status].bg, color: statusColors[emp.status].text }}>
+                            {statusColors[emp.status].label}
                           </span>
-                        ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        {emp.leave ? (
-                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: `${leaveColors[emp.leave]}18`, color: leaveColors[emp.leave] }}>{emp.leave}</span>
-                        ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: statusColors[emp.status].bg, color: statusColors[emp.status].text }}>
-                          {statusColors[emp.status].label}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                      </tr>
+                    );
+                  }))}
               </tbody>
             </table>
           </div>
@@ -884,24 +1099,64 @@ export default function Attendance() {
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', fontWeight: 600 }}>Employee Leave Requests</span>
           </div>
+          {/* Toolbar */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                value={leaveSearch}
+                onChange={e => setLeaveSearch(e.target.value)}
+                placeholder="Search employee, ID or reason..."
+                style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px 8px 36px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+                onFocus={e => { (e.target as HTMLElement).style.borderColor = 'var(--brand)'; }}
+                onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border)'; }}
+              />
+            </div>
+            <select
+              value={leaveTypeFilter}
+              onChange={e => setLeaveTypeFilter(e.target.value)}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">All Leave Types</option>
+              <option value="CL">Casual Leave (CL)</option>
+              <option value="SL">Sick Leave (SL)</option>
+              <option value="EL">Earned Leave (EL)</option>
+              <option value="WFH">Work From Home (WFH)</option>
+            </select>
+            <select
+              value={leaveStatusFilter}
+              onChange={e => setLeaveStatusFilter(e.target.value)}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                  {['Employee', 'Leave Type', 'From Date', 'To Date', 'Reason', 'Applied On', 'Status', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
+                  {renderSortHeader('Employee', 'employeeName', leaveSortField, leaveSortOrder, handleLeaveSort)}
+                  {renderSortHeader('Leave Type', 'type', leaveSortField, leaveSortOrder, handleLeaveSort)}
+                  {renderSortHeader('From Date', 'from', leaveSortField, leaveSortOrder, handleLeaveSort)}
+                  {renderSortHeader('To Date', 'to', leaveSortField, leaveSortOrder, handleLeaveSort)}
+                  {renderSortHeader('Reason', 'reason', leaveSortField, leaveSortOrder, handleLeaveSort)}
+                  {renderSortHeader('Applied On', 'appliedOn', leaveSortField, leaveSortOrder, handleLeaveSort)}
+                  {renderSortHeader('Status', 'status', leaveSortField, leaveSortOrder, handleLeaveSort)}
+                  <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {leaves.length === 0 ? (
+                {processedLeaves.length === 0 ? (
                   <tr>
                     <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                      No leave applications submitted yet.
+                      {leaves.length === 0 ? 'No leave applications submitted yet.' : 'No matching leave requests found.'}
                     </td>
                   </tr>
                 ) : (
-                  [...leaves].reverse().map((leave, i) => {
+                  processedLeaves.map((leave, i) => {
                     const statusBadgeColors = {
                       pending: { bg: 'rgba(245,158,11,0.12)', text: '#F59E0B' },
                       approved: { bg: 'rgba(16,185,129,0.12)', text: '#10B981' },
@@ -934,8 +1189,14 @@ export default function Attendance() {
                         </td>
                         <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{leave.from}</td>
                         <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{leave.to}</td>
-                        <td style={{ padding: '14px 20px', fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={leave.reason}>
-                          {leave.reason}
+                        <td
+                          onClick={() => setSelectedReasonModal({ open: true, title: `${leave.employeeName}'s Leave Reason`, reason: leave.reason, applicant: leave.employeeName, dates: `${leave.from} to ${leave.to}`, type: leave.type })}
+                          style={{ padding: '14px 20px', fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '240px', cursor: 'pointer' }}
+                          title="Click to view full reason"
+                        >
+                          <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {leave.reason}
+                          </div>
                         </td>
                         <td style={{ padding: '14px 20px', fontSize: '12px', color: 'var(--text-muted)' }}>{leave.appliedOn}</td>
                         <td style={{ padding: '14px 20px' }}>
@@ -984,26 +1245,50 @@ export default function Attendance() {
             <span style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ClipboardList size={16} color="var(--brand)" /> Attendance Audit Log
             </span>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{auditLogs.length} entries</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{processedAuditLogs.length} entries</span>
+          </div>
+          {/* Toolbar */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                value={auditSearch}
+                onChange={e => setAuditSearch(e.target.value)}
+                placeholder="Search audit logs by employee, ID, editor or reason..."
+                style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px 8px 36px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+                onFocus={e => { (e.target as HTMLElement).style.borderColor = 'var(--brand)'; }}
+                onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border)'; }}
+              />
+            </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            {auditLogs.length === 0 ? (
+            {processedAuditLogs.length === 0 ? (
               <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
                 <ClipboardList size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>No audit entries yet</div>
-                <div style={{ fontSize: '12px' }}>Attendance corrections made by admins will appear here.</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>
+                  {auditLogs.length === 0 ? 'No audit entries yet' : 'No matching audit entries found'}
+                </div>
+                <div style={{ fontSize: '12px' }}>
+                  {auditLogs.length === 0 ? 'Attendance corrections made by admins will appear here.' : 'Try adjusting your search criteria.'}
+                </div>
               </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                    {['Employee', 'Date', 'Previous Status', 'New Status', 'Check-In', 'Check-Out', 'Edited By', 'Timestamp', 'Reason'].map(h => (
-                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
+                    {renderSortHeader('Employee', 'employeeName', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('Date', 'attendanceDate', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('Previous Status', 'previousStatus', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('New Status', 'newStatus', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('Check-In', 'checkInAfter', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('Check-Out', 'checkOutAfter', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('Edited By', 'editedBy', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('Timestamp', 'editTimestamp', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
+                    {renderSortHeader('Reason', 'reason', auditSortField, auditSortOrder, handleAuditSort, '12px 16px')}
                   </tr>
                 </thead>
                 <tbody>
-                  {auditLogs.map((log, i) => {
+                  {processedAuditLogs.map((log, i) => {
                     const prevColor = log.previousStatus ? (statusColors[log.previousStatus] || { bg: 'rgba(100,116,139,0.12)', text: '#64748B' }) : null;
                     const newColor = statusColors[log.newStatus] || { bg: 'rgba(100,116,139,0.12)', text: '#64748B' };
                     return (
@@ -1231,6 +1516,47 @@ export default function Attendance() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Leave Reason Popup Modal ─── */}
+      {selectedReasonModal && selectedReasonModal.open && (
+        <div
+          onClick={() => setSelectedReasonModal(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(9, 14, 26, 0.65)', backdropFilter: 'blur(4px)', padding: '20px' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', animation: 'slideInModal 0.22s ease-out', overflow: 'hidden' }}
+          >
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(79, 142, 247, 0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileText size={18} color="var(--brand)" />
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedReasonModal.title}</h3>
+              </div>
+              <button onClick={() => setSelectedReasonModal(null)} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={15} />
+              </button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {selectedReasonModal.applicant && (
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-elevated)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Details:</div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedReasonModal.applicant} ({selectedReasonModal.type})</div>
+                  {selectedReasonModal.dates && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: 'auto' }}>{selectedReasonModal.dates}</div>}
+                </div>
+              )}
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Full Request Explanation</div>
+                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px', fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.6, maxHeight: '260px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {selectedReasonModal.reason}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <button onClick={() => setSelectedReasonModal(null)} style={{ padding: '10px 24px', borderRadius: '8px', background: 'var(--brand)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Close</button>
+              </div>
             </div>
           </div>
         </div>

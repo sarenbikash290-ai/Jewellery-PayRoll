@@ -37,6 +37,7 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
         active={activeModule}
         onNavigate={(m) => setActiveModule(m)}
         open={sidebarOpen}
+        onLogout={onLogout}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Header

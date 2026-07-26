@@ -848,3 +848,44 @@ img { display: block; max-width: 100%; }
   transition: var(--transition);
 }
 .sidebar-user:hover { background: var(--bg-hover); }
+
+/* ── Toast Notifications Entrance & Smooth Exit ── */
+@keyframes toastSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toastSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    max-height: 80px;
+    margin-bottom: 0px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(60px) scale(0.9);
+    max-height: 0px;
+    margin-bottom: -10px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+  }
+}
+
+.toast-item {
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.toast-item.exiting {
+  animation: toastSlideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+

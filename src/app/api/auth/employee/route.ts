@@ -200,7 +200,7 @@ export async function POST(request: Request) {
       cookieStore.set('hrpulse_emp_session', employeeId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: 60 * 60 * 24, // 24 hours
         path: '/',
       });
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
       cookieStore.set('hrpulse_emp_session', upperEmpId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: 60 * 60 * 24, // 24 hours
         path: '/',
       });

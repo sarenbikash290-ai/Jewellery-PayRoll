@@ -41,6 +41,8 @@ interface LiveNotif {
   title: string;
   text: string;
   ts: number;
+  module: string; // target module to navigate to on click
+  subTab?: string; // optional sub-tab within the module
 }
 
 function timeAgo(ts: number): string {
@@ -84,6 +86,7 @@ function loadDismissed(): Set<string> {
 export default function Header({ activeModule, onToggleSidebar, onLogout }: HeaderProps) {
   const {
     openModal, toast, modal,
+    setActiveModule,
     attendanceRecords, employees,
     leaves, advancePayments,
     incentives, commissions,
@@ -144,33 +147,46 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
     .forEach(r => {
       const emp  = employees.find(e => e.id === r.employeeId);
       const name = emp?.name ?? r.employeeId;
+      const nowTs = Date.now();
 
       if (r.checkIn) {
-        all.push({
-          id:    `checkin-${r.employeeId}-${r.date}-${r.checkIn}`,
-          type:  'success',
-          title: 'Employee Checked In',
-          text:  `${name} checked in at ${r.checkIn}`,
-          ts:    timeStrToTs(r.checkIn, r.date),
-        });
+        const ts = timeStrToTs(r.checkIn, r.date);
+        if (ts <= nowTs) {
+          all.push({
+            id:    `checkin-${r.employeeId}-${r.date}-${r.checkIn}`,
+            type:  'success',
+            title: 'Employee Checked In',
+            text:  `${name} checked in at ${r.checkIn}`,
+            ts,
+            module: 'attendance',
+          });
+        }
       }
       if (r.checkOut) {
-        all.push({
-          id:    `checkout-${r.employeeId}-${r.date}-${r.checkOut}`,
-          type:  'info',
-          title: 'Employee Checked Out',
-          text:  `${name} checked out at ${r.checkOut}`,
-          ts:    timeStrToTs(r.checkOut, r.date),
-        });
+        const ts = timeStrToTs(r.checkOut, r.date);
+        if (ts <= nowTs) {
+          all.push({
+            id:    `checkout-${r.employeeId}-${r.date}-${r.checkOut}`,
+            type:  'info',
+            title: 'Employee Checked Out',
+            text:  `${name} checked out at ${r.checkOut}`,
+            ts,
+            module: 'attendance',
+          });
+        }
       }
       if (r.status === 'late' && r.checkIn) {
-        all.push({
-          id:    `late-${r.employeeId}-${r.date}`,
-          type:  'warning',
-          title: 'Late Arrival',
-          text:  `${name} arrived late at ${r.checkIn}`,
-          ts:    timeStrToTs(r.checkIn, r.date),
-        });
+        const ts = timeStrToTs(r.checkIn, r.date);
+        if (ts <= nowTs) {
+          all.push({
+            id:    `late-${r.employeeId}-${r.date}`,
+            type:  'warning',
+            title: 'Late Arrival',
+            text:  `${name} arrived late at ${r.checkIn}`,
+            ts,
+            module: 'attendance',
+          });
+        }
       }
     });
 
@@ -178,13 +194,22 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
   leaves
     .filter(l => l.status === 'pending')
     .forEach(l => {
-      const ts = (() => { try { return new Date(l.appliedOn).getTime(); } catch { return Date.now(); } })();
+      const ts = l.createdAt ? new Date(l.createdAt).getTime() : (() => {
+        try {
+          const [yr, mo, dy] = l.appliedOn.split('-').map(Number);
+          return new Date(yr, mo - 1, dy).getTime();
+        } catch {
+          return Date.now();
+        }
+      })();
       all.push({
         id:    `leave-${l.id}`,
         type:  'warning',
         title: 'Leave Request Pending',
         text:  `${l.employeeName} applied for ${l.type} leave (${l.from} → ${l.to}): "${l.reason}"`,
         ts,
+        module: 'attendance',
+        subTab: 'leaves',
       });
     });
 
@@ -201,6 +226,7 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
         title: 'Advance Payment Pending',
         text:  `₹${Number(a.amount).toLocaleString('en-IN')} advance for ${name} — deduct: ${a.deductMonth}`,
         ts,
+        module: 'advance-payment',
       });
     });
 
@@ -215,6 +241,7 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
         title: 'Incentive Awaiting Approval',
         text:  `₹${Number(inc.amount).toLocaleString('en-IN')} incentive for ${inc.employeeName} (${inc.month})`,
         ts,
+        module: 'incentives',
       });
     });
 
@@ -229,6 +256,7 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
         title: 'Commission Pending Approval',
         text:  `₹${Number(com.amount).toLocaleString('en-IN')} commission for ${com.leadName} (${com.month})`,
         ts,
+        module: 'incentives',
       });
     });
 
@@ -396,7 +424,9 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
                     borderLeft: `3px solid ${COLORS[n.type]}`,
                     background: 'transparent',
                     transition: 'background 0.15s',
+                    cursor: 'pointer',
                   }}
+                  onClick={() => { setActiveModule(n.module, n.subTab); setNotifOpen(false); }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 >

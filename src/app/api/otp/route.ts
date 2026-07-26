@@ -1,5 +1,27 @@
 import nodemailer from 'nodemailer';
 
+// ── Rate limiter (max 3 OTP sends per 10 minutes per IP) ────────────────────
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return true;
+  }
+
+  entry.count++;
+  return false;
+}
+
 // ── In-memory OTP store (valid 10 minutes) ──────────────────────────────────
 // { token → { otp, expiresAt } }
 const otpStore = new Map<string, { otp: string; expiresAt: number }>();
@@ -21,6 +43,17 @@ export async function POST(request: Request) {
 
   // ── SEND OTP ──────────────────────────────────────────────────────────────
   if (action === 'send') {
+    // Rate limit: max 3 OTP sends per 10 minutes per IP
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+    if (isRateLimited(clientIp)) {
+      return Response.json(
+        { ok: false, error: 'Too many OTP requests. Please try again in a few minutes.' },
+        { status: 429 }
+      );
+    }
+
     const gmailUser  = process.env.GMAIL_USER;
     const gmailPass  = process.env.GMAIL_APP_PASSWORD;
     const toEmail    = process.env.RECOVERY_EMAIL;

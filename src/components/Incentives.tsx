@@ -562,7 +562,7 @@ export default function Incentives() {
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Incentives & Commissions</h1>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Employee Benefits & Lead Rewards · <span style={{ color: '#10B981', fontWeight: 600 }}>🟢 Live</span>
+            Employee Benefits & Lead Rewards
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -630,10 +630,10 @@ export default function Incentives() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '4px', width: 'fit-content' }}>
         {[
-          { id: 'incentives', label: '🎁 Incentives' },
-          { id: 'commissions', label: '👑 Commissions' },
-          { id: 'rules', label: '⚙️ Rules' },
-          { id: 'disputes', label: '⚠️ Disputes' },
+          { id: 'incentives', label: ' Incentives' },
+          { id: 'commissions', label: ' Commissions' },
+          { id: 'rules', label: ' Rules' },
+          { id: 'disputes', label: ' Disputes' },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as TabType)} style={{ padding: '8px 20px', borderRadius: '8px', background: tab === t.id ? 'var(--brand)' : 'transparent', color: tab === t.id ? '#fff' : 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', whiteSpace: 'nowrap', border: 'none' }}>
             {t.label}
@@ -649,7 +649,6 @@ export default function Incentives() {
               <div style={{ fontSize: '14px', fontWeight: 600 }}>Employee Incentives & Sales Performance
                 <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px' }}>Click any row to view details</span>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: 'rgba(16,185,129,0.12)', color: '#10B981' }}>🟢 Real-time</span>
               <select value={sortBy} onChange={e => setSortBy(e.target.value as 'sales' | 'incentive' | 'salary')} style={{ fontSize: '12px', padding: '6px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 <option value="sales">Sort by Sales ↓</option>
                 <option value="incentive">Sort by Incentive ↓</option>
@@ -754,7 +753,6 @@ export default function Incentives() {
         <CardBox>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '14px', fontWeight: 600 }}>Lead Commissions — LIVE</div>
-            <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: 'rgba(255,107,107,0.12)', color: '#FF6B6B' }}>🟢 Real-time</span>
           </div>
           <div>
             {commissions.length === 0 ? (

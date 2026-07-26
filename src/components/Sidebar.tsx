@@ -6,21 +6,22 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { id: 'dashboard',        icon: LayoutDashboard, label: 'Dashboard',        badge: null },
-  { id: 'employees',        icon: Users,           label: 'Employees',        badge: '247' },
-  { id: 'attendance',       icon: Clock,           label: 'Attendance',       badge: null },
-  { id: 'payroll',          icon: DollarSign,      label: 'Payroll',          badge: null },
-  { id: 'incentives',       icon: TrendingUp,      label: 'Incentives',       badge: 'New' },
-  { id: 'advance-payment',  icon: CreditCard,      label: 'Advance Payment',  badge: null },
-  { id: 'reports',          icon: BarChart3,       label: 'Reports',          badge: null },
-  { id: 'payroll-locks',    icon: Lock,            label: 'Payroll Locks',    badge: null },
-  { id: 'settings',         icon: Settings,        label: 'Settings',         badge: null },
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', badge: null },
+  { id: 'employees', icon: Users, label: 'Employees', badge: '247' },
+  { id: 'attendance', icon: Clock, label: 'Attendance', badge: null },
+  { id: 'payroll', icon: DollarSign, label: 'Payroll', badge: null },
+  { id: 'incentives', icon: TrendingUp, label: 'Incentives', badge: null },
+  { id: 'advance-payment', icon: CreditCard, label: 'Advance Payment', badge: null },
+  { id: 'reports', icon: BarChart3, label: 'Reports', badge: null },
+  { id: 'payroll-locks', icon: Lock, label: 'Payroll Locks', badge: null },
+  { id: 'settings', icon: Settings, label: 'Settings', badge: null },
 ];
 
 interface SidebarProps {
   active: string;
   onNavigate: (module: string) => void;
   open: boolean;
+  onLogout?: () => void;
 }
 
 import { useApp } from './AppContext';
@@ -35,7 +36,7 @@ const fadeStyle = (visible: boolean): React.CSSProperties => ({
   whiteSpace: 'nowrap' as const,
 });
 
-export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
+export default function Sidebar({ active, onNavigate, open, onLogout }: SidebarProps) {
   const { employees, openModal } = useApp();
 
   return (
@@ -74,30 +75,7 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
         </div>
       </div>
 
-      {/* User profile mini */}
-      <div style={{
-        padding: open ? '16px 20px' : '0 20px',
-        borderBottom: open ? '1px solid var(--border)' : '1px solid transparent',
-        display: 'flex', alignItems: 'center', gap: '12px',
-        maxHeight: open ? '80px' : '0px',
-        opacity: open ? 1 : 0,
-        transition: 'max-height 0.15s ease, opacity 0.12s ease, padding 0.15s ease',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          width: '36px', height: '36px',
-          background: 'linear-gradient(135deg, #4F8EF7 0%, #8B5CF6 100%)',
-          borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0,
-        }}>AD</div>
-        <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>Admin User</div>
-          <div style={{ fontSize: '11px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Shield size={10} /> Super Admin
-          </div>
-        </div>
-      </div>
+
 
       {/* Navigation */}
       <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
@@ -173,6 +151,7 @@ export default function Sidebar({ active, onNavigate, open }: SidebarProps) {
           borderRadius: '8px', color: 'var(--text-muted)',
           fontSize: '13.5px', transition: 'background 0.18s ease, color 0.18s ease, padding 0.15s ease',
         }}
+          onClick={onLogout}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--danger)'; (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         >

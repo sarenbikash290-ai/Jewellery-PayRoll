@@ -25,7 +25,8 @@ function mapLeaveToClient(l: any) {
     to: l.to_date,
     reason: l.reason,
     status: l.status,
-    appliedOn: l.applied_on
+    appliedOn: l.applied_on,
+    createdAt: l.created_at
   };
 }
 
@@ -99,13 +100,7 @@ export async function POST(request: Request) {
     }, 0);
     const nextId = `LV${String(maxNum + 1).padStart(3, '0')}`;
 
-    const appliedOnStr = (() => {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    })();
+    const appliedOnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
     const { data: newLeave, error: insertErr } = await supabase
       .from('leaves')

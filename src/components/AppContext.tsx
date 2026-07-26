@@ -67,6 +67,7 @@ export interface LeaveApplication {
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   appliedOn: string; // YYYY-MM-DD
+  createdAt?: string; // ISO timestamp
 }
 
 export interface AttendanceRecord {
@@ -129,6 +130,27 @@ export interface ModalState {
 
 // ---- Toast Component ----
 function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
+  const [exiting, setExiting] = useState(false);
+  const onDismissRef = useRef(onDismiss);
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  const startDismiss = useCallback(() => {
+    setExiting(true);
+    setTimeout(() => {
+      onDismissRef.current();
+    }, 300); // 300ms smooth exit transition
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startDismiss();
+    }, 3500); // 3.5 seconds auto-erase
+    return () => clearTimeout(timer);
+  }, [startDismiss]);
+
   const cfg = {
     success: { icon: CheckCircle, bg: 'rgba(16,185,129,0.15)', color: '#10B981', border: 'rgba(16,185,129,0.25)' },
     error:   { icon: XCircle,     bg: 'rgba(239,68,68,0.15)',   color: '#EF4444', border: 'rgba(239,68,68,0.25)' },
@@ -137,21 +159,32 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
   }[item.type];
   const Icon = cfg.icon;
 
-  useEffect(() => {
-    const t = setTimeout(onDismiss, 4000);
-    return () => clearTimeout(t);
-  }, [onDismiss]);
-
   return (
-    <div className="toast" style={{ borderLeftColor: cfg.color, borderLeftWidth: 3, borderLeftStyle: 'solid', background: '#fff', padding: '8px', margin: '4px', display: 'flex', alignItems: 'center' }}>
-      <div className="toast-icon" style={{ background: cfg.bg, borderRadius: '50%', padding: '4px', marginRight: '8px' }}>
+    <div
+      className={`toast-item ${exiting ? 'exiting' : ''}`}
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderLeft: `4px solid ${cfg.color}`,
+        borderRadius: '10px',
+        padding: '12px 14px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        minWidth: '280px',
+        maxWidth: '360px',
+        cursor: 'default',
+      }}
+    >
+      <div className="toast-icon" style={{ background: cfg.bg, borderRadius: '50%', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <Icon size={16} color={cfg.color} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>{item.title}</div>
-        {item.message && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{item.message}</div>}
+        <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.3 }}>{item.title}</div>
+        {item.message && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: 1.3 }}>{item.message}</div>}
       </div>
-      <button onClick={onDismiss} style={{ color: 'var(--text-secondary)', flexShrink: 0, padding: '2px', background: 'transparent', border: 'none' }}>
+      <button onClick={startDismiss} style={{ color: 'var(--text-muted)', flexShrink: 0, padding: '4px', borderRadius: '6px', background: 'transparent', border: 'none', display: 'flex', alignItems: 'center' }}>
         <X size={14} />
       </button>
     </div>
@@ -165,7 +198,8 @@ interface AppCtx {
   openModal: (id: ModalId, data?: Record<string, any>) => void;
   closeModal: () => void;
   activeModule: string;
-  setActiveModule: (m: string) => void;
+  setActiveModule: (m: string, subTab?: string) => void;
+  pendingSubTab: string | null;
   sidebarOpen: boolean;
   setSidebarOpen: (v: boolean) => void;
   employees: Employee[];
@@ -191,6 +225,8 @@ interface AppCtx {
   authorizedWifiIp: string;
   clientIp: string;
   updateAuthorizedWifiIp: (ip: string) => Promise<void>;
+  monthlySalesTarget: number;
+  updateMonthlySalesTarget: (target: number) => Promise<void>;
   logManualAttendance: (employeeId: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh') => Promise<void>;
   // Attendance correction with audit trail
   editAttendance: (employeeId: string, employeeName: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh', reason?: string) => Promise<{ ok: boolean; error?: string; lockReason?: string }>;
@@ -236,7 +272,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const closeModal = useCallback(() => setModal({ open: null }), []);
 
   // UI state
-  const [activeModule, setActiveModule] = useState('dashboard');
+  const [activeModule, _setActiveModule] = useState('dashboard');
+  const [pendingSubTab, setPendingSubTab] = useState<string | null>(null);
+  const setActiveModule = useCallback((m: string, subTab?: string) => {
+    _setActiveModule(m);
+    setPendingSubTab(subTab ?? null);
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Core data stores (dynamic LocalStorage synced)
@@ -459,6 +500,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [authorizedWifiIp, setAuthorizedWifiIp] = useState('127.0.0.1');
   const [clientIp, setClientIp] = useState('127.0.0.1');
+  const [monthlySalesTarget, setMonthlySalesTarget] = useState(500000);
 
   const knownLeaveIds = useRef<Set<string>>(new Set());
   const isInitialLeavesLoad = useRef(true);
@@ -533,6 +575,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (data.authorizedWifiIp) setAuthorizedWifiIp(data.authorizedWifiIp);
         if (data.clientIp) setClientIp(data.clientIp);
+        if (data.monthlySalesTarget) setMonthlySalesTarget(data.monthlySalesTarget);
 
         setAttendanceRecords(serverRecords);
         localStorage.setItem('hrpulse_attendance_records', JSON.stringify(serverRecords));
@@ -763,6 +806,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
+  const updateMonthlySalesTarget = useCallback(async (target: number) => {
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateSalesTarget', monthlySalesTarget: target })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMonthlySalesTarget(data.monthlySalesTarget);
+        toast('success', 'Sales Target Updated', `Monthly sales target is now set to ₹${data.monthlySalesTarget.toLocaleString('en-IN')}.`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast('error', 'Update Failed', 'Could not update monthly sales target on the server.');
+    }
+  }, [toast]);
+
   const logManualAttendance = useCallback(async (
     employeeId: string, 
     date: string, 
@@ -797,6 +858,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('hrpulse_attendance_records', JSON.stringify(updated));
           return updated;
         });
+        // Refresh audit logs
+        fetchAuditLogs();
         toast('success', 'Attendance Logged Manually', `Successfully updated attendance for ${date}.`);
       } else {
         throw new Error(data.error || 'Server error');
@@ -1032,6 +1095,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         closeModal,
         activeModule,
         setActiveModule,
+        pendingSubTab,
         sidebarOpen,
         setSidebarOpen,
         employees,
@@ -1054,9 +1118,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         attendanceRecords,
         markAttendance,
         changePin,
-        authorizedWifiIp,
+         authorizedWifiIp,
         clientIp,
         updateAuthorizedWifiIp,
+        monthlySalesTarget,
+        updateMonthlySalesTarget,
         logManualAttendance,
         editAttendance,
         auditLogs,

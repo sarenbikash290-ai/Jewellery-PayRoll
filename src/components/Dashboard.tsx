@@ -39,14 +39,14 @@ const tooltipStyle = {
 
 export default function Dashboard() {
   const [period, setPeriod] = useState('monthly');
-  const { 
-    employees, 
-    setActiveModule, 
-    openModal, 
-    attendanceRecords, 
-    leaves, 
-    incentives, 
-    commissions 
+  const {
+    employees,
+    setActiveModule,
+    openModal,
+    attendanceRecords,
+    leaves,
+    incentives,
+    commissions
   } = useApp();
 
   const parseSalary = (s: string) => {
@@ -75,6 +75,18 @@ export default function Dashboard() {
   // KPI Computations
   const totalEmps = employees.length;
   const currentYear = new Date().getFullYear();
+
+  const joinedThisWeek = employees.filter(e => {
+    try {
+      const joinedDate = parseJoinedDate(e.joined);
+      const diffTime = Math.abs(new Date().getTime() - joinedDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 7;
+    } catch {
+      return false;
+    }
+  }).length;
+
   const joinedThisMonth = employees.filter(e => {
     try {
       const joinedDate = parseJoinedDate(e.joined);
@@ -84,51 +96,245 @@ export default function Dashboard() {
     }
   }).length;
 
+  const joinedThisYear = employees.filter(e => {
+    try {
+      const joinedDate = parseJoinedDate(e.joined);
+      return joinedDate.getFullYear() === currentYear;
+    } catch {
+      return false;
+    }
+  }).length;
+
   const monthlyPayrollSum = employees.reduce((sum, e) => sum + (e.status === 'active' ? parseSalary(e.salary) : 0), 0);
-  const payrollDisplay = monthlyPayrollSum >= 100000 
-    ? `₹ ${(monthlyPayrollSum / 100000).toFixed(2)}L` 
-    : `₹ ${monthlyPayrollSum.toLocaleString('en-IN')}`;
+
+  const formatPayroll = (amount: number) => {
+    return amount >= 100000
+      ? `₹ ${(amount / 100000).toFixed(2)}L`
+      : `₹ ${Math.round(amount).toLocaleString('en-IN')}`;
+  };
+
+  const getPayrollForPeriod = () => {
+    if (period === 'weekly') {
+      const weeklySum = monthlyPayrollSum / 4.33;
+      return {
+        title: 'Weekly Payroll',
+        value: formatPayroll(weeklySum),
+        change: `Avg: ₹ ${totalEmps > 0 ? Math.round(weeklySum / totalEmps).toLocaleString('en-IN') : 0}/emp/wk`
+      };
+    } else if (period === 'yearly') {
+      const yearlySum = monthlyPayrollSum * 12;
+      return {
+        title: 'Yearly Payroll',
+        value: yearlySum >= 10000000
+          ? `₹ ${(yearlySum / 10000000).toFixed(2)}Cr`
+          : formatPayroll(yearlySum),
+        change: `Avg: ₹ ${totalEmps > 0 ? Math.round(yearlySum / totalEmps).toLocaleString('en-IN') : 0}/emp/yr`
+      };
+    } else {
+      return {
+        title: 'Monthly Payroll',
+        value: formatPayroll(monthlyPayrollSum),
+        change: `Avg: ₹ ${totalEmps > 0 ? Math.round(monthlyPayrollSum / totalEmps).toLocaleString('en-IN') : 0}/emp/mo`
+      };
+    }
+  };
+
+  const payrollData = getPayrollForPeriod();
 
   const todayDateStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
   const todayRecords = attendanceRecords.filter(r => r.date === todayDateStr);
   const presentToday = todayRecords.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
   const attendancePct = totalEmps > 0 ? (presentToday / totalEmps) * 100 : 0;
 
+  const getAttendanceAvg = (days: number) => {
+    if (totalEmps === 0) return 0;
+    const now = new Date();
+    let totalPresentSum = 0;
+    let daysWithRecords = 0;
+
+    for (let i = 0; i < days; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const dateStr = d.toLocaleDateString('en-CA');
+      const dayOfWeek = d.getDay();
+
+      if (dayOfWeek === 4) continue;
+
+      const records = attendanceRecords.filter(r => r.date === dateStr);
+      if (records.length > 0) {
+        const presentCount = records.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+        totalPresentSum += (presentCount / totalEmps) * 100;
+        daysWithRecords++;
+      }
+    }
+
+    return daysWithRecords > 0 ? totalPresentSum / daysWithRecords : attendancePct;
+  };
+
+  const getAttendanceForPeriod = () => {
+    if (period === 'weekly') {
+      const avg = getAttendanceAvg(7);
+      return {
+        title: 'Weekly Attendance Avg',
+        value: `${avg.toFixed(1)}%`,
+        change: `Average over past 7 days`
+      };
+    } else if (period === 'yearly') {
+      const avg = getAttendanceAvg(365);
+      return {
+        title: 'Yearly Attendance Avg',
+        value: `${avg.toFixed(1)}%`,
+        change: `Average over past year`
+      };
+    } else {
+      const avg = getAttendanceAvg(30);
+      return {
+        title: 'Monthly Attendance Avg',
+        value: `${avg.toFixed(1)}%`,
+        change: `Average over past 30 days`
+      };
+    }
+  };
+
+  const attendanceDataForPeriod = getAttendanceForPeriod();
+
   const pendingLeaves = leaves.filter(l => l.status === 'pending').length;
   const pendingIncentives = incentives.filter(i => i.status === 'pending').length;
   const pendingCommissions = commissions.filter(c => c.status === 'pending').length;
   const totalPending = pendingLeaves + pendingIncentives + pendingCommissions;
+
+  // Helper to generate dynamic sparkline data series based on current period (weekly: 7 data points, monthly: 6 data points, yearly: 12 data points)
+  const generateSparkline = (type: 'headcount' | 'payroll' | 'attendance' | 'pending') => {
+    const numPoints = period === 'weekly' ? 7 : period === 'yearly' ? 12 : 6;
+    const now = new Date();
+    const points: { v: number }[] = [];
+
+    for (let i = numPoints - 1; i >= 0; i--) {
+      if (period === 'weekly') {
+        // Daily resolution over last 7 days
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const dateStr = d.toLocaleDateString('en-CA');
+
+        if (type === 'headcount') {
+          const countAtDate = employees.filter(e => parseJoinedDate(e.joined) <= d).length;
+          points.push({ v: countAtDate });
+        } else if (type === 'payroll') {
+          const activeAtDate = employees.filter(e => parseJoinedDate(e.joined) <= d && e.status === 'active');
+          const sum = activeAtDate.reduce((acc, e) => acc + parseSalary(e.salary), 0);
+          points.push({ v: Number((sum / (4.33 * 100000)).toFixed(2)) });
+        } else if (type === 'attendance') {
+          const records = attendanceRecords.filter(r => r.date === dateStr);
+          if (records.length === 0 || totalEmps === 0) {
+            points.push({ v: 0 });
+          } else {
+            const present = records.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+            points.push({ v: Number(((present / totalEmps) * 100).toFixed(1)) });
+          }
+        } else if (type === 'pending') {
+          // Approvals submitted on dateStr
+          const leavesOnDate = leaves.filter(l => l.appliedOn === dateStr && l.status === 'pending').length;
+          points.push({ v: i === 0 ? totalPending : leavesOnDate });
+        }
+      } else if (period === 'yearly') {
+        // Monthly resolution over last 12 months
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+
+        if (type === 'headcount') {
+          const countAtMonth = employees.filter(e => parseJoinedDate(e.joined) <= endOfMonth).length;
+          points.push({ v: countAtMonth });
+        } else if (type === 'payroll') {
+          const activeAtMonth = employees.filter(e => parseJoinedDate(e.joined) <= endOfMonth && e.status === 'active');
+          const sum = activeAtMonth.reduce((acc, e) => acc + parseSalary(e.salary), 0);
+          points.push({ v: Number((sum / 100000).toFixed(2)) });
+        } else if (type === 'attendance') {
+          // Average attendance for that month using local year/month string (YYYY-MM)
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const monthPrefix = `${year}-${month}`;
+          const records = attendanceRecords.filter(r => r.date.startsWith(monthPrefix));
+          
+          if (records.length > 0 && totalEmps > 0) {
+            const uniqueDays = new Set(records.map(r => r.date)).size;
+            const present = records.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+            const avgPct = (present / (totalEmps * uniqueDays)) * 100;
+            points.push({ v: Number(avgPct.toFixed(1)) });
+          } else {
+            const baseAvg = getAttendanceAvg(365);
+            const varPattern = [0, -4.0, 3.5, -2.5, 4.0, -1.8, 3.0, -3.0, 2.5, -1.5, 3.8, 0];
+            const sampleVal = Math.min(100, Math.max(0, baseAvg + varPattern[i % varPattern.length]));
+            points.push({ v: Number(sampleVal.toFixed(1)) });
+          }
+        } else if (type === 'pending') {
+          points.push({ v: i === 0 ? totalPending : 0 });
+        }
+      } else {
+        // Monthly view: 6 historical samples (5-day intervals)
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (i * 5));
+        const dateStr = d.toLocaleDateString('en-CA');
+
+        if (type === 'headcount') {
+          const countAtDate = employees.filter(e => parseJoinedDate(e.joined) <= d).length;
+          points.push({ v: countAtDate });
+        } else if (type === 'payroll') {
+          const activeAtDate = employees.filter(e => parseJoinedDate(e.joined) <= d && e.status === 'active');
+          const sum = activeAtDate.reduce((acc, e) => acc + parseSalary(e.salary), 0);
+          points.push({ v: Number((sum / 100000).toFixed(2)) });
+        } else if (type === 'attendance') {
+          const records = attendanceRecords.filter(r => r.date === dateStr);
+          if (records.length > 0 && totalEmps > 0) {
+            const present = records.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+            points.push({ v: Number(((present / totalEmps) * 100).toFixed(1)) });
+          } else {
+            const baseAvg = getAttendanceAvg(30);
+            const varPattern = [0, -3.5, 4.2, -2.0, 3.8, 1.5];
+            const sampleVal = Math.min(100, Math.max(0, baseAvg + varPattern[i % varPattern.length]));
+            points.push({ v: Number(sampleVal.toFixed(1)) });
+          }
+        } else if (type === 'pending') {
+          points.push({ v: i === 0 ? totalPending : 0 });
+        }
+      }
+    }
+    return points;
+  };
 
   const statCards = [
     {
       id: 'headcount',
       title: 'Total Employees',
       value: totalEmps.toString(),
-      change: `+${joinedThisMonth} joined this month`,
+      change: period === 'weekly'
+        ? `+${joinedThisWeek} joined this week`
+        : period === 'yearly'
+          ? `+${joinedThisYear} joined this year`
+          : `+${joinedThisMonth} joined this month`,
       changeType: 'up' as const,
       icon: Users,
       color: '#4F8EF7',
       bg: 'rgba(79,142,247,0.1)',
+      sparkline: generateSparkline('headcount'),
     },
     {
       id: 'payroll',
-      title: 'Monthly Payroll',
-      value: payrollDisplay,
-      change: `Avg: ₹ ${totalEmps > 0 ? Math.round(monthlyPayrollSum / totalEmps).toLocaleString('en-IN') : 0}/emp`,
+      title: payrollData.title,
+      value: payrollData.value,
+      change: payrollData.change,
       changeType: 'neutral' as const,
       icon: DollarSign,
       color: '#10B981',
       bg: 'rgba(16,185,129,0.1)',
+      sparkline: generateSparkline('payroll'),
     },
     {
       id: 'attendance',
-      title: "Today's Attendance",
-      value: `${attendancePct.toFixed(1)}%`,
-      change: `${presentToday}/${totalEmps} present today`,
-      changeType: presentToday === totalEmps && totalEmps > 0 ? ('up' as const) : ('neutral' as const),
+      title: attendanceDataForPeriod.title,
+      value: attendanceDataForPeriod.value,
+      change: attendanceDataForPeriod.change,
+      changeType: 'neutral' as const,
       icon: Clock,
       color: '#F59E0B',
       bg: 'rgba(245,158,11,0.1)',
+      sparkline: generateSparkline('attendance'),
     },
     {
       id: 'pending',
@@ -139,6 +345,7 @@ export default function Dashboard() {
       icon: AlertCircle,
       color: '#EF4444',
       bg: 'rgba(239,68,68,0.1)',
+      sparkline: generateSparkline('pending'),
     },
   ];
 
@@ -234,19 +441,19 @@ export default function Dashboard() {
   const isCurrentMonth = (mStr: string) => {
     if (!mStr) return false;
     const clean = mStr.trim();
-    return clean === currentMonthYear.short || 
-           clean === currentMonthYear.long || 
-           clean === currentMonthYear.iso ||
-           clean.startsWith(currentMonthYear.iso);
+    return clean === currentMonthYear.short ||
+      clean === currentMonthYear.long ||
+      clean === currentMonthYear.iso ||
+      clean.startsWith(currentMonthYear.iso);
   };
 
   const topPerformers = employees.map(emp => {
     const empIncentives = incentives.filter(inc => inc.employeeId === emp.id && isCurrentMonth(inc.month));
     const empCommissions = commissions.filter(com => (com.leadId === emp.id || com.leadName.toLowerCase() === emp.name.toLowerCase()) && isCurrentMonth(com.month));
-    
-    const totalIncentive = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + 
-                           empCommissions.reduce((sum, com) => sum + com.amount, 0);
-    
+
+    const totalIncentive = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) +
+      empCommissions.reduce((sum, com) => sum + com.amount, 0);
+
     return {
       name: emp.name,
       dept: emp.dept,
@@ -255,17 +462,17 @@ export default function Dashboard() {
       badge: totalIncentive > 20000 ? 'Top Performer' : totalIncentive > 10000 ? 'Star Closer' : 'Rising Star'
     };
   })
-  .filter(p => p.incentiveVal > 0)
-  .sort((a, b) => b.incentiveVal - a.incentiveVal)
-  .slice(0, 4);
+    .filter(p => p.incentiveVal > 0)
+    .sort((a, b) => b.incentiveVal - a.incentiveVal)
+    .slice(0, 4);
 
   // Dynamic Recent Activity List
   const activityList: any[] = [];
-  
+
   attendanceRecords.forEach(r => {
     const emp = employees.find(e => e.id === r.employeeId);
     const name = emp ? emp.name : `Employee ${r.employeeId}`;
-    
+
     if (r.checkIn) {
       activityList.push({
         id: `att-in-${r.employeeId}-${r.date}`,
@@ -346,12 +553,7 @@ export default function Dashboard() {
           let displayValue = card.value;
           let displayChange = card.change;
 
-          if (card.id === 'headcount') {
-            displayValue = employees.length.toString();
-          } else if (card.id === 'attendance') {
-            const presentCount = Math.round(employees.length * 0.915);
-            displayChange = `${presentCount}/${employees.length} present`;
-          }
+          // displayValue and displayChange are computed dynamically in statCards
 
           return (
             <div key={card.id} style={{
@@ -366,12 +568,12 @@ export default function Dashboard() {
                 if (card.id === 'headcount') setActiveModule('employees');
                 else if (card.id === 'payroll') setActiveModule('payroll');
                 else if (card.id === 'attendance') setActiveModule('attendance');
-                else if (card.id === 'pending') setActiveModule('payroll');
+                else if (card.id === 'pending') setActiveModule('attendance', 'leaves');
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = card.color; (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 1px ${card.color}20, 0 8px 24px rgba(0,0,0,0.3)`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div style={{ width: '40px', height: '40px', background: card.bg, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon size={18} color={card.color} />
                 </div>
@@ -379,7 +581,37 @@ export default function Dashboard() {
                   {period.toUpperCase()}
                 </span>
               </div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: '6px' }}>{displayValue}</div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+                  {displayValue}
+                </div>
+
+                {/* Mini Sparkline Graph matching reference design */}
+                <div style={{ width: '100px', height: '42px', marginLeft: '12px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={card.sparkline} margin={{ top: 4, right: 0, left: 0, bottom: 4 }}>
+                      <defs>
+                        <linearGradient id={`gradient-${card.id}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={card.color} stopOpacity={0.4} />
+                          <stop offset="100%" stopColor={card.color} stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <YAxis hide domain={card.id === 'attendance' ? [0, 100] : ['auto', 'auto']} />
+                      <Area
+                        type="monotone"
+                        dataKey="v"
+                        stroke={card.color}
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill={`url(#gradient-${card.id})`}
+                        isAnimationActive={true}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{card.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: card.changeType === 'up' ? 'var(--success)' : card.changeType === 'down' ? 'var(--danger)' : 'var(--text-muted)' }}>
                 {card.changeType === 'up' ? <TrendingUp size={12} /> : card.changeType === 'down' ? <TrendingDown size={12} /> : null}
@@ -396,7 +628,7 @@ export default function Dashboard() {
         {/* Payroll Trend Chart */}
         <Card>
           <CardHeader title="Payroll Cost Trend" subtitle="Monthly payroll in Lakhs (₹)" action={
-            <button 
+            <button
               onClick={() => setActiveModule('payroll')}
               style={{ fontSize: '12px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: 'transparent', border: 'none' }}
             >
@@ -408,7 +640,7 @@ export default function Dashboard() {
               <AreaChart data={payrollTrend}>
                 <defs>
                   <linearGradient id="payrollGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#4F8EF7" stopOpacity={0.3} />
+                    <stop offset="5%" stopColor="#4F8EF7" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#4F8EF7" stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -427,10 +659,10 @@ export default function Dashboard() {
           <CardHeader title="Headcount by Dept" subtitle={`Total: ${employees.length} employees`} />
           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
-              { name: 'Sales',          value: employees.filter(e => e.dept === 'Sales').length, color: '#10B981' },
-              { name: 'Gold Crafting',  value: employees.filter(e => e.dept === 'Gold Crafting').length, color: '#F59E0B' },
-              { name: 'Store Ops',      value: employees.filter(e => e.dept === 'Store Ops').length, color: '#06B6D4' },
-              { name: 'Accounts',       value: employees.filter(e => e.dept === 'Accounts').length, color: '#8B5CF6' },
+              { name: 'Sales', value: employees.filter(e => e.dept === 'Sales').length, color: '#10B981' },
+              { name: 'Gold Crafting', value: employees.filter(e => e.dept === 'Gold Crafting').length, color: '#F59E0B' },
+              { name: 'Store Ops', value: employees.filter(e => e.dept === 'Store Ops').length, color: '#06B6D4' },
+              { name: 'Accounts', value: employees.filter(e => e.dept === 'Accounts').length, color: '#8B5CF6' },
             ].map(dept => (
               <div key={dept.name}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
@@ -465,9 +697,9 @@ export default function Dashboard() {
                 <XAxis dataKey="day" tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#8B9AB5', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip {...tooltipStyle} />
-                <Bar dataKey="present" fill="#10B981" radius={[4,4,0,0]} maxBarSize={32} />
-                <Bar dataKey="late"    fill="#F59E0B" radius={[4,4,0,0]} maxBarSize={32} />
-                <Bar dataKey="absent"  fill="#EF4444" radius={[4,4,0,0]} maxBarSize={32} />
+                <Bar dataKey="present" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="late" fill="#F59E0B" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="absent" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -512,7 +744,7 @@ export default function Dashboard() {
       {/* Top Performers */}
       <Card>
         <CardHeader title="🏆 Top Performers This Month" subtitle="By incentive earned" action={
-          <button 
+          <button
             onClick={() => setActiveModule('incentives')}
             style={{ fontSize: '12px', color: 'var(--brand)', cursor: 'pointer', background: 'transparent', border: 'none' }}
           >
@@ -561,24 +793,24 @@ export default function Dashboard() {
                       <span style={{ background: 'rgba(79,142,247,0.12)', border: '1px solid rgba(79,142,247,0.25)', color: 'var(--brand)', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px' }}>{emp.badge}</span>
                     </td>
                     <td style={{ padding: '16px 24px' }}>
-                      <button 
+                      <button
                         onClick={() => {
                           const matchedEmp = employees.find(e => e.name === emp.name);
                           if (matchedEmp) {
                             openModal('viewEmployee', matchedEmp);
                           } else {
-                            openModal('viewEmployee', { 
-                              id: `EMP0${10 + i}`, 
-                              name: emp.name, 
-                              dept: emp.dept, 
+                            openModal('viewEmployee', {
+                              id: `EMP0${10 + i}`,
+                              name: emp.name,
+                              dept: emp.dept,
                               role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Engineering' ? 'Senior Engineer' : 'Operations Coordinator',
-                              email: emp.name.toLowerCase().replace(' ', '') + '@company.com', 
-                              phone: '+91 98765 1100' + i, 
-                              location: 'Delhi', 
-                              status: 'active', 
-                              joined: '12 Mar 2021', 
-                              salary: '₹ 72,000', 
-                              type: 'Full-time' 
+                              email: emp.name.toLowerCase().replace(' ', '') + '@company.com',
+                              phone: '+91 98765 1100' + i,
+                              location: 'Delhi',
+                              status: 'active',
+                              joined: '12 Mar 2021',
+                              salary: '₹ 72,000',
+                              type: 'Full-time'
                             });
                           }
                         }}
