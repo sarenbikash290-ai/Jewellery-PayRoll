@@ -157,7 +157,7 @@ export default function Dashboard() {
       const dateStr = d.toLocaleDateString('en-CA');
       const dayOfWeek = d.getDay();
 
-      if (dayOfWeek === 4) continue;
+      if (dayOfWeek === 4) continue; // Skip weekly off
 
       const records = attendanceRecords.filter(r => r.date === dateStr);
       if (records.length > 0) {
@@ -167,7 +167,7 @@ export default function Dashboard() {
       }
     }
 
-    return daysWithRecords > 0 ? totalPresentSum / daysWithRecords : attendancePct;
+    return daysWithRecords > 0 ? totalPresentSum / daysWithRecords : 0;
   };
 
   const getAttendanceForPeriod = () => {
@@ -286,9 +286,13 @@ export default function Dashboard() {
             points.push({ v: Number(((present / totalEmps) * 100).toFixed(1)) });
           } else {
             const baseAvg = getAttendanceAvg(30);
-            const varPattern = [0, -3.5, 4.2, -2.0, 3.8, 1.5];
-            const sampleVal = Math.min(100, Math.max(0, baseAvg + varPattern[i % varPattern.length]));
-            points.push({ v: Number(sampleVal.toFixed(1)) });
+            if (baseAvg === 0) {
+              points.push({ v: 0 });
+            } else {
+              const varPattern = [0, -3.5, 4.2, -2.0, 3.8, 1.5];
+              const sampleVal = Math.min(100, Math.max(0, baseAvg + varPattern[i % varPattern.length]));
+              points.push({ v: Number(sampleVal.toFixed(1)) });
+            }
           }
         } else if (type === 'pending') {
           points.push({ v: i === 0 ? totalPending : 0 });
