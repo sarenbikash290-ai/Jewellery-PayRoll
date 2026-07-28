@@ -248,7 +248,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
             {screen === 'revealed' ? 'Identity Verified!' : screen === 'sending' ? 'Sending OTP…' : screen === 'otp' ? 'Check Your Email' : 'HRPulse'}
           </div>
           <div style={{ fontSize: '11px', color: 'rgba(148,163,184,0.7)', fontWeight: 500, letterSpacing: '2px', textTransform: 'uppercase' }}>
-            SAI Jewellers · Enterprise Suite
+            Shri Sai Jewellers · Enterprise Suite
           </div>
           <div style={{ marginTop: '8px', fontSize: '12px', color: 'rgba(100,116,139,0.9)' }}>
             {screen === 'revealed' ? 'Your password has been retrieved.' :
@@ -439,7 +439,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
 
       {/* Footer */}
       <div style={{ position: 'absolute', bottom: '20px', fontSize: '11px', color: 'rgba(100,116,139,0.4)', textAlign: 'center', letterSpacing: '0.5px' }}>
-        © {new Date().getFullYear()} SAI Jewellers · HRPulse v1.0
+        © {new Date().getFullYear()} Shri Sai Jewellers · HRPulse v1.0
       </div>
 
       <style>{`

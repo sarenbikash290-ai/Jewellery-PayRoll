@@ -74,7 +74,7 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
     const absentCount = currentMonthRecords.filter((r) => r.status === 'absent').length;
     const totalDays = currentMonthRecords.length;
 
-    const rate = totalDays > 0 ? Math.round(((presentCount + wfhCount) / totalDays) * 100) : 100;
+    const rate = totalDays > 0 ? Math.round(((presentCount + wfhCount) / totalDays) * 100) : 0;
 
     return {
       rate,

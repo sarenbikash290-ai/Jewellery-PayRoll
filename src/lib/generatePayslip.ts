@@ -44,7 +44,7 @@ export function generatePayslip(employee: Employee, month: string) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text('SAI JEWELLERS', 15, 10);
+  doc.text('SHRI SAI JEWELLERS', 15, 10);
 
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   doc.setFontSize(20);
@@ -178,7 +178,7 @@ export function generatePayslip(employee: Employee, month: string) {
   doc.setDrawColor(lineStrokeColor[0], lineStrokeColor[1], lineStrokeColor[2]);
   doc.line(15, 275, 195, 275);
   doc.setFontSize(8);
-  doc.text('SAI JEWELLERS · Confidential Payslip', 15, 282);
+  doc.text('SHRI SAI JEWELLERS · Confidential Payslip', 15, 282);
   doc.text(`Generated on ${new Date().toLocaleDateString('en-IN')}`, 155, 282);
 
   doc.save(`payslip_${employee.id}_${month.replace(' ', '_')}.pdf`);

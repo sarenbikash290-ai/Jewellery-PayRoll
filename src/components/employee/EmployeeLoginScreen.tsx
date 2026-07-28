@@ -339,7 +339,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
             {screen === 'success' ? 'Authenticated!' : screen === 'otp' ? 'Verification Code' : screen === 'changePin' ? 'Change Default PIN' : 'Employee Portal'}
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase' }}>
-            SAI Jewellers · Employee Portal
+            Shri Sai Jewellers · Employee Portal
           </div>
           <div style={{ marginTop: '8px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
             {screen === 'success'

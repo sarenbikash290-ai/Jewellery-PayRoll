@@ -1,7 +1,7 @@
 {
-  "name": "HRPulse SAI Jewellers",
+  "name": "HRPulse Shri Sai Jewellers",
   "short_name": "HRPulse",
-  "description": "SAI Jewellers HR and Payroll Management Platform",
+  "description": "Shri Sai Jewellers HR and Payroll Management Platform",
   "start_url": "/employee",
   "display": "standalone",
   "background_color": "#060912",

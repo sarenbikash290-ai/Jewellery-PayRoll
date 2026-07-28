@@ -263,11 +263,29 @@ export default function Reports() {
     ? `₹ ${(payrollYtdSum / 100).toFixed(2)} Cr` 
     : `₹ ${payrollYtdSum.toFixed(2)} Lakhs`;
 
-  const totalAttRecords = attendanceRecords.length;
-  const presentAttRecords = attendanceRecords.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
-  const avgAttendanceDisplay = totalAttRecords > 0 
-    ? `${((presentAttRecords / totalAttRecords) * 100).toFixed(1)}%` 
-    : (employees.length > 0 ? '100.0%' : '0.0%');
+  const calcAttendanceAvg = (days: number) => {
+    if (employees.length === 0) return 0;
+    const now = new Date();
+    let totalPresentSum = 0;
+    let daysWithRecords = 0;
+
+    for (let i = 0; i < days; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const dateStr = d.toLocaleDateString('en-CA');
+      if (d.getDay() === 4) continue; // Skip weekly off
+
+      const records = attendanceRecords.filter(r => r.date === dateStr);
+      if (records.length > 0) {
+        const presentCount = records.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
+        totalPresentSum += (presentCount / employees.length) * 100;
+        daysWithRecords++;
+      }
+    }
+
+    return daysWithRecords > 0 ? totalPresentSum / daysWithRecords : 0;
+  };
+
+  const avgAttendanceDisplay = `${calcAttendanceAvg(30).toFixed(1)}%`;
 
   const inactiveCount = employees.filter(e => e.status === 'inactive').length;
   const attritionRateDisplay = employees.length > 0 
@@ -295,7 +313,7 @@ export default function Reports() {
       
       const total = recordsInWeek.length;
       const present = recordsInWeek.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
-      const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+      const rate = total > 0 ? Math.round((present / total) * 100) : 0;
       
       trend.push({
         week: `Wk ${5 - i}`,

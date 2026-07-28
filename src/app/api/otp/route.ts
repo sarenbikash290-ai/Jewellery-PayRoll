@@ -81,7 +81,7 @@ export async function POST(request: Request) {
           <div style="text-align:center;margin-bottom:28px;">
             <div style="display:inline-flex;width:56px;height:56px;background:linear-gradient(135deg,#4F8EF7,#8B5CF6);border-radius:14px;align-items:center;justify-content:center;font-size:28px;">🛡️</div>
             <h1 style="color:#F0F4FF;font-size:20px;font-weight:800;margin:14px 0 4px;letter-spacing:-0.5px;">HRPulse — OTP Verification</h1>
-            <p style="color:#64748B;font-size:13px;margin:0;">SAI Jewellers · Enterprise Suite</p>
+            <p style="color:#64748B;font-size:13px;margin:0;">Shri Sai Jewellers · Enterprise Suite</p>
           </div>
 
           <p style="color:#94A3B8;font-size:14px;line-height:1.6;margin:0 0 24px;">
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
           </div>
 
           <p style="color:#475569;font-size:11px;text-align:center;margin:0;">
-            © ${new Date().getFullYear()} SAI Jewellers · HRPulse v1.0
+            © ${new Date().getFullYear()} Shri Sai Jewellers · HRPulse v1.0
           </p>
         </div>
       </div>
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
     try {
       await transporter.sendMail({
-        from: `"HRPulse · SAI Jewellers" <${gmailUser}>`,
+        from: `"HRPulse · Shri Sai Jewellers" <${gmailUser}>`,
         to: toEmail,
         subject: `🔐 Your HRPulse OTP: ${otp}`,
         html,

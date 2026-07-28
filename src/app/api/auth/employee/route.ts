@@ -101,7 +101,7 @@ export async function POST(request: Request) {
                 <div style="text-align:center;margin-bottom:28px;">
                   <div style="display:inline-flex;width:56px;height:56px;background:rgba(217, 119, 6, 0.1);border-radius:14px;align-items:center;justify-content:center;font-size:28px;color:#D97706;">🔐</div>
                   <h1 style="color:#0F172A;font-size:20px;font-weight:800;margin:14px 0 4px;letter-spacing:-0.5px;">HRPulse Employee Access</h1>
-                  <p style="color:#64748B;font-size:13px;margin:0;">SAI Jewellers · Employee Portal</p>
+                  <p style="color:#64748B;font-size:13px;margin:0;">Shri Sai Jewellers · Employee Portal</p>
                 </div>
 
                 <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 24px;">
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
                 </p>
 
                 <p style="color:#94A3B8;font-size:11px;text-align:center;margin:0;border-top:1px solid #f1f5f9;padding-top:20px;">
-                  © ${new Date().getFullYear()} SAI Jewellers · HRPulse Employee Portal
+                  © ${new Date().getFullYear()} Shri Sai Jewellers · HRPulse Employee Portal
                 </p>
               </div>
             </div>

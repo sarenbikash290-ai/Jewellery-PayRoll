@@ -1103,7 +1103,7 @@ export default function GlobalModals() {
               {/* Document Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #0d131f', paddingBottom: '16px', marginBottom: '16px' }}>
                 <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0d131f' }}>SAI JEWELLERS PRIVATE LTD.</h2>
+                  <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0d131f' }}>SHRI SAI JEWELLERS PRIVATE LTD.</h2>
                   <p style={{ fontSize: '12px', color: '#4a5568', marginTop: '2px' }}>12, Luxury Plaza, Chanakyapuri, New Delhi - 110021</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -1338,7 +1338,7 @@ export default function GlobalModals() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                   <label>Company Legal Name</label>
-                  <input type="text" defaultValue="Sai Jewellers Private Limited" className="form-input" />
+                  <input type="text" defaultValue="Shri Sai Jewellers Private Limited" className="form-input" />
                 </div>
                 <div className="form-group">
                   <label>Support Email</label>

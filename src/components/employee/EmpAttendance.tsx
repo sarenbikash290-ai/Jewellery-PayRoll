@@ -114,7 +114,7 @@ export default function EmpAttendance({ employee }: EmpAttendanceProps) {
       }
     });
     const totalHours = (totalMinutes / 60).toFixed(1);
-    const onTimeRate = totalPresent > 0 ? Math.round(((totalPresent - totalLate) / totalPresent) * 100) : 100;
+    const onTimeRate = totalPresent > 0 ? Math.round(((totalPresent - totalLate) / totalPresent) * 100) : 0;
 
     return { totalPresent, totalLate, totalHours, onTimeRate };
   }, [filteredRecords]);
