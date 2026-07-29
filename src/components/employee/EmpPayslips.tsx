@@ -89,7 +89,7 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
 
   const filteredPayslips = useMemo(() => {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    
+
     // Convert locks to payslip format
     const lockedPayslips = payrollLocks.map(lock => ({
       month: `${months[lock.month - 1]} ${lock.year}`,
@@ -103,7 +103,7 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
       return (
         payslipDate.getFullYear() > joinedDate.getFullYear() ||
         (payslipDate.getFullYear() === joinedDate.getFullYear() &&
-         payslipDate.getMonth() >= joinedDate.getMonth())
+          payslipDate.getMonth() >= joinedDate.getMonth())
       );
     });
 
@@ -131,7 +131,7 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px' }}>
-      
+
       {/* Page Header */}
       <div>
         <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
@@ -150,98 +150,98 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
           </div>
         ) : (
           filteredPayslips.map((slip, i) => (
-          <div key={i} className="glass-card" style={{
-            flexDirection: 'column',
-            alignItems: 'stretch',
-            gap: '16px',
-            padding: '20px',
-            borderRadius: '16px',
-            display: 'flex',
-            background: '#FFFFFF'
-          }}
-          >
-            {/* Header Block */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                background: '#EFF6FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <Banknote size={18} color="#2563EB" />
-              </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{slip.month}</div>
-                <div style={{ fontSize: '10.5px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2.5px', fontWeight: 600 }}>
-                  <CheckCircle size={11} /> Salary Transferred
-                </div>
-              </div>
-            </div>
-
-            {/* Figures Block */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: '8px',
-              borderTop: '1px solid rgba(15,23,42,0.05)',
-              paddingTop: '16px',
-            }}>
-              <div>
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Gross</span>
-                <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  {fmt(salaryComponents.gross)}
-                </div>
-              </div>
-              <div>
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Deductions</span>
-                <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#EF4444', marginTop: '4px' }}>
-                  {fmt(salaryComponents.deductions)}
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Net Take-Home</span>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#854D0E', marginTop: '4px' }}>
-                  {fmt(salaryComponents.net)}
-                </div>
-              </div>
-            </div>
-
-            {/* Download Action */}
-            <button
-              onClick={() => handleDownload(slip.month)}
-              disabled={downloading === slip.month}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '11px 16px',
-                borderRadius: '10px',
-                background: downloading === slip.month ? '#E2E8F0' : '#854D0E',
-                border: 'none',
-                color: '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: downloading === slip.month ? 'default' : 'pointer',
-                transition: 'all 0.2s ease',
-                width: '100%',
-                boxShadow: downloading === slip.month ? 'none' : '0 4px 12px rgba(133,77,14,0.18)',
-              }}
+            <div key={i} className="glass-card" style={{
+              flexDirection: 'column',
+              alignItems: 'stretch',
+              gap: '16px',
+              padding: '20px',
+              borderRadius: '16px',
+              display: 'flex',
+              background: '#FFFFFF'
+            }}
             >
-              <Download size={14} />
-              {downloading === slip.month ? 'Generating...' : 'Download PDF'}
-            </button>
-          </div>
-        )))}
+              {/* Header Block */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: '#EFF6FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Banknote size={18} color="#2563EB" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{slip.month}</div>
+                  <div style={{ fontSize: '10.5px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2.5px', fontWeight: 600 }}>
+                    <CheckCircle size={11} /> Salary Transferred
+                  </div>
+                </div>
+              </div>
+
+              {/* Figures Block */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: '8px',
+                borderTop: '1px solid rgba(15,23,42,0.05)',
+                paddingTop: '16px',
+              }}>
+                <div>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Gross</span>
+                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    {fmt(salaryComponents.gross)}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Deductions</span>
+                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#EF4444', marginTop: '4px' }}>
+                    {fmt(salaryComponents.deductions)}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Net Take-Home</span>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#854D0E', marginTop: '4px' }}>
+                    {fmt(salaryComponents.net)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Download Action */}
+              <button
+                onClick={() => handleDownload(slip.month)}
+                disabled={downloading === slip.month}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '11px 16px',
+                  borderRadius: '10px',
+                  background: downloading === slip.month ? '#E2E8F0' : '#854D0E',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: downloading === slip.month ? 'default' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  width: '100%',
+                  boxShadow: downloading === slip.month ? 'none' : '0 4px 12px rgba(133,77,14,0.18)',
+                }}
+              >
+                <Download size={14} />
+                {downloading === slip.month ? 'Generating...' : 'Download PDF'}
+              </button>
+            </div>
+          )))}
       </div>
 
       <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', background: 'rgba(217,119,6,0.05)', border: '1px solid rgba(217,119,6,0.12)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '11px', alignItems: 'center' }}>
         <AlertCircle size={14} color="#D97706" style={{ flexShrink: 0 }} />
-        <span>For help with payslips, contact accounts@saijewellers.com.</span>
+        <span>For help with payslips, contact support@shrisaijewels.com.</span>
       </div>
     </div>
   );

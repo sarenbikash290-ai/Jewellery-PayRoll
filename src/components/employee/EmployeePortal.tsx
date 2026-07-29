@@ -173,11 +173,14 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
                 width: '32px', height: '32px',
-                background: '#0F172A',
+                background: '#ffffff',
                 borderRadius: '8px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                overflow: 'hidden',
+                padding: '2px'
               }}>
-                <Zap size={15} color="#fff" />
+                <img src="/logo.png" alt="Shri Sai Jewellers" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>HRPulse</span>
             </div>
@@ -300,16 +303,18 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
               transition: 'padding 0.15s ease',
             }}>
               <div style={{
-                width: '36px',
-                height: '36px',
-                background: '#0F172A',
+                width: '36px', height: '36px',
+                background: '#ffffff',
                 borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                overflow: 'hidden',
+                padding: '2px',
               }}>
-                <Zap size={16} color="#fff" />
+                <img src="/logo.png" alt="Shri Sai Jewellers" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               <div style={fadeStyle(sidebarOpen)}>
                 <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>HRPulse</div>

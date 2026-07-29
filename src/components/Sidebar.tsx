@@ -60,14 +60,17 @@ export default function Sidebar({ active, onNavigate, open, onLogout }: SidebarP
         transition: 'padding 0.15s ease',
       }}>
         <div style={{
-          width: '38px', height: '38px',
-          background: 'linear-gradient(135deg, #4F8EF7, #8B5CF6)',
+          width: '40px', height: '40px',
+          background: '#ffffff',
           borderRadius: '10px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
-          boxShadow: '0 4px 14px rgba(79,142,247,0.4)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+          padding: '2px',
         }}>
-          <Zap size={18} color="#fff" />
+          <img src="/logo.png" alt="Shri Sai Jewellers" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div style={fadeStyle(open)}>
           <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>HRPulse</div>
