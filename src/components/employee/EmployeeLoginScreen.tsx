@@ -116,7 +116,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
       setMaskedEmail(data.maskedEmail || '');
       setOtp('');
       setScreen('otp');
-      setTimer(600);
+      setTimer(120); // Resend countdown: 2 minutes (OTP valid for 10 min on server)
 
       if (data.emailSent) {
         toast('success', 'OTP Sent to Email', `Verification code sent to registered email ${data.maskedEmail}.`);
@@ -197,7 +197,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
       setOtpToken(data.token);
       setMaskedEmail(data.maskedEmail || '');
       setOtp('');
-      setTimer(600);
+      setTimer(120);
       if (data.emailSent) {
         toast('success', 'OTP Resent', `A new verification code has been sent to ${data.maskedEmail}.`);
       } else {

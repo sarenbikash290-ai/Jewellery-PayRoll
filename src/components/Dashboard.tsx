@@ -383,24 +383,35 @@ export default function Dashboard() {
     };
   });
 
-  // Dynamic Attendance Trend for the current week (Monday-Friday)
+  // Dynamic Attendance Trend for the current week (Mon-Sun, Thursday Store Holiday)
   const getWeekDates = () => {
     const now = new Date();
-    const dayOfWeek = now.getDay();
+    const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
     const startOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const weekDays = [];
-    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-    for (let i = 0; i < 5; i++) {
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu (Off)', 'Fri', 'Sat', 'Sun'];
+    for (let i = 0; i < 7; i++) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + startOffset + i);
+      const isThu = d.getDay() === 4;
       weekDays.push({
-        name: dayNames[i],
-        dateStr: d.toLocaleDateString('en-CA')
+        name: isThu ? 'Thu (Off)' : dayNames[i],
+        dateStr: d.toLocaleDateString('en-CA'),
+        isHoliday: isThu
       });
     }
     return weekDays;
   };
 
   const attendanceTrend = getWeekDates().map(day => {
+    if (day.isHoliday) {
+      return {
+        day: day.name,
+        present: 0,
+        late: 0,
+        absent: 0
+      };
+    }
+
     const recordsForDay = attendanceRecords.filter(r => r.date === day.dateStr);
     const present = recordsForDay.filter(r => r.status === 'present').length;
     const late = recordsForDay.filter(r => r.status === 'late').length;
@@ -687,11 +698,12 @@ export default function Dashboard() {
 
         {/* Attendance Chart */}
         <Card>
-          <CardHeader title="Weekly Attendance" subtitle="This week breakdown" action={
-            <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
+          <CardHeader title="Weekly Attendance" subtitle="Full week breakdown (Thursday: Weekly Off)" action={
+            <div style={{ display: 'flex', gap: '14px', fontSize: '12px' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', background: '#10B981', borderRadius: '2px', display: 'inline-block' }} />Present</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', background: '#F59E0B', borderRadius: '2px', display: 'inline-block' }} />Late</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', background: '#EF4444', borderRadius: '2px', display: 'inline-block' }} />Absent</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '8px', height: '8px', background: '#64748B', borderRadius: '2px', display: 'inline-block' }} />Weekly Off</span>
             </div>
           } />
           <div style={{ padding: '24px' }}>

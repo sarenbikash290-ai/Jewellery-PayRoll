@@ -37,6 +37,7 @@ const reportTemplates = [
 
 export default function Reports() {
   const { openModal, toast, employees, incentives, commissions, attendanceRecords, leaves, advancePayments } = useApp();
+  const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const parsedSalary = (salStr: any) => {
     if (!salStr || typeof salStr !== 'string') {
@@ -329,7 +330,7 @@ export default function Reports() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Reports & Analytics</h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>June 2025 · Data-driven insights across all HR functions</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{currentMonthLabel} · Data-driven insights across all HR functions</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button 
@@ -394,7 +395,7 @@ export default function Reports() {
         </Card>
 
         <Card>
-          <CardHeader title="Payroll by Department" subtitle="June 2025 in Lakhs (₹)" />
+          <CardHeader title="Payroll by Department" subtitle={`${currentMonthLabel} in Lakhs (₹)`} />
           <div style={{ padding: '24px' }}>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={deptCosts} layout="vertical" barSize={16}>

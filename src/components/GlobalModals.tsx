@@ -347,49 +347,132 @@ export default function GlobalModals() {
         toast('warning', 'No Modules Selected', 'Please check at least one data module to export.');
       }
     } else if (modal.open === 'customReport') {
-      const template = data.get('template') as string;
-      const format = data.get('format') as string;
-      const dept = data.get('dept') as string;
+      const template = (data.get('template') as string) || 'payroll';
+      const format = (data.get('format') as string) || 'excel';
+      const dept = (data.get('dept') as string) || 'All';
+      const range = (data.get('range') as string) || 'this-month';
+
+      const now = new Date();
+      const thisMonthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthName = prevDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      let rangeText = thisMonthName;
+      if (range === 'last-month') rangeText = lastMonthName;
+      else if (range === 'qtr') rangeText = `Q${Math.ceil((now.getMonth() + 1) / 3)} ${now.getFullYear()}`;
+      else if (range === 'ytd') rangeText = `YTD ${now.getFullYear()}`;
 
       const filteredEmps = dept === 'All' ? employees : employees.filter(e => e.dept === dept);
 
+      let title = `Custom Report — ${rangeText}`;
+      let headers: string[] = [];
+      let rows: (string | number)[][] = [];
+
       if (template === 'payroll') {
-        let csv = `Employee ID,Name,Department,Salary\n`;
-        filteredEmps.forEach(e => {
-          csv += `"${e.id}","${e.name}","${e.dept}","${e.salary}"\n`;
+        title = `Payroll Cost Breakdown (${dept})`;
+        headers = ['Employee ID', 'Name', 'Department', 'Role', 'Basic', 'HRA', 'Allowances', 'Gross Pay'];
+        rows = filteredEmps.map(e => {
+          const salaryVal = parsedSalary(e.salary || '50000');
+          const basic = Math.round(salaryVal * 0.6);
+          const hra = Math.round(basic * 0.4);
+          const allowances = Math.round(basic * 0.2);
+          const gross = basic + hra + allowances;
+          return [e.id, e.name, e.dept, e.role, basic, hra, allowances, gross];
         });
-        downloadFile(`payroll_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
       } else if (template === 'attendance') {
-        let csv = `Employee ID,Name,Date,Status\n`;
+        title = `Monthly Attendance Log (${dept})`;
+        headers = ['Employee ID', 'Name', 'Department', 'Date', 'Status', 'Check In', 'Check Out'];
         filteredEmps.forEach(e => {
           const records = attendanceRecords.filter(r => r.employeeId === e.id);
-          records.forEach(r => {
-            csv += `"${e.id}","${e.name}","${r.date}","${r.status}"\n`;
-          });
+          if (records.length === 0) {
+            rows.push([e.id, e.name, e.dept, 'N/A', 'No Records', '--', '--']);
+          } else {
+            records.forEach(r => {
+              rows.push([e.id, e.name, e.dept, r.date, r.status, r.checkIn || '', r.checkOut || '']);
+            });
+          }
         });
-        downloadFile(`attendance_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
       } else if (template === 'incentives') {
-        let csv = `Employee ID,Name,Month,Amount,Status\n`;
+        title = `Sales Commissions Ledger (${dept})`;
+        headers = ['Incentive ID', 'Employee ID', 'Employee Name', 'Department', 'Month', 'Amount', 'Status', 'Rule Type'];
         filteredEmps.forEach(e => {
           const empIncs = incentives.filter(i => i.employeeId === e.id);
-          empIncs.forEach(i => {
-            csv += `"${e.id}","${e.name}","${i.month}",${i.amount},"${i.status}"\n`;
-          });
+          if (empIncs.length === 0) {
+            rows.push(['--', e.id, e.name, e.dept, 'Current Month', 0, 'No Payouts', 'N/A']);
+          } else {
+            empIncs.forEach(i => {
+              rows.push([i.id, e.id, e.name, e.dept, i.month, i.amount, i.status, i.ruleType]);
+            });
+          }
         });
-        downloadFile(`incentives_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
       } else if (template === 'tax') {
-        let csv = `Employee ID,Name,PF,TDS\n`;
-        filteredEmps.forEach(emp => {
+        title = `PF & TDS Deductions Summary (${dept})`;
+        headers = ['Employee ID', 'Employee Name', 'Department', 'Basic Salary', 'PF (12%)', 'ESI (0.75%)', 'TDS'];
+        rows = filteredEmps.map(emp => {
           const salaryVal = parsedSalary(emp.salary || '50000');
           const basic = Math.round(salaryVal * 0.6);
+          const gross = basic * 1.6;
           const pf = Math.round(basic * 0.12);
-          const tds = basic > 45000 ? Math.round(basic * 0.1) : Math.round(basic * 0.05);
-          csv += `"${emp.id}","${emp.name}",${pf},${tds}\n`;
+          const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
+          const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
+          return [emp.id, emp.name, emp.dept, basic, pf, esi, tds];
         });
-        downloadFile(`tax_report_${dept.toLowerCase()}.csv`, csv, 'text/csv;charset=utf-8;');
       }
 
-      toast('success', 'Report Exported', 'Your custom report has been generated and downloaded.');
+      if (format === 'pdf') {
+        const htmlDoc = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${title}</title>
+  <style>
+    body { font-family: sans-serif; padding: 24px; color: #1e293b; }
+    h1 { font-size: 20px; color: #0f172a; margin-bottom: 4px; }
+    p { font-size: 12px; color: #64748b; margin-top: 0; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+    th { background-color: #f1f5f9; font-weight: 600; }
+    tr:nth-child(even) { background-color: #f8fafc; }
+    .footer { margin-top: 24px; font-size: 11px; color: #94a3b8; text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Shri Sai Jewellers — ${title}</h1>
+  <p>Generated on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} | Timeline: ${range} | Dept: ${dept}</p>
+  <table>
+    <thead>
+      <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+    </thead>
+    <tbody>
+      ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+    </tbody>
+  </table>
+  <div class="footer">HRPulse Enterprise Report Suite</div>
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
+</body>
+</html>`;
+        const printWin = window.open('', '_blank');
+        if (printWin) {
+          printWin.document.write(htmlDoc);
+          printWin.document.close();
+        }
+        downloadFile(`${template}_report_${dept.toLowerCase()}.html`, htmlDoc, 'text/html');
+        toast('success', 'PDF Export Generated', 'Report print window opened and file downloaded.');
+      } else {
+        let csv = `# Shri Sai Jewellers — ${title}\n# Generated: ${new Date().toISOString()}\n`;
+        csv += headers.map(h => `"${h}"`).join(',') + '\n';
+        rows.forEach(r => {
+          csv += r.map(c => typeof c === 'string' ? `"${c.replace(/"/g, '""')}"` : c).join(',') + '\n';
+        });
+
+        const fileExt = format === 'excel' ? 'xlsx' : 'csv';
+        const mimeType = format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv;charset=utf-8;';
+        const fileName = `${template}_report_${dept.toLowerCase()}.${fileExt}`;
+
+        downloadFile(fileName, csv, mimeType);
+        toast('success', 'Report Exported', `${title} (${format === 'excel' ? 'Excel .xlsx' : 'CSV'}) compiled and downloaded.`);
+      }
     }
 
     closeModal();
@@ -1196,6 +1279,11 @@ export default function GlobalModals() {
     }
 
     case 'customReport': {
+      const now = new Date();
+      const thisMonthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthName = prevDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
       return (
         <Modal 
           title="Run Custom Report" 
@@ -1205,7 +1293,7 @@ export default function GlobalModals() {
           <form onSubmit={handleExport} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group">
               <label>Report Template</label>
-              <select className="form-input">
+              <select name="template" className="form-input">
                 <option value="payroll">Payroll Cost breakdown</option>
                 <option value="attendance">Monthly Attendance log</option>
                 <option value="incentives">Sales Commissions Ledger</option>
@@ -1216,16 +1304,16 @@ export default function GlobalModals() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Date Range</label>
-                <select className="form-input">
-                  <option value="this-month">This Month (June 2025)</option>
-                  <option value="last-month">Last Month (May 2025)</option>
-                  <option value="q1">Q1 Fiscal Year</option>
-                  <option value="custom">Custom Date Selection</option>
+                <select name="range" className="form-input">
+                  <option value="this-month">This Month ({thisMonthName})</option>
+                  <option value="last-month">Last Month ({lastMonthName})</option>
+                  <option value="qtr">Current Fiscal Quarter</option>
+                  <option value="ytd">Year to Date ({now.getFullYear()})</option>
                 </select>
               </div>
               <div className="form-group">
                 <label>Format</label>
-                <select className="form-input">
+                <select name="format" className="form-input">
                   <option value="excel">Excel Document (.xlsx)</option>
                   <option value="pdf">A4 PDF Report</option>
                   <option value="csv">Standard CSV</option>
@@ -1235,12 +1323,12 @@ export default function GlobalModals() {
 
             <div className="form-group">
               <label>Filter Department</label>
-              <select className="form-input">
+              <select name="dept" className="form-input">
                 <option value="All">All Departments</option>
                 <option value="Sales">Sales</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Operations">Operations</option>
-                <option value="HR">HR</option>
+                <option value="Gold Crafting">Gold Crafting</option>
+                <option value="Store Ops">Store Ops</option>
+                <option value="Accounts">Accounts</option>
               </select>
             </div>
 

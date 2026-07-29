@@ -16,6 +16,7 @@ export default function Payroll() {
   const [processing, setProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
   const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth } = useApp();
+  const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const parsedSalary = (salStr: any) => {
     if (!salStr || typeof salStr !== 'string') {
@@ -194,7 +195,7 @@ export default function Payroll() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Payroll Management</h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>June 2025 · Processing cycle</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{currentMonthLabel} · Processing cycle</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button 
@@ -233,7 +234,7 @@ export default function Payroll() {
       {/* Run Payroll Wizard */}
       <Card>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '15px', fontWeight: 600 }}>Run Payroll — June 2025</div>
+          <div style={{ fontSize: '15px', fontWeight: 600 }}>Run Payroll — {currentMonthLabel}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>3-step process: Review → Approve → Process</div>
         </div>
 
@@ -293,7 +294,7 @@ export default function Payroll() {
                 <CheckCircle size={28} color="#10B981" />
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Payroll Processed! 🎉</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>June 2025 payroll of <strong style={{ color: '#10B981' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> has been processed. Payslips are now available for employees to view and download.</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>{currentMonthLabel} payroll of <strong style={{ color: '#10B981' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> has been processed. Payslips are now available for employees to view and download.</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                 <button 
                   onClick={downloadPayrollCSV}
@@ -311,7 +312,7 @@ export default function Payroll() {
       {/* Payroll Table */}
       <Card>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '14px', fontWeight: 600 }}>Salary Breakup — June 2025</span>
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>Salary Breakup — {currentMonthLabel}</span>
           <button 
             onClick={() => toast('success', 'Payslips Generated', 'PDF payslips have been compiled and sent to all employees.')}
             style={{ fontSize: '12px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: 'transparent', border: 'none' }}
