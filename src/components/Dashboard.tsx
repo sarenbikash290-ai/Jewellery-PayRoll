@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useApp } from './AppContext';
 import {
-  Users, TrendingUp, TrendingDown, DollarSign, Clock,
+  Users, TrendingUp, TrendingDown, IndianRupee, Clock,
   AlertCircle, CheckCircle, ArrowUpRight, MoreHorizontal,
   UserCheck, UserX, Calendar
 } from 'lucide-react';
@@ -324,7 +324,7 @@ export default function Dashboard() {
       value: payrollData.value,
       change: payrollData.change,
       changeType: 'neutral' as const,
-      icon: DollarSign,
+      icon: IndianRupee,
       color: '#10B981',
       bg: 'rgba(16,185,129,0.1)',
       sparkline: generateSparkline('payroll'),

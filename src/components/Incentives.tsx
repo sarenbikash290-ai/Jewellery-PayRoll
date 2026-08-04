@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import { useApp } from './AppContext';
 import {
   TrendingUp, Target, Award, Plus, Clock, AlertCircle, Gift, Crown,
-  Zap, ArrowUp, DollarSign, Trash2, X, ChevronRight, BarChart2,
+  Zap, ArrowUp, IndianRupee, Trash2, X, ChevronRight, BarChart2,
   ShoppingBag, Calendar, User, Mail, Phone, MapPin, Briefcase,
   ArrowLeft, Package
 } from 'lucide-react';
@@ -233,7 +233,7 @@ function EmployeeDetailPanel({
                   { icon: MapPin, label: 'Location', value: emp.location },
                   { icon: Calendar, label: 'Joined', value: emp.joined },
                   { icon: Briefcase, label: 'Role', value: emp.role },
-                  { icon: DollarSign, label: 'Gross Salary', value: `₹${fmt(emp.salary)}` },
+                  { icon: IndianRupee, label: 'Gross Salary', value: `₹${fmt(emp.salary)}` },
                 ].map((f, i) => {
                   const Icon = f.icon;
                   return (
@@ -587,7 +587,7 @@ export default function Incentives() {
             { label: 'Total Sales', value: `₹${(totalSales / 100000).toFixed(2)}L`, sub: 'All employees', color: '#4F8EF7', icon: TrendingUp },
             { label: 'On-Track', value: `${onTrackCount}/${employeeData.length}`, sub: 'Good performers', color: '#8B5CF6', icon: Award },
             { label: 'At-Risk', value: String(atRiskCount), sub: 'Need support', color: '#F59E0B', icon: AlertCircle },
-            { label: 'Monthly Payroll', value: `₹${(totalSalary / 100000).toFixed(2)}L`, sub: 'All salaries', color: '#06B6D4', icon: DollarSign },
+            { label: 'Monthly Payroll', value: `₹${(totalSalary / 100000).toFixed(2)}L`, sub: 'All salaries', color: '#06B6D4', icon: IndianRupee },
           ].map((s, i) => {
             const Icon = s.icon;
             return (

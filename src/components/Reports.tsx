@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from './AppContext';
-import { Download, FileText, Filter, BarChart2, TrendingUp, Users, DollarSign } from 'lucide-react';
+import { Download, FileText, Filter, BarChart2, TrendingUp, Users, IndianRupee } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
@@ -27,7 +27,7 @@ const CardHeader = ({ title, subtitle, action }: { title: string; subtitle?: str
 );
 
 const reportTemplates = [
-  { icon: DollarSign, color: '#10B981', title: 'Payroll Cost Report', desc: 'Monthly payroll by dept & employee', format: 'Excel + PDF' },
+  { icon: IndianRupee, color: '#10B981', title: 'Payroll Cost Report', desc: 'Monthly payroll by dept & employee', format: 'Excel + PDF' },
   { icon: Users, color: '#4F8EF7', title: 'Headcount Report', desc: 'Workforce by dept, type, location', format: 'Excel' },
   { icon: BarChart2, color: '#8B5CF6', title: 'Attendance Summary', desc: 'Attendance rate, late, absences', format: 'Excel + PDF' },
   { icon: TrendingUp, color: '#F59E0B', title: 'Incentive Payout Report', desc: 'Commission payouts vs targets', format: 'Excel' },

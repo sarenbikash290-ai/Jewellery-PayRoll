@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from './AppContext';
-import { DollarSign, Download, Play, CheckCircle, Clock, Users, FileText, AlertCircle } from 'lucide-react';
+import { IndianRupee, Download, Play, CheckCircle, Clock, Users, FileText, AlertCircle } from 'lucide-react';
 
 // payrollEmployees will be constructed dynamically inside the component using useApp()
 const avatarColors = ['#4F8EF7', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#EF4444'];
@@ -243,7 +243,7 @@ export default function Payroll() {
       {/* Summary Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
         {[
-          { label: 'Gross Payroll',   value: fmt(totalGross), sub: `${employees.length} employees`, color: '#4F8EF7', icon: DollarSign },
+          { label: 'Gross Payroll',   value: fmt(totalGross), sub: `${employees.length} employees`, color: '#4F8EF7', icon: IndianRupee },
           { label: 'Net Payable',     value: fmt(totalNet),   sub: 'After deductions', color: '#10B981', icon: CheckCircle },
           { label: 'PF Deduction',    value: fmt(totalPF),    sub: 'Employer + Employee', color: '#F59E0B', icon: Users },
           { label: 'TDS Deduction',   value: fmt(totalTDS),   sub: 'Income tax withheld', color: '#8B5CF6', icon: FileText },

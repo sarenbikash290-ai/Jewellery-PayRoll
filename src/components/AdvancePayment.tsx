@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import { useApp, AdvancePayment } from './AppContext';
 import {
   CreditCard, Plus, Trash2, X, CheckCircle, Clock, AlertCircle,
-  User, Calendar, DollarSign, FileText, ChevronDown, Search
+  User, Calendar, IndianRupee, FileText, ChevronDown, Search
 } from 'lucide-react';
 
 function fmt(n: number) {

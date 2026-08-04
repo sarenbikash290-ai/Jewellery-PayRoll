@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useApp, Employee } from '../AppContext';
-import { LayoutDashboard, Clock, Calendar, FileText, LogOut, Zap, User, Fingerprint, Banknote, Mail, Phone, MapPin, DollarSign, Briefcase, X } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, FileText, LogOut, Zap, User, Fingerprint, Banknote, Mail, Phone, MapPin, IndianRupee, Briefcase, X } from 'lucide-react';
 import EmpDashboard from './EmpDashboard';
 import EmpAttendance from './EmpAttendance';
 import EmpLeave from './EmpLeave';
@@ -620,7 +620,7 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
                     { icon: Phone, label: 'Phone Number', value: employee.phone },
                     { icon: MapPin, label: 'Store Location', value: employee.location || 'Flagship Store' },
                     { icon: Calendar, label: 'Date Joined', value: employee.joined },
-                    { icon: DollarSign, label: 'Base Salary', value: employee.salary },
+                    { icon: IndianRupee, label: 'Base Salary', value: employee.salary },
                   ].map((f, i) => {
                     const Icon = f.icon;
                     return (

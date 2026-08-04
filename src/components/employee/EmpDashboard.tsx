@@ -4,7 +4,7 @@ import { useApp, Employee } from '../AppContext';
 import { 
   User, Calendar, Clock, CheckCircle, AlertCircle, FileText, 
   ChevronRight, Megaphone, Bell, Banknote, MapPin, Fingerprint,
-  TrendingUp, AlertTriangle, DollarSign, Activity, Award, ShoppingBag
+  TrendingUp, AlertTriangle, IndianRupee, Activity, Award, ShoppingBag
 } from 'lucide-react';
 
 interface EmpDashboardProps {
@@ -430,7 +430,7 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
         <div className="glass-card" style={{ padding: '14px 16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Current Month Loss of Pay</span>
           <span style={{ fontSize: '13px', fontWeight: 700, color: salaryDeductions.lopDeduction > 0 ? '#EF4444' : '#10B981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-            <DollarSign size={13} color={salaryDeductions.lopDeduction > 0 ? '#EF4444' : '#10B981'} /> ₹{salaryDeductions.lopDeduction.toLocaleString('en-IN')}
+            <IndianRupee size={13} color={salaryDeductions.lopDeduction > 0 ? '#EF4444' : '#10B981'} /> ₹{salaryDeductions.lopDeduction.toLocaleString('en-IN')}
           </span>
         </div>
       </div>

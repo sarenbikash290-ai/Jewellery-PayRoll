@@ -6,7 +6,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { generatePayslip } from '@/lib/generatePayslip';
 import {
-  User, Mail, Phone, MapPin, DollarSign, Calendar, Clock, Briefcase,
+  User, Mail, Phone, MapPin, IndianRupee, Calendar, Clock, Briefcase,
   CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil
 } from 'lucide-react';
 
@@ -674,7 +674,7 @@ export default function GlobalModals() {
                 <div className="form-group">
                   <label>Monthly Gross Salary (INR)</label>
                   <div style={{ position: 'relative' }}>
-                    <DollarSign size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
+                    <IndianRupee size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
                     <input
                       type="text"
                       required
@@ -763,7 +763,7 @@ export default function GlobalModals() {
                 { icon: Phone, label: 'Phone Number', value: emp.phone },
                 { icon: MapPin, label: 'Work Location', value: emp.location },
                 { icon: Calendar, label: 'Joining Date', value: emp.joined },
-                { icon: DollarSign, label: 'Salary (Gross)', value: emp.salary },
+                { icon: IndianRupee, label: 'Salary (Gross)', value: emp.salary },
                 { icon: Briefcase, label: 'Job Type', value: emp.type },
               ].map((f, i) => {
                 const Icon = f.icon;
