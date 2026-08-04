@@ -4,9 +4,9 @@ import { useApp } from './AppContext';
 import Modal from './Modal';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { 
-  User, Mail, Phone, MapPin, DollarSign, Calendar, Clock, Briefcase, 
-  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil 
+import {
+  User, Mail, Phone, MapPin, DollarSign, Calendar, Clock, Briefcase,
+  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil
 } from 'lucide-react';
 
 export default function GlobalModals() {
@@ -98,7 +98,7 @@ export default function GlobalModals() {
       toast('error', 'Invalid Mobile Number', 'Please enter a valid mobile number with at least 10 digits.');
       return;
     }
-    
+
     const empData = {
       name,
       dept: formData.dept || 'Sales',
@@ -217,10 +217,10 @@ export default function GlobalModals() {
           ).length;
 
           const unpaidLeavesCount = leaves.filter(
-            l => l.employeeId === emp.id && 
-                 l.status === 'approved' && 
-                 (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
-                 (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))
+            l => l.employeeId === emp.id &&
+              l.status === 'approved' &&
+              (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
+              (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))
           ).length;
 
           const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
@@ -228,15 +228,15 @@ export default function GlobalModals() {
 
           // Incentives & Commissions
           const empIncentives = incentives.filter(
-            inc => inc.employeeId === emp.id && 
-                   (inc.status === 'approved' || inc.status === 'paid') && 
-                   (inc.month.includes('Jun') || inc.month.includes('June'))
+            inc => inc.employeeId === emp.id &&
+              (inc.status === 'approved' || inc.status === 'paid') &&
+              (inc.month.includes('Jun') || inc.month.includes('June'))
           );
-          
+
           const empCommissions = commissions.filter(
-            com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
-                   (com.status === 'approved' || com.status === 'paid') && 
-                   (com.month.includes('Jun') || com.month.includes('June'))
+            com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) &&
+              (com.status === 'approved' || com.status === 'paid') &&
+              (com.month.includes('Jun') || com.month.includes('June'))
           );
 
           const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
@@ -247,9 +247,9 @@ export default function GlobalModals() {
 
           // Advance Deductions
           const empAdvances = advancePayments.filter(
-            adv => adv.employeeId === emp.id && 
-                   adv.status === 'pending' &&
-                   (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+            adv => adv.employeeId === emp.id &&
+              adv.status === 'pending' &&
+              (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
           );
           const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
 
@@ -504,24 +504,24 @@ export default function GlobalModals() {
     case 'editEmployee': {
       const isEdit = modal.open === 'editEmployee';
       return (
-        <Modal 
-          title={isEdit ? 'Edit Employee Profile' : 'Add New Employee'} 
+        <Modal
+          title={isEdit ? 'Edit Employee Profile' : 'Add New Employee'}
           subtitle={isEdit ? `Modifying record for ${formData.name || ''}` : 'Register a new workforce member'}
           size="lg"
         >
           <form onSubmit={handleSaveEmployee} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Modal Tabs */}
             <div style={{
-                display: 'flex',
-                gap: '6px',
-                background: 'rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(6px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '10px',
-                padding: '6px',
-                width: 'fit-content',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-              }}>
+              display: 'flex',
+              gap: '6px',
+              background: 'rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(6px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: '10px',
+              padding: '6px',
+              width: 'fit-content',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}>
               {['basic', 'job', 'salary'].map(t => (
                 <button
                   key={t}
@@ -550,14 +550,14 @@ export default function GlobalModals() {
                   <label>Full Name</label>
                   <div style={{ position: 'relative' }}>
                     <User size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      value={formData.name || ''} 
+                      value={formData.name || ''}
                       onChange={e => handleInputChange('name', e.target.value)}
-                      placeholder="e.g. Rajesh Kumar" 
-                      className="form-input" 
-                      style={{ paddingLeft: 34 }} 
+                      placeholder="e.g. Rajesh Kumar"
+                      className="form-input"
+                      style={{ paddingLeft: 34 }}
                     />
                   </div>
                 </div>
@@ -565,14 +565,14 @@ export default function GlobalModals() {
                   <label>Email Address</label>
                   <div style={{ position: 'relative' }}>
                     <Mail size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input 
-                      type="email" 
+                    <input
+                      type="email"
                       required
-                      value={formData.email || ''} 
+                      value={formData.email || ''}
                       onChange={e => handleInputChange('email', e.target.value)}
-                      placeholder="e.g. rajesh@company.com" 
-                      className="form-input" 
-                      style={{ paddingLeft: 34 }} 
+                      placeholder="e.g. rajesh@company.com"
+                      className="form-input"
+                      style={{ paddingLeft: 34 }}
                     />
                   </div>
                 </div>
@@ -580,14 +580,14 @@ export default function GlobalModals() {
                   <label>Mobile Number</label>
                   <div style={{ position: 'relative' }}>
                     <Phone size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      value={formData.phone || ''} 
+                      value={formData.phone || ''}
                       onChange={e => handleInputChange('phone', e.target.value)}
-                      placeholder="e.g. +91 98765 43210" 
-                      className="form-input" 
-                      style={{ paddingLeft: 34 }} 
+                      placeholder="e.g. +91 98765 43210"
+                      className="form-input"
+                      style={{ paddingLeft: 34 }}
                     />
                   </div>
                 </div>
@@ -595,14 +595,14 @@ export default function GlobalModals() {
                   <label>Office Location</label>
                   <div style={{ position: 'relative' }}>
                     <MapPin size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      value={formData.location || ''} 
+                      value={formData.location || ''}
                       onChange={e => handleInputChange('location', e.target.value)}
-                      placeholder="e.g. Bangalore" 
-                      className="form-input" 
-                      style={{ paddingLeft: 34 }} 
+                      placeholder="e.g. Bangalore"
+                      className="form-input"
+                      style={{ paddingLeft: 34 }}
                     />
                   </div>
                 </div>
@@ -615,21 +615,21 @@ export default function GlobalModals() {
                   <label>Job Title / Role</label>
                   <div style={{ position: 'relative' }}>
                     <Briefcase size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      value={formData.role || ''} 
+                      value={formData.role || ''}
                       onChange={e => handleInputChange('role', e.target.value)}
-                      placeholder="e.g. Account Executive" 
-                      className="form-input" 
-                      style={{ paddingLeft: 34 }} 
+                      placeholder="e.g. Account Executive"
+                      className="form-input"
+                      style={{ paddingLeft: 34 }}
                     />
                   </div>
                 </div>
                 <div className="form-group">
                   <label>Department</label>
-                  <select 
-                    value={formData.dept || 'Sales'} 
+                  <select
+                    value={formData.dept || 'Sales'}
                     onChange={e => handleInputChange('dept', e.target.value)}
                     className="form-input"
                   >
@@ -640,8 +640,8 @@ export default function GlobalModals() {
                 </div>
                 <div className="form-group">
                   <label>Employment Type</label>
-                  <select 
-                    value={formData.type || 'Full-time'} 
+                  <select
+                    value={formData.type || 'Full-time'}
                     onChange={e => handleInputChange('type', e.target.value)}
                     className="form-input"
                   >
@@ -654,14 +654,14 @@ export default function GlobalModals() {
                   <label>Joining Date</label>
                   <div style={{ position: 'relative' }}>
                     <Calendar size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      value={formData.joined || ''} 
+                      value={formData.joined || ''}
                       onChange={e => handleInputChange('joined', e.target.value)}
-                      placeholder="e.g. 15 Jun 2025" 
-                      className="form-input" 
-                      style={{ paddingLeft: 34 }} 
+                      placeholder="e.g. 15 Jun 2025"
+                      className="form-input"
+                      style={{ paddingLeft: 34 }}
                     />
                   </div>
                 </div>
@@ -674,21 +674,21 @@ export default function GlobalModals() {
                   <label>Monthly Gross Salary (INR)</label>
                   <div style={{ position: 'relative' }}>
                     <DollarSign size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      value={formData.salary || ''} 
+                      value={formData.salary || ''}
                       onChange={e => handleInputChange('salary', e.target.value)}
-                      placeholder="e.g. 75,000" 
-                      className="form-input" 
-                      style={{ paddingLeft: 34 }} 
+                      placeholder="e.g. 75,000"
+                      className="form-input"
+                      style={{ paddingLeft: 34 }}
                     />
                   </div>
                 </div>
                 <div className="form-group">
                   <label>Status</label>
-                  <select 
-                    value={formData.status || 'active'} 
+                  <select
+                    value={formData.status || 'active'}
                     onChange={e => handleInputChange('status', e.target.value)}
                     className="form-input"
                   >
@@ -700,16 +700,16 @@ export default function GlobalModals() {
             )}
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-              <button 
-                type="button" 
-                onClick={closeModal} 
+              <button
+                type="button"
+                onClick={closeModal}
                 className="btn btn-secondary"
                 style={{ padding: '8px 18px', fontSize: '13px' }}
               >
                 Cancel
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="btn btn-primary"
                 style={{ padding: '8px 22px', fontSize: '13px' }}
               >
@@ -724,8 +724,8 @@ export default function GlobalModals() {
     case 'viewEmployee': {
       const emp = (modal.data as Record<string, string>) || defaultEmployee;
       return (
-        <Modal 
-          title="Employee Profile Card" 
+        <Modal
+          title="Employee Profile Card"
           subtitle={`Detailed records for employee ${emp.id}`}
           size="md"
           hideClose
@@ -733,9 +733,9 @@ export default function GlobalModals() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Header info */}
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-              <div style={{ 
-                width: '64px', height: '64px', 
-                background: 'linear-gradient(135deg, #4F8EF7 0%, #8B5CF6 100%)', 
+              <div style={{
+                width: '64px', height: '64px',
+                background: 'linear-gradient(135deg, #4F8EF7 0%, #8B5CF6 100%)',
                 borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '24px', fontWeight: 800, color: '#fff'
               }}>
@@ -744,8 +744,8 @@ export default function GlobalModals() {
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-1)' }}>{emp.name}</h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '2px' }}>{emp.role} · <span style={{ color: 'var(--brand)' }}>{emp.dept}</span></p>
-                <span style={{ 
-                  display: 'inline-block', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', 
+                <span style={{
+                  display: 'inline-block', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
                   padding: '2px 8px', borderRadius: '100px', marginTop: '6px',
                   background: emp.status === 'active' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
                   color: emp.status === 'active' ? '#10B981' : '#EF4444'
@@ -822,13 +822,13 @@ export default function GlobalModals() {
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Log Manual Attendance
                 </div>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Date</label>
-                    <input 
-                      type="date" 
-                      value={manualDate} 
+                    <input
+                      type="date"
+                      value={manualDate}
                       onChange={e => setManualDate(e.target.value)}
                       style={{
                         padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
@@ -838,8 +838,8 @@ export default function GlobalModals() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Status</label>
-                    <select 
-                      value={manualStatus} 
+                    <select
+                      value={manualStatus}
                       onChange={e => setManualStatus(e.target.value as any)}
                       style={{
                         padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
@@ -858,9 +858,9 @@ export default function GlobalModals() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Check In Time</label>
-                      <input 
-                        type="text" 
-                        value={manualCheckIn} 
+                      <input
+                        type="text"
+                        value={manualCheckIn}
                         onChange={e => setManualCheckIn(e.target.value)}
                         placeholder="e.g. 09:00 AM"
                         style={{
@@ -871,9 +871,9 @@ export default function GlobalModals() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Check Out Time</label>
-                      <input 
-                        type="text" 
-                        value={manualCheckOut} 
+                      <input
+                        type="text"
+                        value={manualCheckOut}
                         onChange={e => setManualCheckOut(e.target.value)}
                         placeholder="e.g. 06:00 PM (optional)"
                         style={{
@@ -923,8 +923,8 @@ export default function GlobalModals() {
 
             {/* Footer action buttons */}
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => {
                   deleteEmployee(emp.id);
                   toast('error', 'Employee Record Deleted', `${emp.name}'s profile has been permanently removed from workforce records.`);
@@ -935,8 +935,8 @@ export default function GlobalModals() {
               >
                 <Trash2 size={14} /> Delete Employee
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={async () => {
                   if (confirm(`Are you sure you want to reset the login PIN for ${emp.name} to the default '1234'?`)) {
                     try {
@@ -956,23 +956,23 @@ export default function GlobalModals() {
                     }
                   }
                 }}
-                style={{ 
-                  padding: '8px 16px', 
-                  fontSize: '13px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '6px',
-                  background: 'rgba(217, 119, 6, 0.1)', 
-                  border: '1px solid rgba(217, 119, 6, 0.3)', 
-                  borderRadius: '8px', 
+                  background: 'rgba(217, 119, 6, 0.1)',
+                  border: '1px solid rgba(217, 119, 6, 0.3)',
+                  borderRadius: '8px',
                   color: '#D97706',
-                  cursor: 'pointer' 
+                  cursor: 'pointer'
                 }}
               >
                 <Shield size={14} /> Reset PIN
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => {
                   closeModal();
                   setTimeout(() => openModal('editEmployee', emp), 150);
@@ -982,9 +982,9 @@ export default function GlobalModals() {
               >
                 <Pencil size={14} /> Edit Profile
               </button>
-              <button 
-                type="button" 
-                onClick={closeModal} 
+              <button
+                type="button"
+                onClick={closeModal}
                 className="btn btn-secondary"
                 style={{ padding: '8px 18px', fontSize: '13px' }}
               >
@@ -998,8 +998,8 @@ export default function GlobalModals() {
 
     case 'addLeave': {
       return (
-        <Modal 
-          title="Apply for Leave / WFH" 
+        <Modal
+          title="Apply for Leave / WFH"
           subtitle="Submit a leave request for management approval"
           size="md"
         >
@@ -1027,10 +1027,10 @@ export default function GlobalModals() {
 
             <div className="form-group">
               <label>Reason for Leave</label>
-              <textarea 
-                required 
-                className="form-input" 
-                rows={3} 
+              <textarea
+                required
+                className="form-input"
+                rows={3}
                 placeholder="Brief explanation of your leave request..."
                 style={{ resize: 'none', padding: '10px' }}
               />
@@ -1047,8 +1047,8 @@ export default function GlobalModals() {
 
     case 'addIncentiveRule': {
       return (
-        <Modal 
-          title="Create Incentive Rule" 
+        <Modal
+          title="Create Incentive Rule"
           subtitle="Define calculation rules for target achievements and bonuses"
           size="md"
         >
@@ -1095,7 +1095,7 @@ export default function GlobalModals() {
     case 'viewPayslip': {
       const empData = (modal.data as Record<string, string>) || defaultEmployee;
       const emp = employees.find(e => e.id === empData.id) || { ...defaultEmployee, ...empData };
-      
+
       const parsedSalary = (salStr: string) => {
         const clean = salStr.replace(/[^\d]/g, '');
         const val = parseInt(clean, 10);
@@ -1114,10 +1114,10 @@ export default function GlobalModals() {
       ).length;
 
       const unpaidLeavesCount = leaves.filter(
-        l => l.employeeId === emp.id && 
-             l.status === 'approved' && 
-             (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
-             (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
+        l => l.employeeId === emp.id &&
+          l.status === 'approved' &&
+          (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
+          (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
       ).length;
 
       const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
@@ -1125,15 +1125,15 @@ export default function GlobalModals() {
 
       // Incentives & Commissions
       const empIncentives = incentives.filter(
-        inc => inc.employeeId === emp.id && 
-               (inc.status === 'approved' || inc.status === 'paid') && 
-               (inc.month.includes('Jun') || inc.month.includes('June'))
+        inc => inc.employeeId === emp.id &&
+          (inc.status === 'approved' || inc.status === 'paid') &&
+          (inc.month.includes('Jun') || inc.month.includes('June'))
       );
-      
+
       const empCommissions = commissions.filter(
-        com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
-               (com.status === 'approved' || com.status === 'paid') && 
-               (com.month.includes('Jun') || com.month.includes('June'))
+        com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) &&
+          (com.status === 'approved' || com.status === 'paid') &&
+          (com.month.includes('Jun') || com.month.includes('June'))
       );
 
       const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
@@ -1146,9 +1146,9 @@ export default function GlobalModals() {
 
       // Advance Deductions
       const empAdvances = advancePayments.filter(
-        adv => adv.employeeId === emp.id && 
-               adv.status === 'pending' &&
-               (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+        adv => adv.employeeId === emp.id &&
+          adv.status === 'pending' &&
+          (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
       );
       const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
 
@@ -1165,7 +1165,7 @@ export default function GlobalModals() {
 
         const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
         const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-        
+
         const formatHelper = (n: number): string => {
           if (n < 20) return ones[n];
           if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
@@ -1179,8 +1179,8 @@ export default function GlobalModals() {
       };
 
       return (
-        <Modal 
-          title="Interactive Payslip" 
+        <Modal
+          title="Interactive Payslip"
           subtitle="Generate and download employee payslips"
           size="lg"
         >
@@ -1273,12 +1273,12 @@ export default function GlobalModals() {
             {/* Print and Actions */}
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
               <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Close</button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => {
                   toast('success', 'Download Started', 'The PDF document is being generated and downloaded.');
                 }}
-                className="btn btn-primary" 
+                className="btn btn-primary"
                 style={{ padding: '8px 22px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 <Printer size={14} /> Print / Save PDF
@@ -1296,8 +1296,8 @@ export default function GlobalModals() {
       const lastMonthName = prevDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
       return (
-        <Modal 
-          title="Run Custom Report" 
+        <Modal
+          title="Run Custom Report"
           subtitle="Generate reports filtered by timeline and departments"
           size="md"
         >
@@ -1353,8 +1353,8 @@ export default function GlobalModals() {
 
     case 'exportData': {
       return (
-        <Modal 
-          title="Export System Data" 
+        <Modal
+          title="Export System Data"
           subtitle="Choose what data logs you want to backup/download"
           size="md"
         >
@@ -1407,17 +1407,17 @@ export default function GlobalModals() {
 
     case 'settings': {
       return (
-        <Modal 
-          title="Company HR & Payroll Configurations" 
+        <Modal
+          title="Company HR & Payroll Configurations"
           subtitle="Configure business rules, working days, and compliance limits"
           size="lg"
         >
           <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', width: 'fit-content' }}>
-              {['business', 'compliance', 'roles'].map(t => (
-                <button 
-                  key={t} 
-                  type="button" 
+              {['business', 'compliance'].map(t => (
+                <button
+                  key={t}
+                  type="button"
                   onClick={() => setActiveTab(t)}
                   style={{
                     padding: '6px 16px', borderRadius: '6px',
@@ -1459,29 +1459,29 @@ export default function GlobalModals() {
                 </div>
                 <div className="form-group">
                   <label>Monthly Sales Target (₹)</label>
-                  <input 
-                    type="number" 
-                    value={salesTargetInput} 
-                    onChange={e => setSalesTargetInput(parseInt(e.target.value, 10) || 0)} 
-                    className="form-input" 
+                  <input
+                    type="number"
+                    value={salesTargetInput}
+                    onChange={e => setSalesTargetInput(parseInt(e.target.value, 10) || 0)}
+                    className="form-input"
                   />
                 </div>
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label>Authorized Store WiFi Static Public IP</label>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <input 
-                      type="text" 
-                      value={wifiIpInput} 
-                      onChange={e => setWifiIpInput(e.target.value)} 
-                      placeholder="e.g. 103.88.23.14 (Default 127.0.0.1 bypasses validation)" 
-                      className="form-input" 
+                    <input
+                      type="text"
+                      value={wifiIpInput}
+                      onChange={e => setWifiIpInput(e.target.value)}
+                      placeholder="e.g. 103.88.23.14 (Default 127.0.0.1 bypasses validation)"
+                      className="form-input"
                     />
                     <button
                       type="button"
                       onClick={async () => {
                         toast('info', 'Detecting IPs', 'Fetching public IPv4 and IPv6 addresses...');
                         const ips = new Set<string>();
-                        
+
                         try {
                           const res = await fetch('https://api4.ipify.org?format=json');
                           const data = await res.json();
@@ -1558,7 +1558,7 @@ export default function GlobalModals() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ action: 'resetData' })
                           });
-                          
+
                           await fetch('/api/leaves', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1637,26 +1637,6 @@ export default function GlobalModals() {
               </div>
             )}
 
-            {activeTab === 'roles' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '6px' }}>Verify or assign department HR Managers access:</div>
-                {[
-                  { dept: 'Sales Department', manager: 'Sneha Reddy', access: 'HR Manager' },
-                  { dept: 'Housekeeping Department', manager: 'Ramesh Kumar', access: 'Housekeeping Supervisor' },
-                  { dept: 'Helper Department', manager: 'Rohan Mehta', access: 'Shift Supervisor' },
-                ].map((r, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-3)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 600 }}>{r.dept}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>Assigned Manager: {r.manager}</div>
-                    </div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand)', background: 'rgba(79,142,247,0.12)', padding: '4px 10px', borderRadius: '100px' }}>
-                      {r.access}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
               <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>
@@ -1671,8 +1651,8 @@ export default function GlobalModals() {
     case 'editIncentive': {
       const isEdit = modal.open === 'editIncentive';
       return (
-        <Modal 
-          title={isEdit ? 'Edit Incentive Record' : 'Add New Employee Incentive'} 
+        <Modal
+          title={isEdit ? 'Edit Incentive Record' : 'Add New Employee Incentive'}
           subtitle={isEdit ? 'Update incentive details' : 'Create incentive for employee performance'}
           size="md"
         >
@@ -1705,8 +1685,8 @@ export default function GlobalModals() {
           }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group">
               <label>Employee Name</label>
-              <select 
-                value={formData.employeeName || ''} 
+              <select
+                value={formData.employeeName || ''}
                 onChange={e => {
                   const empName = e.target.value;
                   const emp = employees.find(x => x.name === empName);
@@ -1729,8 +1709,8 @@ export default function GlobalModals() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Incentive Type</label>
-                <select 
-                  value={formData.ruleType || ''} 
+                <select
+                  value={formData.ruleType || ''}
                   onChange={e => handleInputChange('ruleType', e.target.value)}
                   required
                   className="form-input"
@@ -1744,13 +1724,13 @@ export default function GlobalModals() {
               </div>
               <div className="form-group">
                 <label>Amount (₹)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   required
-                  value={formData.amount || ''} 
+                  value={formData.amount || ''}
                   onChange={e => handleInputChange('amount', e.target.value)}
-                  placeholder="e.g. 15000" 
-                  className="form-input" 
+                  placeholder="e.g. 15000"
+                  className="form-input"
                 />
               </div>
             </div>
@@ -1758,28 +1738,28 @@ export default function GlobalModals() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Month</label>
-                  <DatePicker
-                    selected={formData.month ? new Date(formData.month + '-01') : null}
-                    onChange={(date: Date | null) => {
-                      if (date) {
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const monthStr = `${year}-${month}`;
-                        handleInputChange('month', monthStr);
-                      } else {
-                        handleInputChange('month', '');
-                      }
-                    }}
-                    dateFormat="MMM yyyy"
-                    showMonthYearPicker
-                    placeholderText="Select month"
-                    className="form-input"
-                  />
+                <DatePicker
+                  selected={formData.month ? new Date(formData.month + '-01') : null}
+                  onChange={(date: Date | null) => {
+                    if (date) {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const monthStr = `${year}-${month}`;
+                      handleInputChange('month', monthStr);
+                    } else {
+                      handleInputChange('month', '');
+                    }
+                  }}
+                  dateFormat="MMM yyyy"
+                  showMonthYearPicker
+                  placeholderText="Select month"
+                  className="form-input"
+                />
               </div>
               <div className="form-group">
                 <label>Status</label>
-                <select 
-                  value={formData.status || 'pending'} 
+                <select
+                  value={formData.status || 'pending'}
                   onChange={e => handleInputChange('status', e.target.value)}
                   className="form-input"
                 >
@@ -1807,8 +1787,8 @@ export default function GlobalModals() {
     case 'editCommission': {
       const isEdit = modal.open === 'editCommission';
       return (
-        <Modal 
-          title={isEdit ? 'Edit Commission Record' : 'Add New Lead Commission'} 
+        <Modal
+          title={isEdit ? 'Edit Commission Record' : 'Add New Lead Commission'}
           subtitle={isEdit ? 'Update commission details' : 'Allocate commission to sales leads'}
           size="md"
         >
@@ -1835,22 +1815,22 @@ export default function GlobalModals() {
             closeModal();
           }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group">
-  <label>Lead Name</label>
-  <input
-    type="text"
-    required
-    value={formData.leadName || ''}
-    onChange={e => handleInputChange('leadName', e.target.value)}
-    placeholder="e.g. John Doe"
-    className="form-input"
-  />
-</div>
+              <label>Lead Name</label>
+              <input
+                type="text"
+                required
+                value={formData.leadName || ''}
+                onChange={e => handleInputChange('leadName', e.target.value)}
+                placeholder="e.g. John Doe"
+                className="form-input"
+              />
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Position</label>
-                <select 
-                  value={formData.position || ''} 
+                <select
+                  value={formData.position || ''}
                   onChange={e => handleInputChange('position', e.target.value)}
                   required
                   className="form-input"
@@ -1864,13 +1844,13 @@ export default function GlobalModals() {
               </div>
               <div className="form-group">
                 <label>Commission Amount (₹)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   required
-                  value={formData.amount || ''} 
+                  value={formData.amount || ''}
                   onChange={e => handleInputChange('amount', e.target.value)}
-                  placeholder="e.g. 25000" 
-                  className="form-input" 
+                  placeholder="e.g. 25000"
+                  className="form-input"
                 />
               </div>
             </div>
@@ -1878,8 +1858,8 @@ export default function GlobalModals() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Performance Level</label>
-                <select 
-                  value={formData.performance || ''} 
+                <select
+                  value={formData.performance || ''}
                   onChange={e => handleInputChange('performance', e.target.value)}
                   required
                   className="form-input"
@@ -1893,20 +1873,20 @@ export default function GlobalModals() {
               </div>
               <div className="form-group">
                 <label>Month</label>
-                <input 
-                  type="month" 
+                <input
+                  type="month"
                   required
-                  value={formData.month || ''} 
+                  value={formData.month || ''}
                   onChange={e => handleInputChange('month', e.target.value)}
-                  className="form-input" 
+                  className="form-input"
                 />
               </div>
             </div>
 
             <div className="form-group">
               <label>Status</label>
-              <select 
-                value={formData.status || 'pending'} 
+              <select
+                value={formData.status || 'pending'}
                 onChange={e => handleInputChange('status', e.target.value)}
                 className="form-input"
               >
