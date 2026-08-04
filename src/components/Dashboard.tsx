@@ -675,9 +675,8 @@ export default function Dashboard() {
           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
               { name: 'Sales', value: employees.filter(e => e.dept === 'Sales').length, color: '#10B981' },
-              { name: 'Gold Crafting', value: employees.filter(e => e.dept === 'Gold Crafting').length, color: '#F59E0B' },
-              { name: 'Store Ops', value: employees.filter(e => e.dept === 'Store Ops').length, color: '#06B6D4' },
-              { name: 'Accounts', value: employees.filter(e => e.dept === 'Accounts').length, color: '#8B5CF6' },
+              { name: 'Housekeeping', value: employees.filter(e => e.dept === 'Housekeeping').length, color: '#F59E0B' },
+              { name: 'Helper', value: employees.filter(e => e.dept === 'Helper').length, color: '#06B6D4' },
             ].map(dept => (
               <div key={dept.name}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
@@ -819,7 +818,7 @@ export default function Dashboard() {
                               id: `EMP0${10 + i}`,
                               name: emp.name,
                               dept: emp.dept,
-                              role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Engineering' ? 'Senior Engineer' : 'Operations Coordinator',
+                              role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff',
                               email: emp.name.toLowerCase().replace(' ', '') + '@company.com',
                               phone: '+91 98765 1100' + i,
                               location: 'Delhi',

@@ -362,7 +362,7 @@ export default function Payroll() {
                         id: emp.id, 
                         name: emp.name, 
                         dept: emp.dept, 
-                        role: emp.dept === 'Sales' ? 'Senior Sales Executive' : 'Senior Engineer' 
+                        role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff' 
                       })}
                       style={{ fontSize: '11px', color: 'var(--brand)', background: 'rgba(79,142,247,0.1)', padding: '5px 12px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', border: 'none' }}
                     >

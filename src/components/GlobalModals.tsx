@@ -101,7 +101,7 @@ export default function GlobalModals() {
     
     const empData = {
       name,
-      dept: formData.role || 'Staff',
+      dept: formData.dept || 'Sales',
       role: formData.role || 'Staff',
       email,
       phone,
@@ -627,6 +627,18 @@ export default function GlobalModals() {
                   </div>
                 </div>
                 <div className="form-group">
+                  <label>Department</label>
+                  <select 
+                    value={formData.dept || 'Sales'} 
+                    onChange={e => handleInputChange('dept', e.target.value)}
+                    className="form-input"
+                  >
+                    <option value="Sales">Sales</option>
+                    <option value="Housekeeping">Housekeeping</option>
+                    <option value="Helper">Helper</option>
+                  </select>
+                </div>
+                <div className="form-group">
                   <label>Employment Type</label>
                   <select 
                     value={formData.type || 'Full-time'} 
@@ -1051,9 +1063,8 @@ export default function GlobalModals() {
                 <label>Department Target</label>
                 <select className="form-input">
                   <option value="Sales">Sales</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Operations">Operations</option>
-                  <option value="HR">HR</option>
+                  <option value="Housekeeping">Housekeeping</option>
+                  <option value="Helper">Helper</option>
                   <option value="All">All Departments</option>
                 </select>
               </div>
@@ -1326,9 +1337,8 @@ export default function GlobalModals() {
               <select name="dept" className="form-input">
                 <option value="All">All Departments</option>
                 <option value="Sales">Sales</option>
-                <option value="Gold Crafting">Gold Crafting</option>
-                <option value="Store Ops">Store Ops</option>
-                <option value="Accounts">Accounts</option>
+                <option value="Housekeeping">Housekeeping</option>
+                <option value="Helper">Helper</option>
               </select>
             </div>
 
@@ -1632,8 +1642,8 @@ export default function GlobalModals() {
                 <div style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '6px' }}>Verify or assign department HR Managers access:</div>
                 {[
                   { dept: 'Sales Department', manager: 'Sneha Reddy', access: 'HR Manager' },
-                  { dept: 'Engineering Department', manager: 'Rohan Mehta', access: 'Technical Head' },
-                  { dept: 'Finance Department', manager: 'Amit Verma', access: 'Accountant' },
+                  { dept: 'Housekeeping Department', manager: 'Ramesh Kumar', access: 'Housekeeping Supervisor' },
+                  { dept: 'Helper Department', manager: 'Rohan Mehta', access: 'Shift Supervisor' },
                 ].map((r, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-3)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                     <div>

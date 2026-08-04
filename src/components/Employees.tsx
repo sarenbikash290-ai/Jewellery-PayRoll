@@ -4,8 +4,7 @@ import { useApp } from './AppContext';
 import { Search, Filter, Plus, Download, Mail, Phone, MapPin, ChevronDown, Users, UserCheck, UserX, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 const deptColors: Record<string, string> = {
-  Sales: '#10B981', Engineering: '#4F8EF7', HR: '#8B5CF6',
-  Finance: '#F59E0B', Operations: '#06B6D4'
+  Sales: '#10B981', Housekeeping: '#F59E0B', Helper: '#06B6D4'
 };
 const avatarColors = ['#4F8EF7', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#EF4444'];
 
@@ -144,7 +143,7 @@ export default function Employees() {
           onChange={e => setDept(e.target.value)}
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 16px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
         >
-          {['All', 'Sales', 'Engineering', 'HR', 'Finance', 'Operations'].map(d => (
+          {['All', 'Sales', 'Housekeeping', 'Helper'].map(d => (
             <option key={d} value={d} style={{ background: 'var(--bg-card)' }}>{d}</option>
           ))}
         </select>

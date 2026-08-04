@@ -27,12 +27,12 @@ const CardHeader = ({ title, subtitle, action }: { title: string; subtitle?: str
 );
 
 const reportTemplates = [
-  { icon: DollarSign, color: '#10B981', title: 'Payroll Cost Report',        desc: 'Monthly payroll by dept & employee', format: 'Excel + PDF' },
-  { icon: Users,      color: '#4F8EF7', title: 'Headcount Report',           desc: 'Workforce by dept, type, location',  format: 'Excel' },
-  { icon: BarChart2,  color: '#8B5CF6', title: 'Attendance Summary',         desc: 'Attendance rate, late, absences',    format: 'Excel + PDF' },
-  { icon: TrendingUp, color: '#F59E0B', title: 'Incentive Payout Report',    desc: 'Commission payouts vs targets',      format: 'Excel' },
-  { icon: FileText,   color: '#06B6D4', title: 'Tax & Compliance Report',    desc: 'TDS, PF, ESI deductions summary',    format: 'PDF' },
-  { icon: Users,      color: '#EF4444', title: 'Attrition & Hiring Report',  desc: 'Joiners, leavers, attrition rate',   format: 'Excel' },
+  { icon: DollarSign, color: '#10B981', title: 'Payroll Cost Report', desc: 'Monthly payroll by dept & employee', format: 'Excel + PDF' },
+  { icon: Users, color: '#4F8EF7', title: 'Headcount Report', desc: 'Workforce by dept, type, location', format: 'Excel' },
+  { icon: BarChart2, color: '#8B5CF6', title: 'Attendance Summary', desc: 'Attendance rate, late, absences', format: 'Excel + PDF' },
+  { icon: TrendingUp, color: '#F59E0B', title: 'Incentive Payout Report', desc: 'Commission payouts vs targets', format: 'Excel' },
+  { icon: FileText, color: '#06B6D4', title: 'Tax & Compliance Report', desc: 'TDS, PF, ESI deductions summary', format: 'PDF' },
+  { icon: Users, color: '#EF4444', title: 'Attrition & Hiring Report', desc: 'Joiners, leavers, attrition rate', format: 'Excel' },
 ];
 
 export default function Reports() {
@@ -75,25 +75,25 @@ export default function Reports() {
         ).length;
 
         const unpaidLeavesCount = leaves.filter(
-          l => l.employeeId === emp.id && 
-               l.status === 'approved' && 
-               (l.from.includes('-06-') || l.from.startsWith('2026-06') || l.from.startsWith('2025-06')) &&
-               (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))
+          l => l.employeeId === emp.id &&
+            l.status === 'approved' &&
+            (l.from.includes('-06-') || l.from.startsWith('2026-06') || l.from.startsWith('2025-06')) &&
+            (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))
         ).length;
 
         const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
         const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
 
         const empIncentives = incentives.filter(
-          inc => inc.employeeId === emp.id && 
-                 (inc.status === 'approved' || inc.status === 'paid') && 
-                 (inc.month.includes('Jun') || inc.month.includes('June'))
+          inc => inc.employeeId === emp.id &&
+            (inc.status === 'approved' || inc.status === 'paid') &&
+            (inc.month.includes('Jun') || inc.month.includes('June'))
         );
-        
+
         const empCommissions = commissions.filter(
-          com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
-                 (com.status === 'approved' || com.status === 'paid') && 
-                 (com.month.includes('Jun') || com.month.includes('June'))
+          com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) &&
+            (com.status === 'approved' || com.status === 'paid') &&
+            (com.month.includes('Jun') || com.month.includes('June'))
         );
 
         const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
@@ -103,9 +103,9 @@ export default function Reports() {
         const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
 
         const empAdvances = advancePayments ? advancePayments.filter(
-          adv => adv.employeeId === emp.id && 
-                 adv.status === 'pending' &&
-                 (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+          adv => adv.employeeId === emp.id &&
+            adv.status === 'pending' &&
+            (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
         ) : [];
         const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
 
@@ -186,8 +186,8 @@ export default function Reports() {
     }
   };
 
-  // Group by active departments: "Sales", "Gold Crafting", "Store Ops", "Accounts"
-  const targetDepts = ["Sales", "Gold Crafting", "Store Ops", "Accounts"];
+  // Group by active departments: "Sales", "Housekeeping","Helper"
+  const targetDepts = ["Sales", "Housekeeping", "Helper"];
 
   const deptCosts = targetDepts.map(dept => {
     const deptEmployees = employees.filter(e => e.dept === dept && e.status === 'active');
@@ -206,10 +206,10 @@ export default function Reports() {
       ).length;
 
       const unpaidLeavesCount = leaves.filter(
-        l => l.employeeId === emp.id && 
-             l.status === 'approved' && 
-             (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
-             (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
+        l => l.employeeId === emp.id &&
+          l.status === 'approved' &&
+          (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
+          (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
       ).length;
 
       const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
@@ -217,15 +217,15 @@ export default function Reports() {
 
       // Incentives & Commissions
       const empIncentives = incentives.filter(
-        inc => inc.employeeId === emp.id && 
-               (inc.status === 'approved' || inc.status === 'paid') && 
-               (inc.month.includes('Jun') || inc.month.includes('June'))
+        inc => inc.employeeId === emp.id &&
+          (inc.status === 'approved' || inc.status === 'paid') &&
+          (inc.month.includes('Jun') || inc.month.includes('June'))
       );
-      
+
       const empCommissions = commissions.filter(
-        com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
-               (com.status === 'approved' || com.status === 'paid') && 
-               (com.month.includes('Jun') || com.month.includes('June'))
+        com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) &&
+          (com.status === 'approved' || com.status === 'paid') &&
+          (com.month.includes('Jun') || com.month.includes('June'))
       );
 
       const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
@@ -260,8 +260,8 @@ export default function Reports() {
 
   // Dynamic Reports Page KPI Calculations
   const payrollYtdSum = monthlyPayroll.reduce((sum, m) => sum + m.cost, 0);
-  const payrollYtdDisplay = payrollYtdSum >= 100 
-    ? `₹ ${(payrollYtdSum / 100).toFixed(2)} Cr` 
+  const payrollYtdDisplay = payrollYtdSum >= 100
+    ? `₹ ${(payrollYtdSum / 100).toFixed(2)} Cr`
     : `₹ ${payrollYtdSum.toFixed(2)} Lakhs`;
 
   const calcAttendanceAvg = (days: number) => {
@@ -289,14 +289,14 @@ export default function Reports() {
   const avgAttendanceDisplay = `${calcAttendanceAvg(30).toFixed(1)}%`;
 
   const inactiveCount = employees.filter(e => e.status === 'inactive').length;
-  const attritionRateDisplay = employees.length > 0 
-    ? `${((inactiveCount / employees.length) * 100).toFixed(1)}%` 
+  const attritionRateDisplay = employees.length > 0
+    ? `${((inactiveCount / employees.length) * 100).toFixed(1)}%`
     : '0.0%';
 
   const totalIncentivesPaid = incentives.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0) +
-                              commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
-  const incentivesDisplay = totalIncentivesPaid >= 100000 
-    ? `₹ ${(totalIncentivesPaid / 100000).toFixed(2)}L` 
+    commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+  const incentivesDisplay = totalIncentivesPaid >= 100000
+    ? `₹ ${(totalIncentivesPaid / 100000).toFixed(2)}L`
     : `₹ ${totalIncentivesPaid.toLocaleString('en-IN')}`;
 
   // Dynamic weekly attendance rate trend for the last 5 weeks
@@ -306,16 +306,16 @@ export default function Reports() {
     for (let i = 4; i >= 0; i--) {
       const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() || 7) - i * 7 + 1);
       const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
-      
+
       const recordsInWeek = attendanceRecords.filter(r => {
         const recordDate = new Date(r.date);
         return recordDate >= weekStart && recordDate <= weekEnd;
       });
-      
+
       const total = recordsInWeek.length;
       const present = recordsInWeek.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'wfh').length;
       const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-      
+
       trend.push({
         week: `Wk ${5 - i}`,
         rate: employees.length === 0 ? 0 : rate
@@ -333,13 +333,13 @@ export default function Reports() {
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{currentMonthLabel} · Data-driven insights across all HR functions</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button 
+          <button
             onClick={() => openModal('customReport')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
           >
             <Filter size={15} /> Custom Report
           </button>
-          <button 
+          <button
             onClick={() => openModal('exportData')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 20px', background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
           >
@@ -351,10 +351,10 @@ export default function Reports() {
       {/* KPI Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
         {[
-          { label: 'Payroll YTD',        value: payrollYtdDisplay, change: '+0.0%', color: '#10B981' },
-          { label: 'Avg Attendance Rate', value: avgAttendanceDisplay, change: '+0.0%',  color: '#4F8EF7' },
-          { label: 'Attrition Rate (YTD)',value: attritionRateDisplay, change: '-0.0%',  color: '#8B5CF6' },
-          { label: 'Incentives Paid YTD', value: incentivesDisplay, change: '+0%',   color: '#F59E0B' },
+          { label: 'Payroll YTD', value: payrollYtdDisplay, change: '+0.0%', color: '#10B981' },
+          { label: 'Avg Attendance Rate', value: avgAttendanceDisplay, change: '+0.0%', color: '#4F8EF7' },
+          { label: 'Attrition Rate (YTD)', value: attritionRateDisplay, change: '-0.0%', color: '#8B5CF6' },
+          { label: 'Incentives Paid YTD', value: incentivesDisplay, change: '+0%', color: '#F59E0B' },
         ].map((kpi, i) => (
           <Card key={i} style={{ padding: '20px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: '6px' }}>{kpi.value}</div>
@@ -368,7 +368,7 @@ export default function Reports() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px' }}>
         <Card>
           <CardHeader title="Payroll Cost Trend — 2025" subtitle="Monthly cost in Lakhs (₹)" action={
-            <button 
+            <button
               onClick={() => openModal('customReport')}
               style={{ fontSize: '12px', color: 'var(--brand)', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
@@ -380,7 +380,7 @@ export default function Reports() {
               <AreaChart data={monthlyPayroll}>
                 <defs>
                   <linearGradient id="rptGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#10B981" stopOpacity={0.25} />
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
                     <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -403,9 +403,9 @@ export default function Reports() {
                 <XAxis type="number" tick={{ fill: '#8B9AB5', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}L`} />
                 <YAxis type="category" dataKey="dept" tick={{ fill: '#8B9AB5', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
                 <Tooltip {...tooltipStyle} formatter={(v: any) => [`₹${v}L`, 'Cost']} />
-                <Bar dataKey="cost" radius={[0,4,4,0]}>
+                <Bar dataKey="cost" radius={[0, 4, 4, 0]}>
                   {deptCosts.map((_, i) => (
-                    <Cell key={i} fill={['#4F8EF7','#10B981','#8B5CF6','#F59E0B','#06B6D4'][i]} />
+                    <Cell key={i} fill={['#4F8EF7', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4'][i]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -463,7 +463,7 @@ export default function Reports() {
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '10px' }}>{rpt.desc}</div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{rpt.format}</span>
-                      <button 
+                      <button
                         onClick={() => handleQuickExport(rpt.title)}
                         style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: rpt.color, background: `${rpt.color}12`, padding: '4px 10px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', border: 'none' }}
                       >
