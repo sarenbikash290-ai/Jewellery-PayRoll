@@ -9,7 +9,7 @@ interface EmpPayslipsProps {
 }
 
 export default function EmpPayslips({ employee }: EmpPayslipsProps) {
-  const { toast, payrollLocks } = useApp();
+  const { toast, payrollLocks, payslips } = useApp();
   const [downloading, setDownloading] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -91,13 +91,28 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     // Convert locks to payslip format
-    const lockedPayslips = payrollLocks.map(lock => ({
-      month: `${months[lock.month - 1]} ${lock.year}`,
-      status: 'released' as const
-    }));
+    const map = new Map<string, any>();
+    payrollLocks.forEach(lock => {
+      const label = `${months[lock.month - 1]} ${lock.year}`;
+      map.set(label, { month: label, monthCode: `${lock.year}-${String(lock.month).padStart(2, '0')}` });
+    });
+
+    // Add saved payslips from Supabase for this employee
+    payslips.filter(p => p.employee_id === employee.id).forEach(p => {
+      const label = p.month_label || p.month;
+      map.set(label, {
+        month: label,
+        monthCode: p.month,
+        gross: Number(p.gross_salary) + Number(p.incentives || 0),
+        deductions: Number(p.total_deductions),
+        net: Number(p.net_pay)
+      });
+    });
+
+    const list = Array.from(map.values());
 
     // Filter by join date eligibility
-    const eligible = lockedPayslips.filter(slip => {
+    const eligible = list.filter(slip => {
       const payslipDate = parsePayslipMonth(slip.month);
       const joinedDate = parseJoinedDate(employee.joined);
       return (
@@ -111,7 +126,7 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
     return eligible.sort((a, b) => {
       return parsePayslipMonth(b.month).getTime() - parsePayslipMonth(a.month).getTime();
     });
-  }, [payrollLocks, employee.joined]);
+  }, [payrollLocks, payslips, employee.id, employee.joined]);
 
   const handleDownload = (month: string) => {
     setDownloading(month);
@@ -193,19 +208,19 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
                 <div>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Gross</span>
                   <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    {fmt(salaryComponents.gross)}
+                    {fmt(slip.gross ?? salaryComponents.gross)}
                   </div>
                 </div>
                 <div>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Deductions</span>
                   <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#EF4444', marginTop: '4px' }}>
-                    {fmt(salaryComponents.deductions)}
+                    {fmt(slip.deductions ?? salaryComponents.deductions)}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Net Take-Home</span>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#854D0E', marginTop: '4px' }}>
-                    {fmt(salaryComponents.net)}
+                    {fmt(slip.net ?? salaryComponents.net)}
                   </div>
                 </div>
               </div>

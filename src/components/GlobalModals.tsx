@@ -4,13 +4,14 @@ import { useApp } from './AppContext';
 import Modal from './Modal';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { generatePayslip } from '@/lib/generatePayslip';
 import {
   User, Mail, Phone, MapPin, DollarSign, Calendar, Clock, Briefcase,
   CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil
 } from 'lucide-react';
 
 export default function GlobalModals() {
-  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, monthlySalesTarget, updateMonthlySalesTarget, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions, advancePayments, auditLogs } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, monthlySalesTarget, updateMonthlySalesTarget, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions, advancePayments, auditLogs, payslips } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [wifiIpInput, setWifiIpInput] = useState('');
@@ -1096,6 +1097,28 @@ export default function GlobalModals() {
       const empData = (modal.data as Record<string, string>) || defaultEmployee;
       const emp = employees.find(e => e.id === empData.id) || { ...defaultEmployee, ...empData };
 
+      const now = new Date();
+      const selectedMonthParam = (modal.data as any)?.month;
+      
+      let payslipMonthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      let payslipYearMonthCode = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      let targetMonthNumStr = String(now.getMonth() + 1).padStart(2, '0');
+
+      if (selectedMonthParam) {
+        if (/^\d{4}-\d{2}$/.test(selectedMonthParam)) {
+          const [y, m] = selectedMonthParam.split('-');
+          const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+          payslipMonthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          payslipYearMonthCode = selectedMonthParam;
+          targetMonthNumStr = m;
+        } else {
+          payslipMonthLabel = selectedMonthParam;
+        }
+      }
+
+      // Check if a frozen saved payslip exists in Supabase for this employee & month
+      const savedPayslip = payslips.find(p => p.slip_id === `PSL-${payslipYearMonthCode}-${emp.id}` || (p.employee_id === emp.id && p.month === payslipYearMonthCode));
+
       const parsedSalary = (salStr: string) => {
         const clean = salStr.replace(/[^\d]/g, '');
         const val = parseInt(clean, 10);
@@ -1103,57 +1126,58 @@ export default function GlobalModals() {
       };
 
       const salaryVal = parsedSalary(emp.salary || '50000');
-      const basic = Math.round(salaryVal * 0.6);
-      const hra = Math.round(basic * 0.4);
-      const allowances = Math.round(basic * 0.2);
-      const gross = basic + hra + allowances;
+      const basic = savedPayslip ? Number(savedPayslip.basic_salary) : Math.round(salaryVal * 0.6);
+      const hra = savedPayslip ? Number(savedPayslip.hra) : Math.round(basic * 0.4);
+      const allowances = savedPayslip ? Number(savedPayslip.allowances) : Math.round(basic * 0.2);
+      const gross = savedPayslip ? Number(savedPayslip.gross_salary) : (basic + hra + allowances);
 
       // LOP Days & Deduction
       const absentDays = attendanceRecords.filter(
-        r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes('-06-') || r.date.startsWith('2026-06'))
+        r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes(`-${targetMonthNumStr}-`) || r.date.startsWith(payslipYearMonthCode))
       ).length;
 
       const unpaidLeavesCount = leaves.filter(
         l => l.employeeId === emp.id &&
           l.status === 'approved' &&
-          (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
+          (l.from.includes(`-${targetMonthNumStr}-`) || l.from.startsWith(payslipYearMonthCode)) &&
           (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
       ).length;
 
       const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
-      const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
+      const lopDeduction = savedPayslip ? Number(savedPayslip.lop_deduction) : Math.round((salaryVal / 30) * totalAbsentOrLopDays);
 
       // Incentives & Commissions
+      const monthNameShort = payslipMonthLabel.split(' ')[0].substring(0, 3);
       const empIncentives = incentives.filter(
         inc => inc.employeeId === emp.id &&
           (inc.status === 'approved' || inc.status === 'paid') &&
-          (inc.month.includes('Jun') || inc.month.includes('June'))
+          (inc.month.toLowerCase().includes(monthNameShort.toLowerCase()) || inc.month.startsWith(payslipYearMonthCode))
       );
 
       const empCommissions = commissions.filter(
         com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) &&
           (com.status === 'approved' || com.status === 'paid') &&
-          (com.month.includes('Jun') || com.month.includes('June'))
+          (com.month.toLowerCase().includes(monthNameShort.toLowerCase()) || com.month.startsWith(payslipYearMonthCode))
       );
 
-      const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
+      const totalIncentives = savedPayslip ? Number(savedPayslip.incentives) : (empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0));
       const totalGrossEarnings = gross + totalIncentives;
 
-      const pf = Math.round(basic * 0.12);
-      const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
-      const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
-      const pt = 200;
+      const pf = savedPayslip ? Number(savedPayslip.pf_deduction) : Math.round(basic * 0.12);
+      const esi = savedPayslip ? Number(savedPayslip.esi_deduction) : (gross < 75000 ? Math.round(gross * 0.0075) : 0);
+      const tds = savedPayslip ? Number(savedPayslip.tds_deduction) : (gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05));
+      const pt = savedPayslip ? Number(savedPayslip.pt_deduction) : 200;
 
       // Advance Deductions
       const empAdvances = advancePayments.filter(
         adv => adv.employeeId === emp.id &&
           adv.status === 'pending' &&
-          (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+          adv.deductMonth === payslipYearMonthCode
       );
-      const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
+      const advanceDeduction = savedPayslip ? Number(savedPayslip.advance_deduction) : empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
 
-      const totalDeductions = pf + esi + tds + pt + lopDeduction + advanceDeduction;
-      const net = totalGrossEarnings - totalDeductions;
+      const totalDeductions = savedPayslip ? Number(savedPayslip.total_deductions) : (pf + esi + tds + pt + lopDeduction + advanceDeduction);
+      const net = savedPayslip ? Number(savedPayslip.net_pay) : (totalGrossEarnings - totalDeductions);
 
       const numberToWords = (num: number) => {
         if (num === 72262) return 'Seventy-Two Thousand Two Hundred and Sixty-Two Rupees Only';
@@ -1198,11 +1222,13 @@ export default function GlobalModals() {
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #0d131f', paddingBottom: '16px', marginBottom: '16px' }}>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0d131f' }}>SHRI SAI JEWELLERS PRIVATE LTD.</h2>
-                  <p style={{ fontSize: '12px', color: '#4a5568', marginTop: '2px' }}>12, Luxury Plaza, Chanakyapuri, New Delhi - 110021</p>
+                  <p style={{ fontSize: '12px', color: '#4a5568', marginTop: '2px' }}>#4-40/A TaraNagar
+                    Lingampally, Hyderabad-500019
+                    Telangana, India</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#4a5568' }}>PAY SLIP - JUNE 2025</h3>
-                  <p style={{ fontSize: '12px', color: '#718096', marginTop: '2px' }}>Slip ID: PSL-2025-06-{emp.id || '09'}</p>
+                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#4a5568' }}>PAY SLIP - {payslipMonthLabel.toUpperCase()}</h3>
+                  <p style={{ fontSize: '12px', color: '#718096', marginTop: '2px' }}>Slip ID: PSL-{payslipYearMonthCode}-{emp.id || '09'}</p>
                 </div>
               </div>
 
@@ -1276,7 +1302,44 @@ export default function GlobalModals() {
               <button
                 type="button"
                 onClick={() => {
-                  toast('success', 'Download Started', 'The PDF document is being generated and downloaded.');
+                  try {
+                    generatePayslip({
+                      ...emp,
+                      salary: emp.salary || `₹ ${gross}`
+                    }, payslipMonthLabel);
+                    toast('success', 'Payslip PDF Downloaded', `Downloaded payslip PDF for ${emp.name}.`);
+                  } catch (err: any) {
+                    console.error('PDF Generation Error:', err);
+                    toast('error', 'PDF Generation Failed', err.message || 'Could not download PDF.');
+                  }
+
+                  const printEl = document.getElementById('payslip-doc');
+                  if (printEl) {
+                    const printWin = window.open('', '_blank');
+                    if (printWin) {
+                      printWin.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                          <head>
+                            <title>Payslip - ${emp.name} (${payslipMonthLabel})</title>
+                            <style>
+                              body { font-family: system-ui, -apple-system, sans-serif; padding: 30px; margin: 0; background: #fff; color: #0d131f; }
+                              @media print { body { padding: 0; } }
+                            </style>
+                          </head>
+                          <body>
+                            ${printEl.outerHTML}
+                            <script>
+                              window.onload = function() {
+                                window.print();
+                              };
+                            </script>
+                          </body>
+                        </html>
+                      `);
+                      printWin.document.close();
+                    }
+                  }
                 }}
                 className="btn btn-primary"
                 style={{ padding: '8px 22px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}

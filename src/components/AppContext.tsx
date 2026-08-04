@@ -114,6 +114,32 @@ export interface AdvancePayment {
   createdAt: string;
 }
 
+export interface SavedPayslip {
+  id?: string;
+  slip_id: string;
+  employee_id: string;
+  employee_name: string;
+  department: string;
+  role: string;
+  month: string;
+  month_label: string;
+  basic_salary: number;
+  hra: number;
+  allowances: number;
+  gross_salary: number;
+  incentives: number;
+  pf_deduction: number;
+  esi_deduction: number;
+  tds_deduction: number;
+  pt_deduction: number;
+  lop_deduction: number;
+  advance_deduction: number;
+  total_deductions: number;
+  net_pay: number;
+  status: string;
+  created_at?: string;
+}
+
 // ---- UI Helper Types ----
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 export interface ToastItem {
@@ -245,6 +271,10 @@ interface AppCtx {
   deleteAdvancePayment: (id: string) => Promise<void>;
   // Employee Profile update
   updateEmployeeProfile: (profile: { bank_name?: string; bank_account_no?: string; ifsc_code?: string; pan_no?: string; pf_no?: string }) => Promise<void>;
+  // Payslips Storage
+  payslips: SavedPayslip[];
+  fetchPayslips: () => Promise<void>;
+  savePayslips: (payslipsArr: SavedPayslip[]) => Promise<{ ok: boolean; count?: number; error?: string }>;
 }
 
 const Ctx = createContext<AppCtx>({} as AppCtx);
@@ -496,6 +526,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [auditLogs, setAuditLogs] = useState<AttendanceAuditLog[]>([]);
   const [payrollLocks, setPayrollLocks] = useState<PayrollMonthLock[]>([]);
+  const [payslips, setPayslips] = useState<SavedPayslip[]>([]);
 
 
   const [authorizedWifiIp, setAuthorizedWifiIp] = useState('127.0.0.1');
@@ -676,6 +707,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ── Payslips Fetch ────────────────────────────────────────────────────────
+  const fetchPayslips = useCallback(async () => {
+    try {
+      const res = await fetch('/api/payslips');
+      const data = await res.json();
+      if (data.ok && data.payslips) {
+        setPayslips(data.payslips);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payslips:', err);
+    }
+  }, []);
+
+  // ── Save Payslips to Supabase ──────────────────────────────────────────────
+  const savePayslips = useCallback(async (payslipsArr: SavedPayslip[]) => {
+    try {
+      const res = await fetch('/api/payslips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payslips: payslipsArr })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        if (data.payslips) {
+          setPayslips(prev => {
+            const map = new Map(prev.map(p => [p.slip_id, p]));
+            data.payslips.forEach((p: SavedPayslip) => map.set(p.slip_id, p));
+            return Array.from(map.values());
+          });
+        }
+        return { ok: true, count: data.count };
+      } else {
+        return { ok: false, error: data.error };
+      }
+    } catch (err: any) {
+      console.error('Failed to save payslips:', err);
+      return { ok: false, error: err.message || 'Network error' };
+    }
+  }, []);
+
   useEffect(() => {
     fetchLeaves();
     fetchAttendance();
@@ -686,6 +757,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchAuditLogs();
     fetchPayrollLocks();
     fetchAdvancePayments();
+    fetchPayslips();
 
     const interval = setInterval(() => {
       fetchLeaves();
@@ -695,10 +767,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       fetchCommissions();
       fetchSales();
       fetchAdvancePayments();
+      fetchPayslips();
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales, fetchAuditLogs, fetchPayrollLocks, fetchAdvancePayments]);
+  }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales, fetchAuditLogs, fetchPayrollLocks, fetchAdvancePayments, fetchPayslips]);
 
   const applyLeave = useCallback(async (newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
     const emp = employees.find(e => e.id === newLeave.employeeId);
@@ -1138,6 +1211,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateAdvancePaymentStatus,
         deleteAdvancePayment,
         updateEmployeeProfile,
+        // Payslips
+        payslips,
+        fetchPayslips,
+        savePayslips,
       }}
     >
       {children}

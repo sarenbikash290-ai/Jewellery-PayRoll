@@ -15,7 +15,7 @@ export default function Payroll() {
   const [step, setStep] = useState(1);
   const [processing, setProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
-  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth } = useApp();
+  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth, savePayslips } = useApp();
   const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const parsedSalary = (salStr: any) => {
@@ -109,12 +109,45 @@ export default function Payroll() {
 
   const runPayroll = async () => {
     setProcessing(true);
-    const result = await lockPayrollMonth(2025, 6, "June 2025 payroll run finalized");
-    setProcessing(false);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthNum = now.getMonth() + 1;
+    const monthCode = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+    const monthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    const result = await lockPayrollMonth(currentYear, currentMonthNum, `${monthLabel} payroll run finalized`);
+    
     if (result.ok) {
+      const payslipRecords = payrollEmployees.map(pe => ({
+        slip_id: `PSL-${monthCode}-${pe.id}`,
+        employee_id: pe.id,
+        employee_name: pe.name,
+        department: pe.dept,
+        role: pe.dept === 'Sales' ? 'Senior Sales Executive' : pe.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff',
+        month: monthCode,
+        month_label: monthLabel,
+        basic_salary: pe.basic,
+        hra: pe.hra,
+        allowances: pe.allowances,
+        gross_salary: pe.gross,
+        incentives: pe.incentives,
+        pf_deduction: pe.pf,
+        esi_deduction: pe.esi,
+        tds_deduction: pe.tds,
+        pt_deduction: 200,
+        lop_deduction: pe.lopDeduction,
+        advance_deduction: pe.advanceDeduction,
+        total_deductions: pe.pf + pe.esi + pe.tds + 200 + pe.lopDeduction + pe.advanceDeduction,
+        net_pay: pe.net,
+        status: 'processed'
+      }));
+
+      await savePayslips(payslipRecords);
+      setProcessing(false);
       setProcessed(true); 
       setStep(3); 
     } else {
+      setProcessing(false);
       toast('error', 'Payroll Run Failed', result.error || 'Could not finalize payroll month.');
     }
   };
@@ -314,7 +347,40 @@ export default function Payroll() {
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '14px', fontWeight: 600 }}>Salary Breakup — {currentMonthLabel}</span>
           <button 
-            onClick={() => toast('success', 'Payslips Generated', 'PDF payslips have been compiled and sent to all employees.')}
+            onClick={async () => {
+              const now = new Date();
+              const currentYear = now.getFullYear();
+              const currentMonthNum = now.getMonth() + 1;
+              const monthCode = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+
+              const payslipRecords = payrollEmployees.map(pe => ({
+                slip_id: `PSL-${monthCode}-${pe.id}`,
+                employee_id: pe.id,
+                employee_name: pe.name,
+                department: pe.dept,
+                role: pe.dept === 'Sales' ? 'Senior Sales Executive' : pe.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff',
+                month: monthCode,
+                month_label: currentMonthLabel,
+                basic_salary: pe.basic,
+                hra: pe.hra,
+                allowances: pe.allowances,
+                gross_salary: pe.gross,
+                incentives: pe.incentives,
+                pf_deduction: pe.pf,
+                esi_deduction: pe.esi,
+                tds_deduction: pe.tds,
+                pt_deduction: 200,
+                lop_deduction: pe.lopDeduction,
+                advance_deduction: pe.advanceDeduction,
+                total_deductions: pe.pf + pe.esi + pe.tds + 200 + pe.lopDeduction + pe.advanceDeduction,
+                net_pay: pe.net,
+                status: 'processed'
+              }));
+
+              await savePayslips(payslipRecords);
+              await lockPayrollMonth(currentYear, currentMonthNum, `${currentMonthLabel} payslips generated & published`);
+              toast('success', 'Payslips Published', `Compiled and published ${currentMonthLabel} payslips to all employee portals.`);
+            }}
             style={{ fontSize: '12px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: 'transparent', border: 'none' }}
           >
             <FileText size={13} /> Generate All Payslips
