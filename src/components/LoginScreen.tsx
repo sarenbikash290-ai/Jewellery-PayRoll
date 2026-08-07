@@ -297,35 +297,92 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
               <Sparkles size={16} color="#1b3d32" />
             </div>
 
-            {/* Main Central Illustration graphic */}
+            {/* Main Central HR Payroll & Jewellery Dashboard Illustration */}
             <div style={{ position: 'relative', textAlign: 'center', zIndex: 2 }}>
-              <svg width="210" height="190" viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Decorative Tree / Growth & Security vector graphic */}
-                <ellipse cx="100" cy="160" rx="75" ry="12" fill="#9dbfb5" opacity="0.5" />
-                {/* Tree foliage */}
-                <path d="M100 20 L145 80 L125 80 L160 130 L40 130 L75 80 L55 80 Z" fill="#1b3d32" />
-                <path d="M100 20 L145 80 L125 80 L160 130 L100 130 Z" fill="#244d40" />
-                {/* Gold ornaments representing jewelry excellence */}
-                <circle cx="90" cy="45" r="4.5" fill="#f59e0b" />
-                <circle cx="115" cy="65" r="4" fill="#f59e0b" />
-                <circle cx="75" cy="85" r="5" fill="#f59e0b" />
-                <circle cx="125" cy="100" r="4" fill="#f59e0b" />
-                <circle cx="95" cy="115" r="5" fill="#f59e0b" />
-                <polygon points="100,12 103,18 109,19 104,24 106,30 100,27 94,30 96,24 91,19 97,18" fill="#fbbf24" />
-                {/* Trunk */}
-                <rect x="91" y="130" width="18" height="28" rx="3" fill="#0e231c" />
-                {/* Small figures / accents */}
-                <circle cx="50" cy="148" r="7" fill="#244d40" />
-                <path d="M43 162 C43 154 57 154 57 162 Z" fill="#244d40" />
-                <circle cx="150" cy="148" r="6" fill="#4a9e97" />
-                <path d="M144 162 C144 155 156 155 156 162 Z" fill="#4a9e97" />
+              <svg width="240" height="210" viewBox="0 0 240 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Soft ground shadow */}
+                <ellipse cx="120" cy="192" rx="85" ry="10" fill="#9dbfb5" opacity="0.45" />
+
+                {/* Main Floating Payroll & HR Dashboard Card */}
+                <g transform="translate(30, 15)">
+                  {/* Card Container */}
+                  <rect x="0" y="0" width="180" height="135" rx="14" fill="#ffffff" filter="drop-shadow(0px 14px 28px rgba(27, 61, 50, 0.18))" />
+                  <rect x="0" y="0" width="180" height="26" rx="14" fill="#1b3d32" />
+                  <rect x="0" y="14" width="180" height="12" fill="#1b3d32" />
+                  
+                  {/* Window Controls */}
+                  <circle cx="16" cy="13" r="3.5" fill="#ef4444" />
+                  <circle cx="28" cy="13" r="3.5" fill="#f59e0b" />
+                  <circle cx="40" cy="13" r="3.5" fill="#10b981" />
+                  <rect x="56" y="10" width="68" height="6" rx="3" fill="#ffffff" opacity="0.45" />
+
+                  {/* Salary Growth & Analytics Chart */}
+                  <g transform="translate(14, 40)">
+                    <line x1="0" y1="52" x2="92" y2="52" stroke="#e2e8f0" strokeDasharray="2 2" />
+                    <line x1="0" y1="32" x2="92" y2="32" stroke="#e2e8f0" strokeDasharray="2 2" />
+
+                    {/* Chart Bars */}
+                    <rect x="4" y="26" width="12" height="26" rx="4" fill="#b3dad0" />
+                    <rect x="24" y="16" width="12" height="36" rx="4" fill="#4a9e97" />
+                    <rect x="44" y="8" width="12" height="44" rx="4" fill="#1b3d32" />
+                    <rect x="64" y="20" width="12" height="32" rx="4" fill="#5ec4b6" />
+
+                    {/* Trendline */}
+                    <path d="M10 24 L30 14 L50 6 L70 18" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+                    <circle cx="70" cy="18" r="3" fill="#f59e0b" />
+                  </g>
+
+                  {/* Staff & Verified Payout Widget */}
+                  <g transform="translate(116, 40)">
+                    <rect x="0" y="0" width="50" height="36" rx="8" fill="#f0f9f6" stroke="#cde6dd" />
+                    <text x="6" y="15" fontFamily="sans-serif" fontSize="9" fontWeight="bold" fill="#1b3d32">Employees</text>
+                    <circle cx="14" cy="26" r="5" fill="#4a9e97" />
+                    <circle cx="23" cy="26" r="5" fill="#1b3d32" />
+                    <circle cx="32" cy="26" r="5" fill="#f59e0b" />
+
+                    {/* Paid Badge */}
+                    <rect x="0" y="44" width="50" height="24" rx="7" fill="#10b981" />
+                    <text x="6" y="59" fontFamily="sans-serif" fontSize="8" fontWeight="bold" fill="#ffffff">₹ PAID ✓</text>
+                  </g>
+                </g>
+
+                {/* Gold Coin Stack (Salary / Jewellery Prosperity) */}
+                <g transform="translate(22, 120)">
+                  <ellipse cx="18" cy="24" rx="14" ry="5" fill="#d97706" />
+                  <rect x="4" y="14" width="28" height="10" fill="#f59e0b" />
+                  <ellipse cx="18" cy="14" rx="14" ry="5" fill="#fbbf24" />
+
+                  <ellipse cx="18" cy="14" rx="14" ry="5" fill="#d97706" />
+                  <rect x="4" y="4" width="28" height="10" fill="#f59e0b" />
+                  <ellipse cx="18" cy="4" rx="14" ry="5" fill="#fef08a" />
+                  <text x="14" y="8" fontFamily="sans-serif" fontSize="10" fontWeight="bold" fill="#b45309">₹</text>
+                </g>
+
+                {/* Business Team Member Figure (HR Manager) */}
+                <g transform="translate(10, 80)">
+                  <path d="M22 68 C22 50 38 50 38 68 Z" fill="#1b3d32" />
+                  <circle cx="30" cy="42" r="7" fill="#4a9e97" />
+                  <rect x="32" y="50" width="12" height="16" rx="2" fill="#ffffff" stroke="#1b3d32" strokeWidth="1.5" />
+                </g>
+
+                {/* Business Team Member Figure (Employee Representative) */}
+                <g transform="translate(182, 90)">
+                  <path d="M24 64 C24 48 40 48 40 64 Z" fill="#4a9e97" />
+                  <circle cx="32" cy="40" r="7" fill="#1b3d32" />
+                </g>
+
+                {/* Diamond / Jewellery Store Sparkle Emblem (Top Right) */}
+                <g transform="translate(196, 20)">
+                  <polygon points="12,0 18,8 12,16 6,8" fill="#5ec4b6" />
+                  <polygon points="12,3 15,8 12,13 9,8" fill="#ffffff" />
+                </g>
               </svg>
             </div>
           </div>
 
           {/* Left Footer */}
           <div style={{ zIndex: 3, fontSize: '11px', color: '#688c7d', fontWeight: 500 }}>
-            <div> 1987 Shri Sai Jewellers</div>
+            <div>© 1987–{new Date().getFullYear()} Shri Sai Jewellers</div>
             <div style={{ fontSize: '10px', color: '#90afa2', marginTop: '2px' }}>Powered by HRPulse</div>
           </div>
         </div>
