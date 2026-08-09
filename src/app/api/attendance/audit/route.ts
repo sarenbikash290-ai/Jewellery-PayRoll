@@ -49,3 +49,23 @@ export async function GET() {
 
   return NextResponse.json({ ok: true, logs });
 }
+
+// DELETE /api/attendance/audit — Admin: clear all audit logs
+export async function DELETE() {
+  const session = await getSession();
+  if (!session || session.role !== 'admin') {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { error } = await supabase
+    .from('attendance_audit_logs')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+
+  if (error) {
+    console.error('Error deleting audit logs:', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, message: 'Audit logs cleared successfully' });
+}

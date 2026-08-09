@@ -2,7 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from './AppContext';
 import { parseTimeToMinutes } from '@/utils/time';
-import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell, Lock, Edit3, ShieldAlert, CheckCircle, ClipboardList, ChevronDown, AlertTriangle, Search, FileText } from 'lucide-react';
+import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell, Lock, Edit3, ShieldAlert, CheckCircle, ClipboardList, ChevronDown, AlertTriangle, Search, FileText, Trash2 } from 'lucide-react';
 import type { AttendanceAuditLog } from './AppContext';
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
@@ -89,7 +89,7 @@ const compareValues = (valA: unknown, valB: unknown, order: 'asc' | 'desc') => {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves' | 'audit'>('today');
-  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords, editAttendance, isDateEditable, isMonthLocked, auditLogs, fetchAuditLogs, pendingSubTab } = useApp();
+  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords, editAttendance, isDateEditable, isMonthLocked, auditLogs, fetchAuditLogs, clearAuditLogs, pendingSubTab } = useApp();
 
   // Auto-switch to a specific tab when navigated with a sub-tab request
   useEffect(() => {
@@ -118,6 +118,7 @@ export default function Attendance() {
   const [auditSearch, setAuditSearch] = useState('');
   const [auditSortField, setAuditSortField] = useState('editTimestamp');
   const [auditSortOrder, setAuditSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [confirmClearAudit, setConfirmClearAudit] = useState(false);
 
   const handleTodaySort = (field: string) => {
     if (todaySortField === field) {
@@ -1222,7 +1223,38 @@ export default function Attendance() {
             <span style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ClipboardList size={16} color="var(--brand)" /> Attendance Audit Log
             </span>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{processedAuditLogs.length} entries</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{processedAuditLogs.length} entries</span>
+              {auditLogs.length > 0 && (
+                confirmClearAudit ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>Clear all logs?</span>
+                    <button
+                      onClick={async () => {
+                        await clearAuditLogs();
+                        setConfirmClearAudit(false);
+                      }}
+                      style={{ padding: '4px 10px', borderRadius: '6px', background: '#EF4444', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Yes, Clear
+                    </button>
+                    <button
+                      onClick={() => setConfirmClearAudit(false)}
+                      style={{ padding: '4px 10px', borderRadius: '6px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmClearAudit(true)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    <Trash2 size={12} /> Clear Logs
+                  </button>
+                )
+              )}
+            </div>
           </div>
           {/* Toolbar */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)', flexWrap: 'wrap' }}>

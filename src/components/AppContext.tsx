@@ -258,6 +258,7 @@ interface AppCtx {
   editAttendance: (employeeId: string, employeeName: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh', reason?: string) => Promise<{ ok: boolean; error?: string; lockReason?: string }>;
   auditLogs: AttendanceAuditLog[];
   fetchAuditLogs: () => Promise<void>;
+  clearAuditLogs: () => Promise<void>;
   // Payroll month locking
   payrollLocks: PayrollMonthLock[];
   lockPayrollMonth: (year: number, month: number, notes?: string) => Promise<{ ok: boolean; error?: string }>;
@@ -680,6 +681,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Failed to fetch audit logs:', err);
     }
   }, []);
+
+  const clearAuditLogs = useCallback(async () => {
+    try {
+      const res = await fetch('/api/attendance/audit', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) {
+        setAuditLogs([]);
+        toast('success', 'Audit Logs Cleared', 'All attendance audit log records have been erased.');
+      } else {
+        throw new Error(data.error || 'Failed to clear audit logs');
+      }
+    } catch (err: any) {
+      toast('error', 'Clear Audit Logs Failed', err.message || 'Could not clear audit log records.');
+    }
+  }, [toast]);
 
   // ── Payroll Month Lock Fetch ──────────────────────────────────────────────
   const fetchPayrollLocks = useCallback(async () => {
@@ -1200,6 +1216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         editAttendance,
         auditLogs,
         fetchAuditLogs,
+        clearAuditLogs,
         payrollLocks,
         lockPayrollMonth,
         unlockPayrollMonth,
