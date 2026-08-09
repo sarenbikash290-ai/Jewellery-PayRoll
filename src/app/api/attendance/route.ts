@@ -115,7 +115,9 @@ export async function GET(request: Request) {
     date: r.date,
     checkIn: r.check_in,
     checkOut: r.check_out,
-    status: r.status
+    status: r.status,
+    overtimeHours: r.overtime_hours,
+    overtimeReason: r.overtime_reason
   }));
 
   const clientIp = extractClientIp(request);
@@ -235,24 +237,42 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'Unauthorized administrative action' }, { status: 403 });
       }
 
-      const { employeeId, date, checkIn, checkOut, status } = body;
+      const { employeeId, date, checkIn, checkOut, status, overtimeHours, overtimeReason } = body;
       if (!employeeId || !date || !status) {
         return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });
       }
 
       const upperEmpId = employeeId.toUpperCase();
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('attendance')
         .upsert({
           employee_id: upperEmpId,
           date: date,
           check_in: checkIn || null,
           check_out: checkOut || null,
-          status: status
+          status: status,
+          overtime_hours: overtimeHours || null,
+          overtime_reason: overtimeReason || null
         }, { onConflict: 'employee_id,date' })
         .select()
         .single();
+
+      if (error && (error.message.includes('overtime_hours') || error.message.includes('column'))) {
+        const fallback = await supabase
+          .from('attendance')
+          .upsert({
+            employee_id: upperEmpId,
+            date: date,
+            check_in: checkIn || null,
+            check_out: checkOut || null,
+            status: status
+          }, { onConflict: 'employee_id,date' })
+          .select()
+          .single();
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         console.error('Error saving manual attendance:', error);
@@ -305,7 +325,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'Unauthorized: Admin access required' }, { status: 403 });
       }
 
-      const { employeeId, employeeName, date, checkIn, checkOut, status, reason } = body;
+      const { employeeId, employeeName, date, checkIn, checkOut, status, reason, overtimeHours, overtimeReason } = body;
       if (!employeeId || !date || !status) {
         return NextResponse.json({ ok: false, error: 'Missing required fields: employeeId, date, status' }, { status: 400 });
       }
@@ -367,7 +387,7 @@ export async function POST(request: Request) {
       const checkOutBefore = existingRecord?.check_out || null;
 
       // 6. Upsert the attendance record
-      const { data: updatedRecord, error: upsertError } = await supabase
+      let { data: updatedRecord, error: upsertError } = await supabase
         .from('attendance')
         .upsert({
           employee_id: upperEmpId,
@@ -375,9 +395,27 @@ export async function POST(request: Request) {
           check_in: checkIn || null,
           check_out: checkOut || null,
           status,
+          overtime_hours: overtimeHours || null,
+          overtime_reason: overtimeReason || null
         }, { onConflict: 'employee_id,date' })
         .select()
         .single();
+
+      if (upsertError && (upsertError.message.includes('overtime_hours') || upsertError.message.includes('column'))) {
+        const fallback = await supabase
+          .from('attendance')
+          .upsert({
+            employee_id: upperEmpId,
+            date,
+            check_in: checkIn || null,
+            check_out: checkOut || null,
+            status
+          }, { onConflict: 'employee_id,date' })
+          .select()
+          .single();
+        updatedRecord = fallback.data;
+        upsertError = fallback.error;
+      }
 
       if (upsertError) {
         console.error('Error editing attendance:', upsertError);

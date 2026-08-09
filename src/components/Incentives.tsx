@@ -99,7 +99,8 @@ function EmployeeDetailPanel({
   }, [currentMonthSales]);
 
   const achievement = emp.target > 0 ? Math.min((currentMonthTotal / emp.target) * 100, 200) : 0;
-  const incentiveInfo = incentives.find(i => i.employeeId === emp.empId);
+  const empIncentives = useMemo(() => incentives.filter(i => i.employeeId === emp.empId), [incentives, emp.empId]);
+  const totalIncentiveAmount = useMemo(() => empIncentives.reduce((sum, i) => sum + i.amount, 0), [empIncentives]);
 
   const handleAddSale = (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,20 +186,6 @@ function EmployeeDetailPanel({
             ))}
           </div>
 
-          {/* Target progress */}
-          <div style={{ marginTop: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginBottom: '6px' }}>
-              <span>Target Progress</span>
-              <span style={{ color: perfColor, fontWeight: 700 }}>{achievement.toFixed(0)}% of ₹{(emp.target / 100000).toFixed(1)}L</span>
-            </div>
-            <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', width: `${Math.min(achievement, 100)}%`,
-                background: achievement >= 100 ? '#10B981' : achievement >= 60 ? '#4F8EF7' : '#F59E0B',
-                borderRadius: '3px', transition: 'width 0.8s ease'
-              }} />
-            </div>
-          </div>
         </div>
 
         {/* Tabs */}
@@ -248,18 +235,22 @@ function EmployeeDetailPanel({
               </div>
 
               {/* Incentive Info */}
-              {incentiveInfo && (
+              {empIncentives.length > 0 && (
                 <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#10B981', marginBottom: '10px' }}>🎯 Incentive Details</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                    <div><span style={{ color: 'var(--text-muted)' }}>Type: </span><span style={{ fontWeight: 600 }}>{incentiveInfo.ruleType}</span></div>
-                    <div><span style={{ color: 'var(--text-muted)' }}>Month: </span><span style={{ fontWeight: 600 }}>{incentiveInfo.month}</span></div>
-                    <div><span style={{ color: 'var(--text-muted)' }}>Amount: </span><span style={{ fontWeight: 700, color: '#10B981' }}>₹{fmt(incentiveInfo.amount)}</span></div>
-                    <div><span style={{ color: 'var(--text-muted)' }}>Status: </span>
-                      <span style={{ fontWeight: 700, color: incentiveInfo.status === 'paid' ? '#10B981' : '#F59E0B' }}>
-                        {incentiveInfo.status === 'paid' ? '✓ Paid' : '⏳ Pending'}
-                      </span>
-                    </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#10B981' }}>🎯 Total Accumulated Incentives</div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#10B981' }}>₹{fmt(totalIncentiveAmount)}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11.5px' }}>
+                    {empIncentives.map((inc, i) => (
+                      <div key={inc.id || i} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{inc.ruleType}</span>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>({inc.month})</span>
+                        </div>
+                        <div style={{ fontWeight: 700, color: '#10B981' }}>+₹{fmt(inc.amount)}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -511,13 +502,13 @@ export default function Incentives() {
 
   const employeeData: EmpRow[] = employees.map(emp => {
     const monthlySales = employeeSales.filter(s => s.employeeId === emp.id).reduce((sum, s) => sum + s.amount, 0);
-    const incentiveObj = incentives.find(i => i.employeeId === emp.id);
-    const incentive = incentiveObj ? incentiveObj.amount : 0;
+    const empIncentiveRecords = incentives.filter(i => i.employeeId === emp.id);
+    const incentive = empIncentiveRecords.reduce((sum, i) => sum + i.amount, 0);
     const salaryStr = typeof emp.salary === 'string' ? emp.salary : (typeof emp.salary === 'number' ? String(emp.salary) : '0');
     const salary = Number(salaryStr.replace(/[₹,\s]/g, '')) || 0;
-    const target = incentiveObj?.target || 0;
+    const target = empIncentiveRecords[0]?.target || 0;
     const performance = target > 0 && monthlySales >= target ? 'Exceeding' : 'On-track';
-    const incStatus = incentiveObj ? incentiveObj.status : 'pending';
+    const incStatus = empIncentiveRecords.some(i => i.status === 'paid') ? 'paid' : empIncentiveRecords.some(i => i.status === 'approved') ? 'approved' : (empIncentiveRecords.length > 0 ? empIncentiveRecords[0].status : 'pending');
     return {
       empId: emp.id,
       name: emp.name,
@@ -697,7 +688,7 @@ export default function Incentives() {
                       <div style={{ fontSize: '13px', fontWeight: 700, color: perfColor }}>
                         {achievement >= 100 ? `↑ ${achievement.toFixed(0)}%` : `↓ ${achievement.toFixed(0)}%`}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Target: ₹{(emp.target / 100000).toFixed(1)}L</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Achieved</div>
                     </div>
 
                     <div style={{ flex: '1', minWidth: '100px' }}>
@@ -728,7 +719,7 @@ export default function Incentives() {
                 <Zap size={16} color="#4F8EF7" style={{ marginTop: '2px' }} />
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>💡 Boost Performance</div>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>Consider tiered incentives for {atRiskCount} at-risk employees to meet targets.</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>Consider tiered incentives for {atRiskCount} employees needing support.</div>
             </CardBox>
             <CardBox style={{ padding: '16px', borderLeft: '4px solid #10B981' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -740,9 +731,9 @@ export default function Incentives() {
             <CardBox style={{ padding: '16px', borderLeft: '4px solid #8B5CF6' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <Target size={16} color="#8B5CF6" style={{ marginTop: '2px' }} />
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>🎯 Target Strategy</div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>🎯 Performance Strategy</div>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>Review quarterly targets based on market conditions and capabilities.</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>Review quarterly incentives based on market conditions and shop goals.</div>
             </CardBox>
           </div>
         </>

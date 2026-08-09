@@ -3,19 +3,24 @@ import { useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import Modal from './Modal';
 import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { generatePayslip } from '@/lib/generatePayslip';
 import {
   User, Mail, Phone, MapPin, IndianRupee, Calendar, Clock, Briefcase,
-  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil
+  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil, Plus
 } from 'lucide-react';
+import { calculateMonthlySalaryBreakdown, calculateMonthlySalaryProgress } from '@/utils/payrollCalc';
 
 export default function GlobalModals() {
-  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, monthlySalesTarget, updateMonthlySalesTarget, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions, advancePayments, auditLogs, payslips } = useApp();
+  const { modal, openModal, closeModal, toast, addEmployee, updateEmployee, deleteEmployee, addIncentive, updateIncentive, addCommission, updateCommission, authorizedWifiIp, clientIp, updateAuthorizedWifiIp, monthlySalesTarget, updateMonthlySalesTarget, logManualAttendance, employees, leaves, attendanceRecords, incentives, commissions, advancePayments, auditLogs, payslips, overtimeRate, updateOvertimeRate, categoryIncentivePcts, updateCategoryIncentivePcts, holidays, addHoliday, deleteHoliday, payrollLocks } = useApp();
   const [activeTab, setActiveTab] = useState('basic');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [wifiIpInput, setWifiIpInput] = useState('');
   const [salesTargetInput, setSalesTargetInput] = useState(500000);
+  const [overtimeRateInput, setOvertimeRateInput] = useState(150);
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [totalSaleInput, setTotalSaleInput] = useState('');
+  const [showRatesEditor, setShowRatesEditor] = useState(false);
 
   // Manual attendance states
   const [showManualForm, setShowManualForm] = useState(false);
@@ -36,6 +41,7 @@ export default function GlobalModals() {
       setActiveTab('business');
       setWifiIpInput(authorizedWifiIp);
       setSalesTargetInput(monthlySalesTarget);
+      setOvertimeRateInput(overtimeRate);
     } else {
       setActiveTab('basic');
     }
@@ -100,10 +106,22 @@ export default function GlobalModals() {
       return;
     }
 
+    const currentDept = formData.dept || 'Sales';
+    let currentRole = formData.role;
+    if (currentDept === 'Sales') {
+      if (!['Gold-01', 'Gold-02', 'Silver-01', 'Silver-02'].includes(currentRole || '')) {
+        currentRole = 'Gold-01';
+      }
+    } else if (currentDept === 'Housekeeping') {
+      currentRole = 'Housekeeping Staff';
+    } else if (currentDept === 'Helper') {
+      currentRole = 'Helper Staff';
+    }
+
     const empData = {
       name,
-      dept: formData.dept || 'Sales',
-      role: formData.role || 'Staff',
+      dept: currentDept,
+      role: currentRole || 'Gold-01',
       email,
       phone,
       location: formData.location || '',
@@ -206,71 +224,29 @@ export default function GlobalModals() {
       // 3. Payroll Breakups
       if (data.get('exp_pay')) {
         const payrollData = employees.map(emp => {
-          const salaryVal = parsedSalary(emp.salary || '50000');
-          const basic = Math.round(salaryVal * 0.6);
-          const hra = Math.round(basic * 0.4);
-          const allowances = Math.round(basic * 0.2);
-          const gross = basic + hra + allowances;
-
-          // LOP Days & Deduction
-          const absentDays = attendanceRecords.filter(
-            r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes('-06-') || r.date.startsWith('2026-06'))
-          ).length;
-
-          const unpaidLeavesCount = leaves.filter(
-            l => l.employeeId === emp.id &&
-              l.status === 'approved' &&
-              (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
-              (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason?.toLowerCase().includes('unpaid') || l.reason?.toLowerCase().includes('lop'))
-          ).length;
-
-          const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
-          const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
-
-          // Incentives & Commissions
-          const empIncentives = incentives.filter(
-            inc => inc.employeeId === emp.id &&
-              (inc.status === 'approved' || inc.status === 'paid') &&
-              (inc.month.includes('Jun') || inc.month.includes('June'))
+          const breakdown = calculateMonthlySalaryBreakdown(
+            emp,
+            '2026-06',
+            attendanceRecords,
+            leaves,
+            incentives,
+            commissions,
+            advancePayments,
+            overtimeRate,
+            holidays
           );
-
-          const empCommissions = commissions.filter(
-            com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) &&
-              (com.status === 'approved' || com.status === 'paid') &&
-              (com.month.includes('Jun') || com.month.includes('June'))
-          );
-
-          const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
-
-          const pf = Math.round(basic * 0.12);
-          const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
-          const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
-
-          // Advance Deductions
-          const empAdvances = advancePayments.filter(
-            adv => adv.employeeId === emp.id &&
-              adv.status === 'pending' &&
-              (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
-          );
-          const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
-
-          const net = gross - pf - esi - tds - lopDeduction - advanceDeduction + totalIncentives;
 
           return {
             id: emp.id,
             name: emp.name,
             dept: emp.dept,
-            basic,
-            hra,
-            allowances,
-            gross,
-            incentives: totalIncentives,
-            pf,
-            esi,
-            tds,
-            lopDeduction,
-            advanceDeduction,
-            net
+            basic: breakdown.basic,
+            gross: breakdown.gross,
+            incentives: breakdown.incentives,
+            overtimeAmount: breakdown.overtimeAmount,
+            lopDeduction: breakdown.lopDeduction,
+            advanceDeduction: breakdown.advanceDeduction,
+            net: breakdown.netPay
           };
         });
 
@@ -278,9 +254,9 @@ export default function GlobalModals() {
           downloadFile('payroll_breakups.json', JSON.stringify(payrollData, null, 2), 'application/json');
         } else {
           let csv = includeMeta ? '# HRPulse Payroll Breakup Export\n# Date: ' + new Date().toISOString() + '\n' : '';
-          csv += 'Employee ID,Name,Department,Basic,HRA,Allowances,Gross,Incentives,PF,ESI,TDS,LOP,Advance,Net Pay\n';
+          csv += 'Employee ID,Name,Department,Basic,Gross,Incentives,Overtime,LOP,Advance,Net Pay\n';
           payrollData.forEach(p => {
-            csv += `"${p.id}","${p.name}","${p.dept}",${p.basic},${p.hra},${p.allowances},${p.gross},${p.incentives},${p.pf},${p.esi},${p.tds},${p.lopDeduction},${p.advanceDeduction},${p.net}\n`;
+            csv += `"${p.id}","${p.name}","${p.dept}",${p.basic},${p.gross},${p.incentives},${p.overtimeAmount},${p.lopDeduction},${p.advanceDeduction},${p.net}\n`;
           });
           downloadFile('payroll_breakups.csv', csv, 'text/csv;charset=utf-8;');
         }
@@ -298,31 +274,6 @@ export default function GlobalModals() {
             csv += `"${i.id}","${i.employeeId}","${i.employeeName}","${i.month}",${i.amount},"${i.status}","${i.ruleType}",${i.target}\n`;
           });
           downloadFile('incentives.csv', csv, 'text/csv;charset=utf-8;');
-        }
-        filesDownloaded++;
-      }
-
-      // 5. Tax Deductions
-      if (data.get('exp_tax')) {
-        const taxData = employees.map(emp => {
-          const salaryVal = parsedSalary(emp.salary || '50000');
-          const basic = Math.round(salaryVal * 0.6);
-          const gross = basic * 1.6;
-          const pf = Math.round(basic * 0.12);
-          const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
-          const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
-          return { id: emp.id, name: emp.name, basic, pf, tds, esi };
-        });
-
-        if (format === 'json') {
-          downloadFile('tax_deductions.json', JSON.stringify(taxData, null, 2), 'application/json');
-        } else {
-          let csv = includeMeta ? '# HRPulse Tax Deductions Export\n# Date: ' + new Date().toISOString() + '\n' : '';
-          csv += 'Employee ID,Employee Name,Basic Salary,PF Deduction,TDS Deduction,ESI Deduction\n';
-          taxData.forEach(t => {
-            csv += `"${t.id}","${t.name}",${t.basic},${t.pf},${t.tds},${t.esi}\n`;
-          });
-          downloadFile('tax_deductions.csv', csv, 'text/csv;charset=utf-8;');
         }
         filesDownloaded++;
       }
@@ -483,6 +434,7 @@ export default function GlobalModals() {
     e.preventDefault();
     updateAuthorizedWifiIp(wifiIpInput);
     updateMonthlySalesTarget(salesTargetInput);
+    updateOvertimeRate(overtimeRateInput);
     closeModal();
   };
 
@@ -613,25 +565,23 @@ export default function GlobalModals() {
             {activeTab === 'job' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
-                  <label>Job Title / Role</label>
-                  <div style={{ position: 'relative' }}>
-                    <Briefcase size={14} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-                    <input
-                      type="text"
-                      required
-                      value={formData.role || ''}
-                      onChange={e => handleInputChange('role', e.target.value)}
-                      placeholder="e.g. Account Executive"
-                      className="form-input"
-                      style={{ paddingLeft: 34 }}
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
                   <label>Department</label>
                   <select
                     value={formData.dept || 'Sales'}
-                    onChange={e => handleInputChange('dept', e.target.value)}
+                    onChange={e => {
+                      const newDept = e.target.value;
+                      let newRole = formData.role;
+                      if (newDept === 'Sales') {
+                        if (!['Gold-01', 'Gold-02', 'Silver-01', 'Silver-02'].includes(newRole || '')) {
+                          newRole = 'Gold-01';
+                        }
+                      } else if (newDept === 'Housekeeping') {
+                        newRole = 'Housekeeping Staff';
+                      } else if (newDept === 'Helper') {
+                        newRole = 'Helper Staff';
+                      }
+                      setFormData(prev => ({ ...prev, dept: newDept, role: newRole }));
+                    }}
                     className="form-input"
                   >
                     <option value="Sales">Sales</option>
@@ -639,6 +589,23 @@ export default function GlobalModals() {
                     <option value="Helper">Helper</option>
                   </select>
                 </div>
+
+                {(formData.dept || 'Sales') === 'Sales' && (
+                  <div className="form-group">
+                    <label>Job Title / Role</label>
+                    <select
+                      value={['Gold-01', 'Gold-02', 'Silver-01', 'Silver-02'].includes(formData.role || '') ? formData.role : 'Gold-01'}
+                      onChange={e => handleInputChange('role', e.target.value)}
+                      className="form-input"
+                    >
+                      <option value="Gold-01">Gold-01</option>
+                      <option value="Gold-02">Gold-02</option>
+                      <option value="Silver-01">Silver-01</option>
+                      <option value="Silver-02">Silver-02</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label>Employment Type</label>
                   <select
@@ -1109,65 +1076,34 @@ export default function GlobalModals() {
       // Check if a frozen saved payslip exists in Supabase for this employee & month
       const savedPayslip = payslips.find(p => p.slip_id === `PSL-${payslipYearMonthCode}-${emp.id}` || (p.employee_id === emp.id && p.month === payslipYearMonthCode));
 
-      const parsedSalary = (salStr: string) => {
-        const clean = salStr.replace(/[^\d]/g, '');
-        const val = parseInt(clean, 10);
-        return isNaN(val) ? 50000 : val;
-      };
-
-      const salaryVal = parsedSalary(emp.salary || '50000');
-      const basic = savedPayslip ? Number(savedPayslip.basic_salary) : Math.round(salaryVal * 0.6);
-      const hra = savedPayslip ? Number(savedPayslip.hra) : Math.round(basic * 0.4);
-      const allowances = savedPayslip ? Number(savedPayslip.allowances) : Math.round(basic * 0.2);
-      const gross = savedPayslip ? Number(savedPayslip.gross_salary) : (basic + hra + allowances);
-
-      // LOP Days & Deduction
-      const absentDays = attendanceRecords.filter(
-        r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes(`-${targetMonthNumStr}-`) || r.date.startsWith(payslipYearMonthCode))
-      ).length;
-
-      const unpaidLeavesCount = leaves.filter(
-        l => l.employeeId === emp.id &&
-          l.status === 'approved' &&
-          (l.from.includes(`-${targetMonthNumStr}-`) || l.from.startsWith(payslipYearMonthCode)) &&
-          (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
-      ).length;
-
-      const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
-      const lopDeduction = savedPayslip ? Number(savedPayslip.lop_deduction) : Math.round((salaryVal / 30) * totalAbsentOrLopDays);
-
-      // Incentives & Commissions
-      const monthNameShort = payslipMonthLabel.split(' ')[0].substring(0, 3);
-      const empIncentives = incentives.filter(
-        inc => inc.employeeId === emp.id &&
-          (inc.status === 'approved' || inc.status === 'paid') &&
-          (inc.month.toLowerCase().includes(monthNameShort.toLowerCase()) || inc.month.startsWith(payslipYearMonthCode))
+      const breakdown = calculateMonthlySalaryBreakdown(
+        emp,
+        payslipYearMonthCode,
+        attendanceRecords,
+        leaves,
+        incentives,
+        commissions,
+        advancePayments,
+        overtimeRate,
+        holidays
       );
 
-      const empCommissions = commissions.filter(
-        com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) &&
-          (com.status === 'approved' || com.status === 'paid') &&
-          (com.month.toLowerCase().includes(monthNameShort.toLowerCase()) || com.month.startsWith(payslipYearMonthCode))
-      );
+      const [yearStr, monthStr] = payslipYearMonthCode.split('-');
+      const targetY = parseInt(yearStr, 10) || 2026;
+      const targetM = parseInt(monthStr, 10) || 8;
+      const isLocked = (payrollLocks || []).some(l => l.year === targetY && l.month === targetM);
 
-      const totalIncentives = savedPayslip ? Number(savedPayslip.incentives) : (empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0));
-      const totalGrossEarnings = gross + totalIncentives;
+      const basic = (isLocked && savedPayslip) ? Number(savedPayslip.basic_salary) : breakdown.basic;
+      const totalIncentives = (isLocked && savedPayslip) ? Number(savedPayslip.incentives) : breakdown.incentives;
+      const overtimeAmount = (isLocked && savedPayslip && savedPayslip.overtime_amount !== undefined) ? Number(savedPayslip.overtime_amount) : breakdown.overtimeAmount;
+      const overtimeRemarks = (isLocked && savedPayslip && savedPayslip.overtime_remarks !== undefined) ? savedPayslip.overtime_remarks : breakdown.overtimeRemarks;
+      const totalGrossEarnings = basic + totalIncentives + overtimeAmount;
 
-      const pf = savedPayslip ? Number(savedPayslip.pf_deduction) : Math.round(basic * 0.12);
-      const esi = savedPayslip ? Number(savedPayslip.esi_deduction) : (gross < 75000 ? Math.round(gross * 0.0075) : 0);
-      const tds = savedPayslip ? Number(savedPayslip.tds_deduction) : (gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05));
-      const pt = savedPayslip ? Number(savedPayslip.pt_deduction) : 200;
+      const lopDeduction = (isLocked && savedPayslip) ? Number(savedPayslip.lop_deduction) : breakdown.lopDeduction;
+      const advanceDeduction = (isLocked && savedPayslip) ? Number(savedPayslip.advance_deduction) : breakdown.advanceDeduction;
 
-      // Advance Deductions
-      const empAdvances = advancePayments.filter(
-        adv => adv.employeeId === emp.id &&
-          adv.status === 'pending' &&
-          adv.deductMonth === payslipYearMonthCode
-      );
-      const advanceDeduction = savedPayslip ? Number(savedPayslip.advance_deduction) : empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
-
-      const totalDeductions = savedPayslip ? Number(savedPayslip.total_deductions) : (pf + esi + tds + pt + lopDeduction + advanceDeduction);
-      const net = savedPayslip ? Number(savedPayslip.net_pay) : (totalGrossEarnings - totalDeductions);
+      const totalDeductions = lopDeduction + advanceDeduction;
+      const net = totalGrossEarnings - totalDeductions;
 
       const numberToWords = (num: number) => {
         if (num === 72262) return 'Seventy-Two Thousand Two Hundred and Sixty-Two Rupees Only';
@@ -1223,7 +1159,7 @@ export default function GlobalModals() {
               </div>
 
               {/* Employee Metadata */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', fontSize: '12px', borderBottom: '1px solid #e1e7f0', paddingBottom: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px', fontSize: '12px', borderBottom: '1px solid #e1e7f0', paddingBottom: '14px' }}>
                 <div>
                   <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Employee Name:</span> <span style={{ color: '#0d131f', fontWeight: 700 }}>{emp.name}</span></div>
                   <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Employee ID:</span> <span style={{ color: '#0d131f' }}>{emp.id}</span></div>
@@ -1232,11 +1168,10 @@ export default function GlobalModals() {
                 </div>
                 <div>
                   <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Bank Account No:</span> <span style={{ color: '#0d131f', fontWeight: 700 }}>{emp.bank_account_no ? `${emp.bank_account_no}${emp.bank_name ? ` (${emp.bank_name})` : ''}` : `XXXX XXXX ${emp.id ? emp.id.replace('EMP', '89') : '8901'}`}</span></div>
-                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>IFSC Code:</span> <span style={{ color: '#0d131f' }}>{emp.ifsc_code ? emp.ifsc_code : 'UTIB0000129'}</span></div>
-                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PF Number:</span> <span style={{ color: '#0d131f' }}>{emp.pf_no ? emp.pf_no : `DL/CPM/89012/${emp.id ? emp.id.replace('EMP', '1') : '129'}`}</span></div>
-                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>PAN Card No:</span> <span style={{ color: '#0d131f' }}>{emp.pan_no ? emp.pan_no : `BKPPS7${emp.id ? emp.id.replace('EMP', '89') : '892'}K`}</span></div>
+                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>IFSC Code:</span> <span style={{ color: '#0d131f' }}>{emp.ifsc_code ? emp.ifsc_code : 'UTIB0000129'}</span></div>
                 </div>
               </div>
+
 
               {/* Earnings & Deductions Tables */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '1px solid #cbd5e0', borderRadius: '4px', overflow: 'hidden', fontSize: '12px', marginBottom: '20px' }}>
@@ -1245,24 +1180,30 @@ export default function GlobalModals() {
                   <div style={{ background: '#f7fafc', padding: '8px 12px', borderBottom: '1px solid #cbd5e0', fontWeight: 700, color: '#2d3748' }}>EARNINGS DETAILS</div>
                   <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Basic Salary</span> <span style={{ fontWeight: 600 }}>₹ {basic.toLocaleString('en-IN')}.00</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>House Rent Allowance (HRA)</span> <span style={{ fontWeight: 600 }}>₹ {hra.toLocaleString('en-IN')}.00</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Special Allowance</span> <span style={{ fontWeight: 600 }}>₹ {allowances.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Monthly Incentive</span> <span style={{ fontWeight: 600 }}>₹ {totalIncentives.toLocaleString('en-IN')}.00</span></div>
+                    {overtimeAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8b5cf6', fontWeight: 700 }}>
+                        <span>Overtime Payment ({breakdown.overtimeHours} hrs)</span>
+                        <span>+₹ {overtimeAmount.toLocaleString('en-IN')}.00</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Right side - Deductions */}
                 <div>
                   <div style={{ background: '#f7fafc', padding: '8px 12px', borderBottom: '1px solid #cbd5e0', fontWeight: 700, color: '#2d3748' }}>DEDUCTIONS DETAILS</div>
                   <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Provident Fund (PF)</span> <span style={{ fontWeight: 600 }}>₹ {pf.toLocaleString('en-IN')}.00</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Employee Insurance (ESI)</span> <span style={{ fontWeight: 600 }}>₹ {esi.toLocaleString('en-IN')}.00</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Tax Deducted at Source (TDS)</span> <span style={{ fontWeight: 600 }}>₹ {tds.toLocaleString('en-IN')}.00</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Professional Tax (PT)</span> <span style={{ fontWeight: 600 }}>₹ {pt.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e53e3e' }}><span>Loss of Pay (LOP)</span> <span style={{ fontWeight: 600 }}>-₹ {lopDeduction.toLocaleString('en-IN')}.00</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e53e3e' }}><span>Salary Advance</span> <span style={{ fontWeight: 600 }}>-₹ {advanceDeduction.toLocaleString('en-IN')}.00</span></div>
                   </div>
                 </div>
               </div>
+
+              {overtimeRemarks && (
+                <div style={{ padding: '8px 12px', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '6px', fontSize: '11px', color: '#6d28d9', marginBottom: '16px' }}>
+                  <strong>Overtime Remark:</strong> {overtimeRemarks}
+                </div>
+              )}
 
               {/* Totals and Net Pay */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', fontSize: '13px' }}>
@@ -1295,7 +1236,7 @@ export default function GlobalModals() {
                   try {
                     generatePayslip({
                       ...emp,
-                      salary: emp.salary || `₹ ${gross}`
+                      salary: emp.salary || `₹ ${basic}`
                     }, payslipMonthLabel);
                     toast('success', 'Payslip PDF Downloaded', `Downloaded payslip PDF for ${emp.name}.`);
                   } catch (err: any) {
@@ -1361,7 +1302,6 @@ export default function GlobalModals() {
                 <option value="payroll">Payroll Cost breakdown</option>
                 <option value="attendance">Monthly Attendance log</option>
                 <option value="incentives">Sales Commissions Ledger</option>
-                <option value="tax">PF & TDS Deductions summary</option>
               </select>
             </div>
 
@@ -1420,7 +1360,6 @@ export default function GlobalModals() {
                   { id: 'exp_att', label: 'Attendance Records' },
                   { id: 'exp_pay', label: 'Payroll & Salary Breakups' },
                   { id: 'exp_inc', label: 'Incentives & Rules' },
-                  { id: 'exp_tax', label: 'Tax Deductions (PF/TDS)' },
                   { id: 'exp_sys', label: 'Audit Logs' },
                 ].map(item => (
                   <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
@@ -1466,229 +1405,241 @@ export default function GlobalModals() {
           size="lg"
         >
           <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', width: 'fit-content' }}>
-              {['business', 'compliance'].map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setActiveTab(t)}
-                  style={{
-                    padding: '6px 16px', borderRadius: '6px',
-                    background: activeTab === t ? 'var(--brand)' : 'transparent',
-                    color: activeTab === t ? '#fff' : 'var(--text-2)',
-                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)',
-                    textTransform: 'capitalize'
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>Company Legal Name</label>
+                <input type="text" defaultValue="Shri Sai Jewellers Private Limited" className="form-input" />
+              </div>
+              <div className="form-group">
+                <label>Support Email</label>
+                <input type="email" defaultValue="hr@saijewellers.com" className="form-input" />
+              </div>
+              <div className="form-group">
+                <label>Payroll Run Date</label>
+                <select className="form-input" defaultValue="28">
+                  <option value="25">25th of month</option>
+                  <option value="28">28th of month</option>
+                  <option value="30">30th/31st of month</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Weekly Offs</label>
+                <select className="form-input" defaultValue="thursday">
+                  <option value="thursday">Thursdays Only</option>
+                  <option value="sat-thu">Saturday & Thursday</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Overtime Hourly Rate (₹ / hr)</label>
+                <input
+                  type="number"
+                  value={overtimeRateInput}
+                  onChange={e => setOvertimeRateInput(parseInt(e.target.value, 10) || 0)}
+                  className="form-input"
+                  placeholder="e.g. 150"
+                />
+              </div>
 
-            {activeTab === 'business' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Company Legal Name</label>
-                  <input type="text" defaultValue="Shri Sai Jewellers Private Limited" className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Support Email</label>
-                  <input type="email" defaultValue="hr@saijewellers.com" className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Payroll Run Date</label>
-                  <select className="form-input" defaultValue="28">
-                    <option value="25">25th of month</option>
-                    <option value="28">28th of month</option>
-                    <option value="30">30th/31st of month</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Weekly Offs</label>
-                  <select className="form-input" defaultValue="thursday">
-                    <option value="thursday">Thursdays Only</option>
-                    <option value="sat-thu">Saturday & Thursday</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Monthly Sales Target (₹)</label>
+              {/* National & Public Holidays Calendar */}
+              <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '6px' }}>
+                <label style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <Calendar size={15} color="var(--brand)" /> National / Public Holidays Calendar
+                </label>
+
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                   <input
-                    type="number"
-                    value={salesTargetInput}
-                    onChange={e => setSalesTargetInput(parseInt(e.target.value, 10) || 0)}
+                    type="date"
+                    value={newHolidayDate}
+                    onChange={e => setNewHolidayDate(e.target.value)}
+                    className="form-input"
+                    style={{ width: '160px' }}
+                  />
+                  <input
+                    type="text"
+                    value={newHolidayName}
+                    onChange={e => setNewHolidayName(e.target.value)}
+                    placeholder="Holiday Name (e.g. Independence Day)"
+                    className="form-input"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newHolidayDate && newHolidayName) {
+                        addHoliday(newHolidayDate, newHolidayName);
+                        setNewHolidayDate('');
+                        setNewHolidayName('');
+                      } else {
+                        toast('error', 'Missing Information', 'Please select a date and enter holiday name.');
+                      }
+                    }}
+                    style={{ padding: '8px 16px', background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={14} /> Add Holiday
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {holidays.map(h => (
+                    <div key={h.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'rgba(79,142,247,0.1)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: '20px', fontSize: '12px' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--brand)' }}>{h.date}:</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{h.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => deleteHoliday(h.id)}
+                        style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label>Authorized Store WiFi Static Public IP</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={wifiIpInput}
+                    onChange={e => setWifiIpInput(e.target.value)}
+                    placeholder="e.g. 103.88.23.14 (Default 127.0.0.1 bypasses validation)"
                     className="form-input"
                   />
-                </div>
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <label>Authorized Store WiFi Static Public IP</label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <input
-                      type="text"
-                      value={wifiIpInput}
-                      onChange={e => setWifiIpInput(e.target.value)}
-                      placeholder="e.g. 103.88.23.14 (Default 127.0.0.1 bypasses validation)"
-                      className="form-input"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        toast('info', 'Detecting IPs', 'Fetching public IPv4 and IPv6 addresses...');
-                        const ips = new Set<string>();
-
-                        try {
-                          const res = await fetch('https://api4.ipify.org?format=json');
-                          const data = await res.json();
-                          if (data.ip) ips.add(data.ip);
-                        } catch (e) {
-                          console.log('Failed to fetch IPv4:', e);
-                        }
-
-                        try {
-                          const res = await fetch('https://api6.ipify.org?format=json');
-                          const data = await res.json();
-                          if (data.ip) ips.add(data.ip);
-                        } catch (e) {
-                          console.log('Failed to fetch IPv6:', e);
-                        }
-
-                        if (clientIp && clientIp !== '127.0.0.1') {
-                          ips.add(clientIp);
-                        }
-
-                        if (ips.size > 0) {
-                          const detected = Array.from(ips).join(', ');
-                          setWifiIpInput(detected);
-                          toast('success', 'IPs Detected', `Found: ${detected}`);
-                        } else {
-                          setWifiIpInput('127.0.0.1');
-                          toast('warning', 'Detection Failed', 'Using loopback address 127.0.0.1');
-                        }
-                      }}
-                      style={{
-                        padding: '8px 14px',
-                        background: 'rgba(79, 142, 247, 0.1)',
-                        border: '1px solid rgba(79, 142, 247, 0.25)',
-                        borderRadius: '8px',
-                        color: 'var(--brand)',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Detect Store IPs
-                    </button>
-                  </div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-                    Employees will only be allowed to log attendance when their device requests come from this public IP.
-                  </span>
-                </div>
-                <div style={{ gridColumn: 'span 2', marginTop: '10px', padding: '16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px dashed rgba(239, 68, 68, 0.3)', borderRadius: '8px' }}>
-                  <label style={{ color: '#EF4444', fontWeight: 700, display: 'block', marginBottom: '6px', fontSize: '13px' }}>System Maintenance</label>
-
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
-                    Clear all locally cached data (employees roster, attendance, leaves, incentives, commissions, and notifications) to start with a fresh database.
-                  </p>
                   <button
                     type="button"
                     onClick={async () => {
-                      if (confirm("Are you sure you want to completely RESET all workforce, payroll, and attendance data? This will clear everything in your browser and cannot be undone.")) {
-                        try {
-                          localStorage.removeItem('hrpulse_employees');
-                          localStorage.removeItem('hrpulse_incentives');
-                          localStorage.removeItem('hrpulse_commissions');
-                          localStorage.removeItem('hrpulse_employee_sales');
-                          localStorage.removeItem('hrpulse_leaves');
-                          localStorage.removeItem('hrpulse_attendance_records');
-                          await fetch('/api/employees', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'resetData' })
-                          });
+                      toast('info', 'Detecting IPs', 'Fetching public IPv4 and IPv6 addresses...');
+                      const ips = new Set<string>();
 
-                          await fetch('/api/attendance', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'resetData' })
-                          });
+                      try {
+                        const res = await fetch('https://api4.ipify.org?format=json');
+                        const data = await res.json();
+                        if (data.ip) ips.add(data.ip);
+                      } catch (e) {
+                        console.log('Failed to fetch IPv4:', e);
+                      }
 
-                          await fetch('/api/leaves', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'resetData' })
-                          });
+                      try {
+                        const res = await fetch('https://api6.ipify.org?format=json');
+                        const data = await res.json();
+                        if (data.ip) ips.add(data.ip);
+                      } catch (e) {
+                        console.log('Failed to fetch IPv6:', e);
+                      }
 
-                          await fetch('/api/incentives', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'resetData' })
-                          });
+                      if (clientIp && clientIp !== '127.0.0.1') {
+                        ips.add(clientIp);
+                      }
 
-                          await fetch('/api/commissions', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'resetData' })
-                          });
-
-                          await fetch('/api/sales', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'resetData' })
-                          });
-
-                          toast('success', 'System Reset Successful', 'All local and server-side records have been deleted. Reloading...');
-                          setTimeout(() => {
-                            window.location.reload();
-                          }, 1000);
-                        } catch (err) {
-                          console.error(err);
-                          toast('error', 'Reset Failed', 'Something went wrong while resetting database records.');
-                        }
+                      if (ips.size > 0) {
+                        const detected = Array.from(ips).join(', ');
+                        setWifiIpInput(detected);
+                        toast('success', 'IPs Detected', `Found: ${detected}`);
+                      } else {
+                        setWifiIpInput('127.0.0.1');
+                        toast('warning', 'Detection Failed', 'Using loopback address 127.0.0.1');
                       }
                     }}
                     style={{
-                      padding: '8px 16px',
-                      background: '#EF4444',
-                      border: 'none',
-                      borderRadius: '6px',
-                      color: '#fff',
+                      padding: '8px 14px',
+                      background: 'rgba(79, 142, 247, 0.1)',
+                      border: '1px solid rgba(79, 142, 247, 0.25)',
+                      borderRadius: '8px',
+                      color: 'var(--brand)',
                       fontSize: '12px',
                       fontWeight: 600,
                       cursor: 'pointer',
-                      transition: 'background 0.2s ease',
+                      whiteSpace: 'nowrap'
                     }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#DC2626'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#EF4444'; }}
                   >
-                    Reset Application Database
+                    Detect Store IPs
                   </button>
                 </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                  Employees will only be allowed to log attendance when their device requests come from this public IP.
+                </span>
               </div>
-            )}
+              <div style={{ gridColumn: 'span 2', marginTop: '10px', padding: '16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px dashed rgba(239, 68, 68, 0.3)', borderRadius: '8px' }}>
+                <label style={{ color: '#EF4444', fontWeight: 700, display: 'block', marginBottom: '6px', fontSize: '13px' }}>System Maintenance</label>
 
-            {activeTab === 'compliance' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label>Provident Fund (PF) Rate</label>
-                  <input type="text" defaultValue="12%" className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Employee Insurance (ESI) Rate</label>
-                  <input type="text" defaultValue="0.75%" className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>TDS Slab Rule</label>
-                  <select className="form-input" defaultValue="new-regime">
-                    <option value="new-regime">New Tax Regime (Slab base)</option>
-                    <option value="old-regime">Old Tax Regime (Configure base)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Professional Tax (PT)</label>
-                  <input type="text" defaultValue="₹ 200 / month" className="form-input" />
-                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
+                  Clear all locally cached data (employees roster, attendance, leaves, incentives, commissions, and notifications) to start with a fresh database.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (confirm("Are you sure you want to completely RESET all workforce, payroll, and attendance data? This will clear everything in your browser and cannot be undone.")) {
+                      try {
+                        localStorage.removeItem('hrpulse_employees');
+                        localStorage.removeItem('hrpulse_incentives');
+                        localStorage.removeItem('hrpulse_commissions');
+                        localStorage.removeItem('hrpulse_employee_sales');
+                        localStorage.removeItem('hrpulse_leaves');
+                        localStorage.removeItem('hrpulse_attendance_records');
+                        await fetch('/api/employees', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'resetData' })
+                        });
+
+                        await fetch('/api/attendance', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'resetData' })
+                        });
+
+                        await fetch('/api/leaves', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'resetData' })
+                        });
+
+                        await fetch('/api/incentives', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'resetData' })
+                        });
+
+                        await fetch('/api/commissions', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'resetData' })
+                        });
+
+                        await fetch('/api/sales', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'resetData' })
+                        });
+
+                        toast('success', 'System Reset Successful', 'All local and server-side records have been deleted. Reloading...');
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 1000);
+                      } catch (err) {
+                        console.error(err);
+                        toast('error', 'Reset Failed', 'Something went wrong while resetting database records.');
+                      }
+                    }
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#EF4444',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s ease',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#DC2626'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#EF4444'; }}
+                >
+                  Reset Application Database
+                </button>
               </div>
-            )}
+            </div>
 
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
@@ -1703,114 +1654,153 @@ export default function GlobalModals() {
     case 'addIncentive':
     case 'editIncentive': {
       const isEdit = modal.open === 'editIncentive';
+
       return (
         <Modal
-          title={isEdit ? 'Edit Incentive Record' : 'Add New Employee Incentive'}
-          subtitle={isEdit ? 'Update incentive details' : 'Create incentive for employee performance'}
+          title={isEdit ? 'Edit Incentive Record' : 'Add Shop Daily Sale Incentive'}
+          subtitle={isEdit ? 'Update incentive details' : 'Enter daily sale amount to distribute incentive shares across job title categories'}
           size="md"
         >
           <form onSubmit={(e) => {
             e.preventDefault();
-            const employeeName = formData.employeeName || 'Employee';
-            // Look up the actual employee to get the correct ID and dept
-            const matchedEmp = employees.find(e => e.name === employeeName);
-            const empLookup = employeeName;
-            const incentiveData = {
-              employeeId: matchedEmp?.id || formData.employeeId || 'EMP001',
-              employeeName: employeeName,
-              dept: matchedEmp?.dept || formData.dept || 'Sales',
-              ruleType: formData.ruleType || 'Performance Bonus',
-              amount: parseInt(formData.amount || '5000'),
-              target: parseInt(formData.target || '500000'),
-              month: formData.month || 'Jun 2025',
-              status: formData.status as 'paid' | 'pending' | 'approved' || 'pending',
-              createdAt: new Date().toISOString().split('T')[0],
-              updatedAt: new Date().toISOString().split('T')[0],
-            };
+            const totalSale = parseFloat(totalSaleInput || '5000') || 5000;
+            const selectedDate = formData.date || new Date().toISOString().split('T')[0];
+            const targetMonth = formData.month || selectedDate.slice(0, 7);
+            const statusVal = (formData.status as 'paid' | 'pending' | 'approved') || 'pending';
+
             if (isEdit) {
+              const matchedEmp = employees.find(e => e.name === formData.employeeName);
+              const empRole = matchedEmp?.role || 'Gold-01';
+              const roleKey = empRole.includes('Housekeeping') ? 'Housekeeping' : empRole;
+              const pct = categoryIncentivePcts[roleKey] !== undefined ? categoryIncentivePcts[roleKey] : 5;
+              const calcAmt = Math.round((totalSale * pct) / 100);
+
+              const incentiveData = {
+                employeeId: matchedEmp?.id || formData.employeeId || 'EMP001',
+                employeeName: formData.employeeName || 'Employee',
+                dept: matchedEmp?.dept || formData.dept || 'Sales',
+                ruleType: `Daily Sale Incentive (${roleKey} - ${pct}%)`,
+                amount: calcAmt,
+                target: totalSale,
+                month: targetMonth,
+                status: statusVal,
+                createdAt: selectedDate,
+                updatedAt: selectedDate,
+              };
               updateIncentive({ ...incentiveData, id: (modal.data as Record<string, string>).id });
-              toast('success', 'Incentive Updated', `Incentive for ${formData.employeeName} has been updated and is now live!`);
+              toast('success', 'Incentive Updated', `Incentive record updated.`);
             } else {
-              addIncentive(incentiveData);
-              toast('success', 'Incentive Added - LIVE', `Incentive for ${formData.employeeName} has been added and applied in real-time!`);
+              // Distribute incentive shares to all employees by Job Title & Housekeeping role
+              let addedCount = 0;
+
+              employees.forEach(emp => {
+                const empRole = emp.role || (emp.dept === 'Housekeeping' ? 'Housekeeping' : 'Gold-01');
+                const roleKey = empRole.includes('Housekeeping') ? 'Housekeeping' : empRole;
+                const pct = categoryIncentivePcts[roleKey] !== undefined ? categoryIncentivePcts[roleKey] : (roleKey === 'Housekeeping' ? 2 : 5);
+                const empAmt = Math.round((totalSale * pct) / 100);
+
+                addIncentive({
+                  employeeId: emp.id,
+                  employeeName: emp.name,
+                  dept: emp.dept || 'Sales',
+                  ruleType: `Daily Sale Incentive (${roleKey} - ${pct}%)`,
+                  amount: empAmt,
+                  target: totalSale,
+                  month: targetMonth,
+                  status: statusVal,
+                  createdAt: selectedDate,
+                  updatedAt: selectedDate,
+                });
+                addedCount++;
+              });
+
+              toast('success', 'Daily Incentive Distributed', `₹${totalSale.toLocaleString('en-IN')} sale incentive distributed across ${addedCount} employees (Gold-01, Gold-02, Silver-01, Silver-02, Housekeeping)!`);
             }
             closeModal();
           }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* Total Daily Sale Amount Input */}
             <div className="form-group">
-              <label>Employee Name</label>
-              <select
-                value={formData.employeeName || ''}
-                onChange={e => {
-                  const empName = e.target.value;
-                  const emp = employees.find(x => x.name === empName);
-                  handleInputChange('employeeName', empName);
-                  if (emp) {
-                    handleInputChange('employeeId', emp.id);
-                    handleInputChange('dept', emp.dept);
-                  }
-                }}
-                required
+              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Total Daily Sale Amount (₹)</label>
+              <input
+                type="number"
+                value={totalSaleInput}
+                onChange={e => setTotalSaleInput(e.target.value)}
+                placeholder="e.g. 5000"
                 className="form-input"
-              >
-                <option value="">Select Employee</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.name}>{emp.name} ({emp.dept})</option>
-                ))}
-              </select>
+              />
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                Enter total shop daily sale (e.g. ₹5,000) to automatically calculate category percentage shares below.
+              </span>
             </div>
 
+            {/* Customizable % Shares for Each Job Title & Housekeeping Role */}
+            <div style={{ background: 'var(--bg-elevated, #f8fafc)', border: '1px solid var(--border, #cbd5e0)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Customizable Job Title Incentive (%) Shares
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Auto-Calculated per Category</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                {['Gold-01', 'Gold-02', 'Silver-01', 'Silver-02', 'Housekeeping'].map(cat => {
+                  const defaultPct = cat === 'Gold-01' ? 20 : cat === 'Gold-02' ? 10 : cat === 'Housekeeping' ? 2 : 5;
+                  const pctVal = categoryIncentivePcts[cat] !== undefined ? categoryIncentivePcts[cat] : defaultPct;
+                  const saleNum = parseFloat(totalSaleInput || '0');
+                  const calcAmt = saleNum > 0 ? Math.round((saleNum * pctVal) / 100) : 0;
+
+                  return (
+                    <div key={cat} style={{ background: 'var(--bg-card, #fff)', border: '1px solid var(--border, #e2e8f0)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{cat}</span>
+                        {saleNum > 0 && (
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#10B981' }}>+₹{calcAmt.toLocaleString('en-IN')}</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={pctVal}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            updateCategoryIncentivePcts({ [cat]: val, ...(cat === 'Housekeeping' ? { 'Housekeeping Staff': val } : {}) });
+                          }}
+                          style={{
+                            width: '100%', padding: '6px 10px', borderRadius: '6px',
+                            border: '1px solid var(--border, #cbd5e0)', fontSize: '13px',
+                            fontWeight: 700, background: 'var(--bg-elevated, #f8fafc)', color: 'var(--text-primary)'
+                          }}
+                        />
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)' }}>%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Sale Date & Status */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
-                <label>Incentive Type</label>
-                <select
-                  value={formData.ruleType || ''}
-                  onChange={e => handleInputChange('ruleType', e.target.value)}
-                  required
-                  className="form-input"
-                >
-                  <option value="">Select Type</option>
-                  <option value="Revenue Slab">Revenue Slab</option>
-                  <option value="Performance Bonus">Performance Bonus</option>
-                  <option value="Zero Absence Bonus">Zero Absence Bonus</option>
-                  <option value="Project Delivery">Project Delivery Bonus</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Amount (₹)</label>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Daily Sale Date</label>
                 <input
-                  type="number"
+                  type="date"
                   required
-                  value={formData.amount || ''}
-                  onChange={e => handleInputChange('amount', e.target.value)}
-                  placeholder="e.g. 15000"
-                  className="form-input"
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="form-group">
-                <label>Month</label>
-                <DatePicker
-                  selected={formData.month ? new Date(formData.month + '-01') : null}
-                  onChange={(date: Date | null) => {
-                    if (date) {
-                      const year = date.getFullYear();
-                      const month = String(date.getMonth() + 1).padStart(2, '0');
-                      const monthStr = `${year}-${month}`;
-                      handleInputChange('month', monthStr);
-                    } else {
-                      handleInputChange('month', '');
+                  value={formData.date || new Date().toISOString().split('T')[0]}
+                  onChange={e => {
+                    const val = e.target.value;
+                    handleInputChange('date', val);
+                    if (val) {
+                      handleInputChange('month', val.slice(0, 7));
                     }
                   }}
-                  dateFormat="MMM yyyy"
-                  showMonthYearPicker
-                  placeholderText="Select month"
                   className="form-input"
                 />
               </div>
               <div className="form-group">
-                <label>Status</label>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Status</label>
                 <select
                   value={formData.status || 'pending'}
                   onChange={e => handleInputChange('status', e.target.value)}
@@ -1823,8 +1813,8 @@ export default function GlobalModals() {
               </div>
             </div>
 
-            <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#10B981' }}>
-              <strong>✓ Real-time Update:</strong> Once saved, this incentive will be immediately reflected in the system and available for employees to view.
+            <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#10B981' }}>
+              <strong>✓ Real-time Update:</strong> Once saved, this incentive will be immediately distributed across workforce categories in real-time.
             </div>
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>

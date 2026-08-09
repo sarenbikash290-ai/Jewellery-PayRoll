@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useApp } from './AppContext';
 import { Search, Filter, Plus, Download, Mail, Phone, MapPin, ChevronDown, Users, UserCheck, UserX, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
+import { calculateMonthlySalaryProgress } from '@/utils/payrollCalc';
+
 const deptColors: Record<string, string> = {
   Sales: '#10B981', Housekeeping: '#F59E0B', Helper: '#06B6D4'
 };
@@ -20,7 +22,7 @@ export default function Employees() {
   const [sortField, setSortField] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selected, setSelected] = useState<string | null>(null);
-  const { employees, openModal } = useApp();
+  const { employees, openModal, attendanceRecords, holidays, overtimeRate } = useApp();
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -66,7 +68,8 @@ export default function Employees() {
     { key: 'dept', label: 'Department' },
     { key: 'role', label: 'Role' },
     { key: 'location', label: 'Location' },
-    { key: 'salary', label: 'Salary' },
+    { key: 'salary', label: 'Basic Salary' },
+    { key: 'progress', label: 'Monthly Salary Progress' },
     { key: 'joined', label: 'Joined' },
     { key: 'status', label: 'Status' },
   ];
@@ -268,6 +271,20 @@ export default function Employees() {
                     <td style={{ padding: '16px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>{emp.role}</td>
                     <td style={{ padding: '16px 20px', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={12} />{emp.location}</td>
                     <td style={{ padding: '16px 20px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{emp.salary}</td>
+                    {(() => {
+                      const prog = calculateMonthlySalaryProgress(emp, new Date(), attendanceRecords, holidays, overtimeRate);
+                      return (
+                        <td style={{ padding: '16px 20px', minWidth: '170px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
+                            <span>Day {prog.elapsedWorkingDays}/{prog.payableWorkingDays}</span>
+                            <span style={{ color: 'var(--brand)' }}>₹{prog.earnedSalarySoFar.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div style={{ height: '7px', width: '100%', background: 'var(--bg-elevated)', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${prog.progressPercent}%`, background: 'linear-gradient(90deg, #4F8EF7, #10B981)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                          </div>
+                        </td>
+                      );
+                    })()}
                     <td style={{ padding: '16px 20px', fontSize: '12px', color: 'var(--text-muted)' }}>{emp.joined}</td>
                     <td style={{ padding: '16px 20px' }}>
                       <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: emp.status === 'active' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: emp.status === 'active' ? '#10B981' : '#EF4444' }}>

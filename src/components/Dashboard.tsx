@@ -11,6 +11,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 
+import { calculateMonthlySalaryProgress } from '@/utils/payrollCalc';
+
 // Dynamic dashboard metrics are computed inside the Dashboard component body
 
 const Card = ({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) => (
@@ -46,7 +48,9 @@ export default function Dashboard() {
     attendanceRecords,
     leaves,
     incentives,
-    commissions
+    commissions,
+    holidays,
+    overtimeRate
   } = useApp();
 
   const parseSalary = (s: string) => {
@@ -636,6 +640,49 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {/* Real-Time Monthly Salary Progress Tracker Card */}
+      <Card>
+        <CardHeader
+          title="Real-Time Monthly Salary Progress Tracker"
+          subtitle="Track daily accumulated earnings & elapsed payable working days (excl. Thursdays & holidays)"
+          action={
+            <button
+              onClick={() => setActiveModule('payroll')}
+              style={{ fontSize: '12px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: 'transparent', border: 'none' }}
+            >
+              View Payroll <ArrowUpRight size={12} />
+            </button>
+          }
+        />
+        <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          {employees.slice(0, 6).map(emp => {
+            const prog = calculateMonthlySalaryProgress(emp, new Date(), attendanceRecords, holidays, overtimeRate);
+            return (
+              <div key={emp.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{emp.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{emp.role}</div>
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '100px', background: 'rgba(79,142,247,0.1)', color: 'var(--brand)' }}>
+                    Day {prog.elapsedWorkingDays}/{prog.payableWorkingDays}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Earned So Far:</span>
+                  <span style={{ color: '#10B981' }}>₹{prog.earnedSalarySoFar.toLocaleString('en-IN')}</span>
+                </div>
+
+                <div style={{ height: '8px', width: '100%', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${prog.progressPercent}%`, background: 'linear-gradient(90deg, #4F8EF7, #10B981)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* Charts Row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '16px' }}>

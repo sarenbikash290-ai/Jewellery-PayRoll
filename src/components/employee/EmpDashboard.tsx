@@ -274,10 +274,10 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
 
   // Overall performance tier rating
   const performanceTier = useMemo(() => {
-    if (salesStats.pct >= 90 && attendanceStats.rate >= 95) return { label: 'Elite Performer', color: '#10B981', desc: 'Outstanding sales and exemplary attendance!' };
-    if (salesStats.pct >= 70 && attendanceStats.rate >= 85) return { label: 'On Track', color: '#4F8EF7', desc: 'Performing solid and hitting targets.' };
-    return { label: 'Needs Improvement', color: '#EF4444', desc: 'Failing to meet sales target or attendance guidelines.' };
-  }, [salesStats.pct, attendanceStats.rate]);
+    if (attendanceStats.rate >= 95) return { label: 'Elite Performer', color: '#10B981', desc: 'Outstanding work performance and exemplary attendance!' };
+    if (attendanceStats.rate >= 85) return { label: 'On Track', color: '#4F8EF7', desc: 'Performing solid and maintaining good attendance.' };
+    return { label: 'Needs Improvement', color: '#EF4444', desc: 'Please ensure on-time attendance and compliance with store guidelines.' };
+  }, [attendanceStats.rate]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px' }}>
@@ -384,27 +384,6 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
           </div>
         )}
 
-        {/* Amber Alert: Sales performance warning */}
-        {salesStats.pct < 50 && (
-          <div className="glass-card" style={{
-            borderColor: 'rgba(139, 92, 246, 0.25)',
-            background: 'rgba(139, 92, 246, 0.04)',
-            padding: '16px 20px',
-            borderRadius: '16px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '14px'
-          }}>
-            <TrendingUp size={20} color="#8B5CF6" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#8B5CF6' }}>Sales Target Alert</div>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.45 }}>
-                Your sales total for {currentMonthName} is **₹{salesStats.sales.toLocaleString('en-IN')}**, which is only <strong style={{ color: '#8B5CF6' }}>{salesStats.pct}%</strong> of your monthly target (₹{salesStats.target.toLocaleString('en-IN')}). 
-                Boost sales to unlock commissions and performance bonuses.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Info Badges Row */}
@@ -531,16 +510,6 @@ export default function EmpDashboard({ employee, onNavigate }: EmpDashboardProps
             </div>
           </div>
 
-          {/* Sales progress bar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 600 }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Target Progress</span>
-              <span style={{ color: 'var(--text-primary)' }}>{salesStats.pct}% Achieved (₹{salesStats.sales.toLocaleString('en-IN')} / ₹{salesStats.target.toLocaleString('en-IN')})</span>
-            </div>
-            <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${salesStats.pct}%`, height: '100%', background: 'linear-gradient(90deg, #4F8EF7, #8B5CF6)', borderRadius: '4px', transition: 'width 0.4s' }} />
-            </div>
-          </div>
 
           {/* Recent sales list */}
           <div style={{ marginTop: '10px' }}>

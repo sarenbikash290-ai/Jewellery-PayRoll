@@ -6,10 +6,13 @@ import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRig
 import type { AttendanceAuditLog } from './AppContext';
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-  present: { bg: 'rgba(16,185,129,0.12)', text: '#10B981', label: 'Present' },
+  present: { bg: 'rgba(16,185,129,0.12)', text: '#10B981', label: 'Full Day' },
   late: { bg: 'rgba(245,158,11,0.12)', text: '#F59E0B', label: 'Late' },
   absent: { bg: 'rgba(239,68,68,0.12)', text: '#EF4444', label: 'Absent' },
   wfh: { bg: 'rgba(99,179,237,0.12)', text: '#06B6D4', label: 'WFH' },
+  half_day: { bg: 'rgba(217,119,6,0.15)', text: '#D97706', label: 'Half Day' },
+  overtime: { bg: 'rgba(139,92,246,0.15)', text: '#8B5CF6', label: 'Holiday OT' },
+  weekend: { bg: 'rgba(100,116,139,0.12)', text: '#64748B', label: 'Weekly Off' },
 };
 const leaveColors: Record<string, string> = {
   PL: '#4F8EF7', SL: '#EF4444', CL: '#F59E0B', WFH: '#06B6D4'
@@ -195,7 +198,7 @@ export default function Attendance() {
     step: 'form' | 'confirm';
   } | null>(null);
 
-  const [editStatus, setEditStatus] = useState<'present' | 'late' | 'absent' | 'wfh'>('present');
+  const [editStatus, setEditStatus] = useState<'present' | 'late' | 'half_day' | 'overtime' | 'absent' | 'wfh'>('present');
   const [editCheckIn, setEditCheckIn] = useState('');
   const [editCheckOut, setEditCheckOut] = useState('');
   const [editReason, setEditReason] = useState('');
@@ -337,11 +340,11 @@ export default function Attendance() {
       if (dow === 4) return { id: emp.id, name: emp.name, dept: emp.dept, status: 'weekend' as const };
       return { id: emp.id, name: emp.name, dept: emp.dept, status: 'absent' as const };
     });
-    const presentCount = statuses.filter(s => s.status === 'present').length;
+    const presentCount = statuses.filter(s => s.status === 'present' || s.status === 'overtime').length;
     const lateCount = statuses.filter(s => s.status === 'late').length;
     const absentCount = statuses.filter(s => s.status === 'absent').length;
     const wfhCount = statuses.filter(s => s.status === 'wfh').length;
-    const isWeekend = statuses.every(s => s.status === 'weekend');
+    const isWeekend = false;
     return { statuses, presentCount, lateCount, absentCount, wfhCount, isWeekend };
   }, [selectedDay, calMonth, calYear, employees, attendanceRecords, leaves, currentDate]);
 
@@ -966,72 +969,71 @@ export default function Attendance() {
                 </button>
               </div>
 
-              {selectedDaySummary.isWeekend ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <Calendar size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>Thursday — Weekly Off</div>
-                  <div style={{ fontSize: '11px', marginTop: '4px' }}>No attendance recorded</div>
-                </div>
-              ) : (
-                <>
-                  {/* Quick Stats */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                    {[
-                      { label: 'Present', value: selectedDaySummary.presentCount, color: '#10B981' },
-                      { label: 'Late', value: selectedDaySummary.lateCount, color: '#F59E0B' },
-                      { label: 'Absent', value: selectedDaySummary.absentCount, color: '#EF4444' },
-                      { label: 'WFH', value: selectedDaySummary.wfhCount, color: '#06B6D4' },
-                    ].map(s => (
-                      <div key={s.label} style={{
-                        padding: '8px 10px', borderRadius: '8px',
-                        background: `${s.color}12`, border: `1px solid ${s.color}25`,
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ fontSize: '16px', fontWeight: 800, color: s.color }}>{s.value}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{s.label}</div>
+              {(() => {
+                const dayOfWeek = new Date(calYear, calMonth, selectedDay).getDay();
+                const isThursday = dayOfWeek === 4;
+                return (
+                  <>
+                    {isThursday && (
+                      <div style={{ padding: '10px 16px', background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.2)', fontSize: '11px', color: '#6D28D9', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={13} /> <span><strong>Thursday Shop Weekly Off</strong> — Working on Thursday is calculated as Extra Day Overtime.</span>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                    {/* Quick Stats */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                      {[
+                        { label: 'Present', value: selectedDaySummary.presentCount, color: '#10B981' },
+                        { label: 'Late', value: selectedDaySummary.lateCount, color: '#F59E0B' },
+                        { label: 'Absent', value: selectedDaySummary.absentCount, color: '#EF4444' },
+                        { label: 'WFH', value: selectedDaySummary.wfhCount, color: '#06B6D4' },
+                      ].map(s => (
+                        <div key={s.label} style={{
+                          padding: '8px 10px', borderRadius: '8px',
+                          background: `${s.color}12`, border: `1px solid ${s.color}25`,
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: s.color }}>{s.value}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
 
-                  {/* Employee List */}
-                  <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '8px 0' }}>
-                    {selectedDaySummary.statuses.map((emp, idx) => {
-                      const sc = statusColors[emp.status];
-                      const fullEmp = employees.find(e => e.id === emp.id);
-                      return (
-                        <div key={idx} style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '8px 16px', transition: 'background 0.1s', cursor: 'pointer'
-                        }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                          onClick={() => fullEmp && openModal('viewEmployee', fullEmp)}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{
-                              width: '26px', height: '26px', borderRadius: '6px',
-                              background: avatarColors[idx % avatarColors.length],
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '11px', fontWeight: 700, color: '#fff', flexShrink: 0
-                            }}>{emp.name.charAt(0)}</div>
-                            <div>
-                              <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</div>
-                              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{emp.dept}</div>
+                    {/* Employee List */}
+                    <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '8px 0' }}>
+                      {selectedDaySummary.statuses.map((emp, idx) => {
+                        const isEmpWorkedThu = isThursday && emp.status !== 'weekend' && emp.status !== 'absent';
+                        const sc = isEmpWorkedThu
+                          ? { bg: 'rgba(139,92,246,0.15)', text: '#8B5CF6', label: 'Worked Thursday OT' }
+                          : statusColors[emp.status];
+                        const fullEmp = employees.find(e => e.id === emp.id);
+                        return (
+                          <div key={idx} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 16px', transition: 'background 0.1s', cursor: 'pointer'
+                          }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            onClick={() => fullEmp && openModal('viewEmployee', fullEmp)}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '26px', height: '26px', borderRadius: '6px',
+                                background: avatarColors[idx % avatarColors.length],
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '11px', fontWeight: 700, color: '#fff', flexShrink: 0
+                              }}>{emp.name.charAt(0)}</div>
+                              <div>
+                                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{emp.dept}</div>
+                              </div>
                             </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {sc && (
-                              <span style={{
-                                fontSize: '10px', fontWeight: 700, padding: '2px 8px',
-                                borderRadius: '100px', background: sc.bg, color: sc.text
-                              }}>{sc.label}</span>
-                            )}
-                            {emp.status !== 'weekend' && emp.status !== 'absent' && new Date(calYear, calMonth, selectedDay).getDay() === 4 && (
-                              <span style={{
-                                fontSize: '10px', fontWeight: 700, padding: '2px 8px',
-                                borderRadius: '100px', background: 'rgba(139, 92, 246, 0.12)', color: '#8B5CF6'
-                              }}>Overtime</span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {sc && (
+                                <span style={{
+                                  fontSize: '10px', fontWeight: 700, padding: '2px 8px',
+                                  borderRadius: '100px', background: sc.bg, color: sc.text
+                                }}>{sc.label}</span>
+                              )}
                             {/* Edit Button for this employee+day */}
                             {(() => {
                               const selDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
@@ -1082,9 +1084,10 @@ export default function Attendance() {
                     })}
                   </div>
                 </>
-              )}
-            </Card>
-          )}
+              );
+            })()}
+          </Card>
+        )}
         </div>
       )}
 
@@ -1415,8 +1418,8 @@ export default function Attendance() {
                   {/* Status */}
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>ATTENDANCE STATUS</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                      {(['present', 'late', 'absent', 'wfh'] as const).map(s => (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {(['present', 'half_day', 'overtime', 'late', 'absent', 'wfh'] as const).map(s => (
                         <button key={s} onClick={() => setEditStatus(s)} style={{
                           padding: '10px 4px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
                           cursor: 'pointer', transition: 'all 0.15s',

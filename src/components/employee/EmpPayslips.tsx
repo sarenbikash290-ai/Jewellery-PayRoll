@@ -28,16 +28,7 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
 
   const salaryComponents = useMemo(() => {
     const salaryVal = parsedSalary(employee.salary);
-    const basic = Math.round(salaryVal * 0.6);
-    const hra = Math.round(basic * 0.4);
-    const allowances = Math.round(basic * 0.2);
-    const gross = basic + hra + allowances;
-    const pf = Math.round(basic * 0.12);
-    const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
-    const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
-    const net = gross - pf - esi - tds;
-
-    return { gross, deductions: pf + esi + tds, net };
+    return { gross: salaryVal, deductions: 0, net: salaryVal };
   }, [employee]);
 
   const parseJoinedDate = (joinedStr: string) => {

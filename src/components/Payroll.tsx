@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { useApp } from './AppContext';
 import { IndianRupee, Download, Play, CheckCircle, Clock, Users, FileText, AlertCircle } from 'lucide-react';
+import { calculateMonthlySalaryBreakdown, calculateMonthlySalaryProgress } from '@/utils/payrollCalc';
 
-// payrollEmployees will be constructed dynamically inside the component using useApp()
 const avatarColors = ['#4F8EF7', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#EF4444'];
 
 interface CardProps { children: React.ReactNode; style?: React.CSSProperties; }
@@ -15,95 +15,65 @@ export default function Payroll() {
   const [step, setStep] = useState(1);
   const [processing, setProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
-  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth, savePayslips } = useApp();
-  const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth, savePayslips, overtimeRate, holidays } = useApp();
 
-  const parsedSalary = (salStr: any) => {
-    if (!salStr || typeof salStr !== 'string') {
-      if (typeof salStr === 'number') return salStr;
-      return 50000;
-    }
-    const clean = salStr.replace(/[^\d]/g, '');
-    const val = parseInt(clean, 10);
-    return isNaN(val) ? 50000 : val;
-  };
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonthNum = now.getMonth() + 1;
+  const currentMonthCode = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+  const currentMonthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const payrollEmployees = employees.map(emp => {
-    const salaryVal = parsedSalary(emp.salary);
-    const basic = Math.round(salaryVal * 0.6);
-    const hra = Math.round(basic * 0.4);
-    const allowances = Math.round(basic * 0.2);
-    const gross = basic + hra + allowances;
-
-    // LOP Days & Deduction
-    const absentDays = attendanceRecords.filter(
-      r => r.employeeId === emp.id && r.status === 'absent' && (r.date.includes('-06-') || r.date.startsWith('2026-06'))
-    ).length;
-
-    const unpaidLeavesCount = leaves.filter(
-      l => l.employeeId === emp.id && 
-           l.status === 'approved' && 
-           (l.from.includes('-06-') || l.from.startsWith('2026-06')) &&
-           (l.type as string === 'unpaid' || l.type as string === 'LOP' || l.reason.toLowerCase().includes('unpaid') || l.reason.toLowerCase().includes('lop'))
-    ).length;
-
-    const totalAbsentOrLopDays = absentDays + unpaidLeavesCount;
-    const lopDeduction = Math.round((salaryVal / 30) * totalAbsentOrLopDays);
-
-    // Incentives & Commissions
-    const empIncentives = incentives.filter(
-      inc => inc.employeeId === emp.id && 
-             (inc.status === 'approved' || inc.status === 'paid') && 
-             (inc.month.includes('Jun') || inc.month.includes('June'))
-    );
-    
-    const empCommissions = commissions.filter(
-      com => (com.leadName.toLowerCase() === emp.name.toLowerCase() || com.leadId === emp.id || com.leadId.replace('LEAD', 'EMP') === emp.id) && 
-             (com.status === 'approved' || com.status === 'paid') && 
-             (com.month.includes('Jun') || com.month.includes('June'))
+    const breakdown = calculateMonthlySalaryBreakdown(
+      emp,
+      currentMonthCode,
+      attendanceRecords,
+      leaves,
+      incentives,
+      commissions,
+      advancePayments,
+      overtimeRate,
+      holidays
     );
 
-    const totalIncentives = empIncentives.reduce((sum, inc) => sum + inc.amount, 0) + empCommissions.reduce((sum, com) => sum + com.amount, 0);
-
-    // Advance Deductions
-    const empAdvances = advancePayments.filter(
-      adv => adv.employeeId === emp.id && 
-             adv.status === 'pending' &&
-             (adv.deductMonth === '2026-06' || adv.deductMonth === '2025-06')
+    const progress = calculateMonthlySalaryProgress(
+      emp,
+      now,
+      attendanceRecords,
+      holidays,
+      overtimeRate
     );
-    const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
-
-    const pf = Math.round(basic * 0.12);
-    const esi = gross < 75000 ? Math.round(gross * 0.0075) : 0;
-    const tds = gross > 75000 ? Math.round(gross * 0.1) : Math.round(gross * 0.05);
-    const net = gross - pf - esi - tds - lopDeduction - advanceDeduction + totalIncentives;
 
     return {
       id: emp.id,
       name: emp.name,
       dept: emp.dept,
-      basic,
-      hra,
-      allowances,
-      gross,
-      incentives: totalIncentives,
-      pf,
-      esi,
-      tds,
-      lopDeduction,
-      advanceDeduction,
-      net
+      role: emp.role,
+      basic: breakdown.basic,
+      gross: breakdown.gross,
+      incentives: breakdown.incentives,
+      lopDeduction: breakdown.lopDeduction,
+      advanceDeduction: breakdown.advanceDeduction,
+      net: breakdown.netPay,
+      overtimeHours: breakdown.overtimeHours,
+      overtimeAmount: breakdown.overtimeAmount,
+      overtimeRemarks: breakdown.overtimeRemarks,
+      payableWorkingDays: breakdown.payableWorkingDays,
+      dailyRate: Math.round(breakdown.dailyRate),
+      paidFullDays: breakdown.paidFullDays,
+      paidHalfDays: breakdown.paidHalfDays,
+      absentDays: breakdown.absentDays,
+      thursdaysOff: breakdown.thursdaysOff,
+      holidaysOff: breakdown.holidaysOff,
+      progress
     };
   });
 
   const totalGross = payrollEmployees.reduce((s, e) => s + e.gross, 0);
   const totalIncentives = payrollEmployees.reduce((s, e) => s + e.incentives, 0);
-  const totalPF    = payrollEmployees.reduce((s, e) => s + e.pf, 0);
-  const totalESI   = payrollEmployees.reduce((s, e) => s + e.esi, 0);
-  const totalTDS   = payrollEmployees.reduce((s, e) => s + e.tds, 0);
-  const totalLOP   = payrollEmployees.reduce((s, e) => s + e.lopDeduction, 0);
+  const totalLOP = payrollEmployees.reduce((s, e) => s + e.lopDeduction, 0);
   const totalAdvance = payrollEmployees.reduce((s, e) => s + e.advanceDeduction, 0);
-  const totalNet   = payrollEmployees.reduce((s, e) => s + e.net, 0);
+  const totalNet = payrollEmployees.reduce((s, e) => s + e.net, 0);
 
   const fmt = (n: number) => `₹ ${n.toLocaleString('en-IN')}`;
 
@@ -116,36 +86,32 @@ export default function Payroll() {
     const monthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     const result = await lockPayrollMonth(currentYear, currentMonthNum, `${monthLabel} payroll run finalized`);
-    
+
     if (result.ok) {
       const payslipRecords = payrollEmployees.map(pe => ({
         slip_id: `PSL-${monthCode}-${pe.id}`,
         employee_id: pe.id,
         employee_name: pe.name,
         department: pe.dept,
-        role: pe.dept === 'Sales' ? 'Senior Sales Executive' : pe.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff',
+        role: pe.role || (pe.dept === 'Sales' ? 'Gold-01' : pe.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff'),
         month: monthCode,
         month_label: monthLabel,
         basic_salary: pe.basic,
-        hra: pe.hra,
-        allowances: pe.allowances,
         gross_salary: pe.gross,
         incentives: pe.incentives,
-        pf_deduction: pe.pf,
-        esi_deduction: pe.esi,
-        tds_deduction: pe.tds,
-        pt_deduction: 200,
+        overtime_amount: pe.overtimeAmount,
+        overtime_remarks: pe.overtimeRemarks,
         lop_deduction: pe.lopDeduction,
         advance_deduction: pe.advanceDeduction,
-        total_deductions: pe.pf + pe.esi + pe.tds + 200 + pe.lopDeduction + pe.advanceDeduction,
+        total_deductions: pe.lopDeduction + pe.advanceDeduction,
         net_pay: pe.net,
         status: 'processed'
       }));
 
       await savePayslips(payslipRecords);
       setProcessing(false);
-      setProcessed(true); 
-      setStep(3); 
+      setProcessed(true);
+      setStep(3);
     } else {
       setProcessing(false);
       toast('error', 'Payroll Run Failed', result.error || 'Could not finalize payroll month.');
@@ -153,30 +119,22 @@ export default function Payroll() {
   };
 
   const downloadPayrollCSV = () => {
-    // CSV headers
     const headers = [
       'Employee ID',
       'Name',
       'Department',
       'Basic Salary (INR)',
-      'HRA (INR)',
-      'Allowances (INR)',
-      'Gross Salary (INR)',
+      'Gross Earnings (INR)',
       'Incentives & Commissions (INR)',
+      'Overtime Payment (INR)',
       'LOP Deduction (INR)',
       'Salary Advance Deduction (INR)',
-      'PF (INR)',
-      'ESI (INR)',
-      'TDS (INR)',
       'Net Payable (INR)',
       'Bank Name',
       'Bank Account Number',
-      'IFSC Code',
-      'PAN Number',
-      'PF Number'
+      'IFSC Code'
     ];
 
-    // CSV rows
     const rows = payrollEmployees.map(pe => {
       const empDetails = employees.find(e => e.id === pe.id);
       return [
@@ -184,21 +142,15 @@ export default function Payroll() {
         pe.name,
         pe.dept,
         pe.basic,
-        pe.hra,
-        pe.allowances,
         pe.gross,
         pe.incentives,
+        pe.overtimeAmount,
         pe.lopDeduction,
         pe.advanceDeduction,
-        pe.pf,
-        pe.esi,
-        pe.tds,
         pe.net,
         empDetails?.bank_name || 'N/A',
         empDetails?.bank_account_no ? `"${empDetails.bank_account_no}"` : 'N/A',
-        empDetails?.ifsc_code || 'N/A',
-        empDetails?.pan_no || 'N/A',
-        empDetails?.pf_no || 'N/A'
+        empDetails?.ifsc_code || 'N/A'
       ];
     });
 
@@ -214,60 +166,40 @@ export default function Payroll() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `HRPulse_Payroll_Summary_June_2025.csv`);
+    link.setAttribute('download', `HRPulse_Payroll_Summary_${currentMonthLabel.replace(/\s+/g, '_')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    toast('success', 'Export Complete', 'Payroll summary CSV sheet downloaded successfully.');
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Payroll Management</h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{currentMonthLabel} · Processing cycle</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+            Payroll Processing
+          </h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Manage monthly salary calculation, attendance deductions & payslips for {currentMonthLabel}
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button 
-            onClick={() => openModal('exportData')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={downloadPayrollCSV}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)' }}
           >
-            <Download size={15} /> Export
+            <Download size={14} /> Export Payroll CSV
           </button>
         </div>
       </div>
 
-      {/* Summary Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
-        {[
-          { label: 'Gross Payroll',   value: fmt(totalGross), sub: `${employees.length} employees`, color: '#4F8EF7', icon: IndianRupee },
-          { label: 'Net Payable',     value: fmt(totalNet),   sub: 'After deductions', color: '#10B981', icon: CheckCircle },
-          { label: 'PF Deduction',    value: fmt(totalPF),    sub: 'Employer + Employee', color: '#F59E0B', icon: Users },
-          { label: 'TDS Deduction',   value: fmt(totalTDS),   sub: 'Income tax withheld', color: '#8B5CF6', icon: FileText },
-        ].map((s, i) => {
-          const Icon = s.icon;
-          return (
-            <Card key={i} style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ width: '38px', height: '38px', background: `${s.color}18`, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon size={17} color={s.color} />
-                </div>
-              </div>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>{s.value}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{s.label}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{s.sub}</div>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Run Payroll Wizard */}
+      {/* Process Wizard Header */}
       <Card>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '15px', fontWeight: 600 }}>Run Payroll — {currentMonthLabel}</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>Monthly Payroll Run — {currentMonthLabel}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>3-step process: Review → Approve → Process</div>
         </div>
 
@@ -329,7 +261,7 @@ export default function Payroll() {
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Payroll Processed! 🎉</div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>{currentMonthLabel} payroll of <strong style={{ color: '#10B981' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> has been processed. Payslips are now available for employees to view and download.</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                <button 
+                <button
                   onClick={downloadPayrollCSV}
                   style={{ padding: '10px 20px', background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
@@ -346,7 +278,7 @@ export default function Payroll() {
       <Card>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '14px', fontWeight: 600 }}>Salary Breakup — {currentMonthLabel}</span>
-          <button 
+          <button
             onClick={async () => {
               const now = new Date();
               const currentYear = now.getFullYear();
@@ -362,17 +294,11 @@ export default function Payroll() {
                 month: monthCode,
                 month_label: currentMonthLabel,
                 basic_salary: pe.basic,
-                hra: pe.hra,
-                allowances: pe.allowances,
                 gross_salary: pe.gross,
                 incentives: pe.incentives,
-                pf_deduction: pe.pf,
-                esi_deduction: pe.esi,
-                tds_deduction: pe.tds,
-                pt_deduction: 200,
                 lop_deduction: pe.lopDeduction,
                 advance_deduction: pe.advanceDeduction,
-                total_deductions: pe.pf + pe.esi + pe.tds + 200 + pe.lopDeduction + pe.advanceDeduction,
+                total_deductions: pe.lopDeduction + pe.advanceDeduction,
                 net_pay: pe.net,
                 status: 'processed'
               }));
@@ -390,7 +316,7 @@ export default function Payroll() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                {['Employee', 'Basic', 'HRA', 'Allowances', 'Gross', 'Incentives', 'PF', 'ESI', 'TDS', 'LOP', 'Advance', 'Net Pay', ''].map(h => (
+                {['Employee', 'Salary Progress', 'Basic Salary', 'Gross Earnings', 'Overtime', 'Incentives', 'LOP Deduction', 'Advance Deduction', 'Net Payable', ''].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: h === '' ? 'center' : 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -411,24 +337,36 @@ export default function Payroll() {
                       </div>
                     </div>
                   </td>
-                  {[emp.basic, emp.hra, emp.allowances].map((val, j) => (
-                    <td key={j} style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{val.toLocaleString('en-IN')}</td>
-                  ))}
+                  <td style={{ padding: '14px 16px', minWidth: '150px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
+                      <span>Day {emp.progress.elapsedWorkingDays}/{emp.progress.payableWorkingDays}</span>
+                      <span style={{ color: 'var(--brand)' }}>₹{emp.progress.earnedSalarySoFar.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div style={{ height: '6px', width: '100%', background: 'var(--bg-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${emp.progress.progressPercent}%`, background: 'linear-gradient(90deg, #4F8EF7, #10B981)', borderRadius: '3px', transition: 'width 0.4s ease' }} />
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{emp.basic.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{emp.gross.toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '12px', color: '#8B5CF6', whiteSpace: 'nowrap' }}>
+                    {emp.overtimeAmount > 0 ? (
+                      <div>
+                        <div style={{ fontWeight: 600 }}>+{emp.overtimeAmount.toLocaleString('en-IN')}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{emp.overtimeHours} hrs</div>
+                      </div>
+                    ) : '—'}
+                  </td>
                   <td style={{ padding: '14px 16px', fontSize: '12px', color: '#10B981', whiteSpace: 'nowrap' }}>+{emp.incentives.toLocaleString('en-IN')}</td>
-                  {[emp.pf, emp.esi, emp.tds].map((val, j) => (
-                    <td key={j} style={{ padding: '14px 16px', fontSize: '12px', color: '#EF4444', whiteSpace: 'nowrap' }}>-{val.toLocaleString('en-IN')}</td>
-                  ))}
                   <td style={{ padding: '14px 16px', fontSize: '12px', color: '#EF4444', whiteSpace: 'nowrap' }}>-{emp.lopDeduction.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '14px 16px', fontSize: '12px', color: '#EF4444', whiteSpace: 'nowrap' }}>-{emp.advanceDeduction.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: '#10B981', whiteSpace: 'nowrap' }}>{emp.net.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                    <button 
-                      onClick={() => openModal('viewPayslip', { 
-                        id: emp.id, 
-                        name: emp.name, 
-                        dept: emp.dept, 
-                        role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff' 
+                    <button
+                      onClick={() => openModal('viewPayslip', {
+                        id: emp.id,
+                        name: emp.name,
+                        dept: emp.dept,
+                        role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff'
                       })}
                       style={{ fontSize: '11px', color: 'var(--brand)', background: 'rgba(79,142,247,0.1)', padding: '5px 12px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', border: 'none' }}
                     >
@@ -441,12 +379,11 @@ export default function Payroll() {
             <tfoot>
               <tr style={{ background: 'rgba(79,142,247,0.05)', borderTop: '2px solid var(--border)' }}>
                 <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>TOTAL</td>
-                <td colSpan={3}></td>
+                <td colSpan={1}></td>
+                <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{payrollEmployees.reduce((s, e) => s + e.basic, 0).toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 700, color: 'var(--brand)', whiteSpace: 'nowrap' }}>{totalGross.toLocaleString('en-IN')}</td>
+                <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#8B5CF6', whiteSpace: 'nowrap' }}>{payrollEmployees.reduce((s, e) => s + e.overtimeAmount, 0).toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#10B981', whiteSpace: 'nowrap' }}>{totalIncentives.toLocaleString('en-IN')}</td>
-                <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalPF.toLocaleString('en-IN')}</td>
-                <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalESI.toLocaleString('en-IN')}</td>
-                <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalTDS.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalLOP.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>{totalAdvance.toLocaleString('en-IN')}</td>
                 <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: 800, color: '#10B981', whiteSpace: 'nowrap' }}>{totalNet.toLocaleString('en-IN')}</td>

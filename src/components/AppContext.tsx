@@ -75,7 +75,16 @@ export interface AttendanceRecord {
   date: string; // YYYY-MM-DD
   checkIn: string | null;
   checkOut: string | null;
-  status: 'present' | 'late' | 'absent' | 'wfh';
+  status: 'present' | 'late' | 'absent' | 'wfh' | 'half_day' | 'overtime';
+  overtimeHours?: number;
+  overtimeReason?: string;
+  overtimeRate?: number;
+}
+
+export interface PublicHoliday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
 }
 
 export interface AttendanceAuditLog {
@@ -124,20 +133,24 @@ export interface SavedPayslip {
   month: string;
   month_label: string;
   basic_salary: number;
-  hra: number;
-  allowances: number;
   gross_salary: number;
   incentives: number;
-  pf_deduction: number;
-  esi_deduction: number;
-  tds_deduction: number;
-  pt_deduction: number;
   lop_deduction: number;
   advance_deduction: number;
   total_deductions: number;
   net_pay: number;
   status: string;
   created_at?: string;
+  payable_working_days?: number;
+  paid_full_days?: number;
+  half_days?: number;
+  absent_days?: number;
+  thursdays_off?: number;
+  holidays_off?: number;
+  overtime_hours?: number;
+  overtime_amount?: number;
+  overtime_remarks?: string;
+  daily_rate?: number;
 }
 
 // ---- UI Helper Types ----
@@ -253,12 +266,20 @@ interface AppCtx {
   updateAuthorizedWifiIp: (ip: string) => Promise<void>;
   monthlySalesTarget: number;
   updateMonthlySalesTarget: (target: number) => Promise<void>;
-  logManualAttendance: (employeeId: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh') => Promise<void>;
+  logManualAttendance: (employeeId: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh' | 'half_day' | 'overtime', overtimeHours?: number, overtimeReason?: string) => Promise<void>;
   // Attendance correction with audit trail
-  editAttendance: (employeeId: string, employeeName: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh', reason?: string) => Promise<{ ok: boolean; error?: string; lockReason?: string }>;
+  editAttendance: (employeeId: string, employeeName: string, date: string, checkIn: string | null, checkOut: string | null, status: 'present' | 'late' | 'absent' | 'wfh' | 'half_day' | 'overtime', reason?: string, overtimeHours?: number) => Promise<{ ok: boolean; error?: string; lockReason?: string }>;
   auditLogs: AttendanceAuditLog[];
   fetchAuditLogs: () => Promise<void>;
   clearAuditLogs: () => Promise<void>;
+  // Overtime & Holidays Configuration
+  overtimeRate: number;
+  updateOvertimeRate: (rate: number) => void;
+  categoryIncentivePcts: Record<string, number>;
+  updateCategoryIncentivePcts: (newPcts: Record<string, number>) => void;
+  holidays: PublicHoliday[];
+  addHoliday: (date: string, name: string) => void;
+  deleteHoliday: (id: string) => void;
   // Payroll month locking
   payrollLocks: PayrollMonthLock[];
   lockPayrollMonth: (year: number, month: number, notes?: string) => Promise<{ ok: boolean; error?: string }>;
@@ -529,10 +550,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [payrollLocks, setPayrollLocks] = useState<PayrollMonthLock[]>([]);
   const [payslips, setPayslips] = useState<SavedPayslip[]>([]);
 
+  const [overtimeRate, setOvertimeRate] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('hrpulse_overtime_rate');
+      return stored ? Number(stored) : 150;
+    }
+    return 150;
+  });
+
+  const updateOvertimeRate = useCallback((rate: number) => {
+    setOvertimeRate(rate);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hrpulse_overtime_rate', String(rate));
+    }
+    toast('success', 'Overtime Rate Updated', `New overtime rate set to ₹${rate}/hour.`);
+  }, [toast]);
+
+  const [holidays, setHolidays] = useState<PublicHoliday[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('hrpulse_holidays');
+      if (stored) return JSON.parse(stored);
+    }
+    return [
+      { id: 'hol-1', date: '2026-01-26', name: 'Republic Day' },
+      { id: 'hol-2', date: '2026-08-15', name: 'Independence Day' },
+      { id: 'hol-3', date: '2026-10-02', name: 'Gandhi Jayanti' },
+      { id: 'hol-4', date: '2026-11-08', name: 'Diwali' },
+    ];
+  });
+
+  const addHoliday = useCallback((date: string, name: string) => {
+    setHolidays(prev => {
+      const updated = [...prev.filter(h => h.date !== date), { id: `hol-${Date.now()}`, date, name }];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hrpulse_holidays', JSON.stringify(updated));
+      }
+      return updated;
+    });
+    toast('success', 'Holiday Added', `${name} (${date}) added to public holiday calendar.`);
+  }, [toast]);
+
+  const deleteHoliday = useCallback((id: string) => {
+    setHolidays(prev => {
+      const updated = prev.filter(h => h.id !== id && h.date !== id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hrpulse_holidays', JSON.stringify(updated));
+      }
+      return updated;
+    });
+    toast('warning', 'Holiday Removed', 'Holiday entry deleted from calendar.');
+  }, [toast]);
 
   const [authorizedWifiIp, setAuthorizedWifiIp] = useState('127.0.0.1');
   const [clientIp, setClientIp] = useState('127.0.0.1');
   const [monthlySalesTarget, setMonthlySalesTarget] = useState(500000);
+
+  const [categoryIncentivePcts, setCategoryIncentivePcts] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('hrpulse_category_incentive_pcts');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {
+      'Gold-01': 20,
+      'Gold-02': 10,
+      'Silver-01': 5,
+      'Silver-02': 5,
+      'Housekeeping': 2,
+      'Housekeeping Staff': 2,
+      'Helper Staff': 0
+    };
+  });
+
+  const updateCategoryIncentivePcts = useCallback((newPcts: Record<string, number>) => {
+    setCategoryIncentivePcts(prev => {
+      const updated = { ...prev, ...newPcts };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hrpulse_category_incentive_pcts', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
 
   const knownLeaveIds = useRef<Set<string>>(new Set());
   const isInitialLeavesLoad = useRef(true);
@@ -918,7 +1017,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     date: string, 
     checkIn: string | null, 
     checkOut: string | null, 
-    status: 'present' | 'late' | 'absent' | 'wfh'
+    status: 'present' | 'late' | 'absent' | 'wfh' | 'half_day' | 'overtime',
+    overtimeHours?: number,
+    overtimeReason?: string
   ) => {
     try {
       const res = await fetch('/api/attendance', {
@@ -930,7 +1031,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           date,
           checkIn,
           checkOut,
-          status
+          status,
+          overtimeHours,
+          overtimeReason
         })
       });
       const data = await res.json();
@@ -980,8 +1083,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     date: string,
     checkIn: string | null,
     checkOut: string | null,
-    status: 'present' | 'late' | 'absent' | 'wfh',
-    reason?: string
+    status: 'present' | 'late' | 'absent' | 'wfh' | 'half_day' | 'overtime',
+    reason?: string,
+    overtimeHours?: number
   ): Promise<{ ok: boolean; error?: string; lockReason?: string }> => {
     try {
       const res = await fetch('/api/attendance', {
@@ -996,6 +1100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           checkOut,
           status,
           reason,
+          overtimeHours
         })
       });
       const data = await res.json();
@@ -1217,6 +1322,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         auditLogs,
         fetchAuditLogs,
         clearAuditLogs,
+        overtimeRate,
+        updateOvertimeRate,
+        categoryIncentivePcts,
+        updateCategoryIncentivePcts,
+        holidays,
+        addHoliday,
+        deleteHoliday,
         payrollLocks,
         lockPayrollMonth,
         unlockPayrollMonth,
