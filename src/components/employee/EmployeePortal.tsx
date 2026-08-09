@@ -42,7 +42,7 @@ export default function EmployeePortal({ empSession, onLogout }: EmployeePortalP
 
   // Find full employee details
   const employee = useMemo(() => {
-    return employees.find(e => e.id === empSession.empId) || {
+    return employees.find(e => e.id.toUpperCase() === empSession.empId.toUpperCase()) || {
       id: empSession.empId,
       name: empSession.name,
       dept: 'Sales',

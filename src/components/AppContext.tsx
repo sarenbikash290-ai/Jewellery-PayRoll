@@ -61,7 +61,7 @@ export interface LeaveApplication {
   id: string;
   employeeId: string;
   employeeName: string;
-  type: 'PL' | 'SL' | 'CL' | 'WFH';
+  type?: string;
   from: string; // YYYY-MM-DD
   to: string; // YYYY-MM-DD
   reason: string;
@@ -243,7 +243,7 @@ interface AppCtx {
   employeeSales: Sale[];
   addSale: (sale: Omit<Sale, 'id'>) => void;
   leaves: LeaveApplication[];
-  applyLeave: (leave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => void;
+  applyLeave: (leave: { employeeId: string; from: string; to: string; reason: string; type?: string }) => void;
   updateLeave: (id: string, status: 'approved' | 'rejected') => void;
   attendanceRecords: AttendanceRecord[];
   markAttendance: (employeeId: string, type: 'checkIn' | 'checkOut') => Promise<void>;
@@ -773,7 +773,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [fetchLeaves, fetchAttendance, fetchEmployees, fetchIncentives, fetchCommissions, fetchSales, fetchAuditLogs, fetchPayrollLocks, fetchAdvancePayments, fetchPayslips]);
 
-  const applyLeave = useCallback(async (newLeave: Omit<LeaveApplication, 'id' | 'employeeName' | 'status' | 'appliedOn'>) => {
+  const applyLeave = useCallback(async (newLeave: { employeeId: string; from: string; to: string; reason: string; type?: string }) => {
     const emp = employees.find(e => e.id === newLeave.employeeId);
     const employeeName = emp ? emp.name : 'Unknown Employee';
 

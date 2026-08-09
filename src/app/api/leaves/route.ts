@@ -20,7 +20,6 @@ function mapLeaveToClient(l: any) {
     id: l.id,
     employeeId: l.employee_id,
     employeeName: l.employee_name,
-    type: l.type,
     from: l.from_date,
     to: l.to_date,
     reason: l.reason,
@@ -76,7 +75,7 @@ export async function POST(request: Request) {
 
     const { employeeId, employeeName, type, from, to, reason } = body;
 
-    if (!employeeId || !type || !from || !to || !reason) {
+    if (!employeeId || !from || !to || !reason) {
       return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });
     }
 
@@ -108,7 +107,6 @@ export async function POST(request: Request) {
         id: nextId,
         employee_id: upperEmpId,
         employee_name: employeeName || 'Unknown Employee',
-        type,
         from_date: from,
         to_date: to,
         reason,

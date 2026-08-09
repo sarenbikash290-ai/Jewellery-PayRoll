@@ -3,15 +3,26 @@ import { supabase } from '@/utils/supabase';
 import { cookies } from 'next/headers';
 
 // Authentication helper
-async function isAdmin() {
+async function getSession() {
   const cookieStore = await cookies();
-  const session = cookieStore.get('hrpulse_admin_session');
-  return session && session.value === 'granted';
+  const adminSession = cookieStore.get('hrpulse_admin_session');
+  if (adminSession && adminSession.value === 'granted') return { role: 'admin' };
+  
+  const empSession = cookieStore.get('hrpulse_emp_session');
+  if (empSession && empSession.value) return { role: 'employee', employeeId: empSession.value };
+  
+  return null;
+}
+
+async function isAdmin() {
+  const session = await getSession();
+  return session?.role === 'admin';
 }
 
 // 1. GET: Fetch all employees
 export async function GET() {
-  if (!await isAdmin()) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 403 });
   }
 

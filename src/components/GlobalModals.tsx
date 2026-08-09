@@ -1005,16 +1005,6 @@ export default function GlobalModals() {
           size="md"
         >
           <form onSubmit={handleSaveLeave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="form-group">
-              <label>Leave Type</label>
-              <select className="form-input">
-                <option value="PL">Privilege Leave (PL)</option>
-                <option value="SL">Sick Leave (SL)</option>
-                <option value="CL">Casual Leave (CL)</option>
-                <option value="WFH">Work From Home (WFH)</option>
-              </select>
-            </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>From Date</label>

@@ -690,14 +690,13 @@ export default function Attendance() {
                   {renderSortHeader('Check Out', 'checkOut', todaySortField, todaySortOrder, handleTodaySort)}
                   {renderSortHeader('Hours', 'hours', todaySortField, todaySortOrder, handleTodaySort)}
                   {renderSortHeader('Marking Source', 'source', todaySortField, todaySortOrder, handleTodaySort)}
-                  {renderSortHeader('Leave Type', 'leave', todaySortField, todaySortOrder, handleTodaySort)}
                   {renderSortHeader('Status', 'status', todaySortField, todaySortOrder, handleTodaySort)}
                 </tr>
               </thead>
               <tbody>
                 {processedAttendanceData.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                       No matching records found.
                     </td>
                   </tr>
@@ -737,11 +736,6 @@ export default function Attendance() {
                               <SrcIcon size={12} />
                               {emp.source}
                             </span>
-                          ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                        </td>
-                        <td style={{ padding: '14px 20px' }}>
-                          {emp.leave ? (
-                            <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: `${leaveColors[emp.leave]}18`, color: leaveColors[emp.leave] }}>{emp.leave}</span>
                           ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                         </td>
                         <td style={{ padding: '14px 20px' }}>
@@ -1113,17 +1107,6 @@ export default function Attendance() {
               />
             </div>
             <select
-              value={leaveTypeFilter}
-              onChange={e => setLeaveTypeFilter(e.target.value)}
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
-            >
-              <option value="all">All Leave Types</option>
-              <option value="CL">Casual Leave (CL)</option>
-              <option value="SL">Sick Leave (SL)</option>
-              <option value="EL">Earned Leave (EL)</option>
-              <option value="WFH">Work From Home (WFH)</option>
-            </select>
-            <select
               value={leaveStatusFilter}
               onChange={e => setLeaveStatusFilter(e.target.value)}
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 16px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
@@ -1139,7 +1122,6 @@ export default function Attendance() {
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
                   {renderSortHeader('Employee', 'employeeName', leaveSortField, leaveSortOrder, handleLeaveSort)}
-                  {renderSortHeader('Leave Type', 'type', leaveSortField, leaveSortOrder, handleLeaveSort)}
                   {renderSortHeader('From Date', 'from', leaveSortField, leaveSortOrder, handleLeaveSort)}
                   {renderSortHeader('To Date', 'to', leaveSortField, leaveSortOrder, handleLeaveSort)}
                   {renderSortHeader('Reason', 'reason', leaveSortField, leaveSortOrder, handleLeaveSort)}
@@ -1151,7 +1133,7 @@ export default function Attendance() {
               <tbody>
                 {processedLeaves.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                       {leaves.length === 0 ? 'No leave applications submitted yet.' : 'No matching leave requests found.'}
                     </td>
                   </tr>
@@ -1182,15 +1164,10 @@ export default function Attendance() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '14px 20px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: 'rgba(79,142,247,0.12)', color: 'var(--brand)' }}>
-                            {leave.type}
-                          </span>
-                        </td>
                         <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{leave.from}</td>
                         <td style={{ padding: '14px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{leave.to}</td>
                         <td
-                          onClick={() => setSelectedReasonModal({ open: true, title: `${leave.employeeName}'s Leave Reason`, reason: leave.reason, applicant: leave.employeeName, dates: `${leave.from} to ${leave.to}`, type: leave.type })}
+                          onClick={() => setSelectedReasonModal({ open: true, title: `${leave.employeeName}'s Leave Reason`, reason: leave.reason, applicant: leave.employeeName, dates: `${leave.from} to ${leave.to}` })}
                           style={{ padding: '14px 20px', fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '240px', cursor: 'pointer' }}
                           title="Click to view full reason"
                         >

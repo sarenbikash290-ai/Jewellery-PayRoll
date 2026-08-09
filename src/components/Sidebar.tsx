@@ -51,7 +51,7 @@ export default function Sidebar({ active, onNavigate, open, onLogout }: SidebarP
     }}>
       {/* Logo */}
       <div style={{
-        padding: open ? '24px 20px' : '24px 16px',
+        padding: open ? '20px 18px' : '20px 14px',
         borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
@@ -70,7 +70,7 @@ export default function Sidebar({ active, onNavigate, open, onLogout }: SidebarP
           overflow: 'hidden',
           padding: '2px',
         }}>
-          <img src="/logo.png" alt="Shri Sai Jewellers" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <img src="/logo.png" alt="Shri Sai Jewellers Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div style={fadeStyle(open)}>
           <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>HRPulse</div>

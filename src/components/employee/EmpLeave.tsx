@@ -15,7 +15,6 @@ const Card = ({ children, style = {} }: CardProps) => (
 export default function EmpLeave({ employee }: EmpLeaveProps) {
   const { leaves, applyLeave, toast } = useApp();
 
-  const [type, setType] = useState<'PL' | 'SL' | 'CL' | 'WFH'>('PL');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [reason, setReason] = useState('');
@@ -38,7 +37,7 @@ export default function EmpLeave({ employee }: EmpLeaveProps) {
 
 
 
-  const [viewReasonModal, setViewReasonModal] = useState<{ open: boolean; reason: string; dates: string; type: string } | null>(null);
+  const [viewReasonModal, setViewReasonModal] = useState<{ open: boolean; reason: string; dates: string } | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +56,6 @@ export default function EmpLeave({ employee }: EmpLeaveProps) {
     setTimeout(() => {
       applyLeave({
         employeeId: employee.id,
-        type,
         from,
         to,
         reason: reason.trim(),
@@ -107,20 +105,6 @@ export default function EmpLeave({ employee }: EmpLeaveProps) {
           </h3>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>LEAVE TYPE</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as any)}
-                className="input-glass"
-                style={inputStyle}
-              >
-                <option value="PL">Annual Leave (PL)</option>
-                <option value="SL">Sick Leave (SL)</option>
-                <option value="CL">Casual Leave (CL)</option>
-                <option value="WFH">Work From Home (WFH)</option>
-              </select>
-            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -233,15 +217,15 @@ export default function EmpLeave({ employee }: EmpLeaveProps) {
                     alignItems: 'center',
                     gap: '12px'
                   }}>
-                    {/* Circle Leave Type Block */}
+                    {/* Icon Block */}
                     <div style={{
                       width: '32px', height: '32px', borderRadius: '50%',
                       background: 'rgba(79, 142, 247, 0.08)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '11px', fontWeight: 800, color: 'var(--brand)',
+                      color: 'var(--brand)',
                       flexShrink: 0
                     }}>
-                      {leave.type}
+                      <Calendar size={15} />
                     </div>
 
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -249,7 +233,7 @@ export default function EmpLeave({ employee }: EmpLeaveProps) {
                         {fDate} - {tDate}
                       </div>
                       <div
-                        onClick={() => setViewReasonModal({ open: true, reason: leave.reason, dates: `${fDate} - ${tDate}`, type: leave.type })}
+                        onClick={() => setViewReasonModal({ open: true, reason: leave.reason, dates: `${fDate} - ${tDate}` })}
                         style={{ fontSize: '11.5px', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '2px', cursor: 'pointer' }}
                         title="Click to view full reason"
                       >
@@ -314,7 +298,7 @@ export default function EmpLeave({ employee }: EmpLeaveProps) {
             <div style={{ padding: '18px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FileText size={18} color="#D97706" />
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>Leave Explanation ({viewReasonModal.type})</h3>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>Leave Explanation</h3>
               </div>
               <button onClick={() => setViewReasonModal(null)} style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(15,23,42,0.08)', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={15} />

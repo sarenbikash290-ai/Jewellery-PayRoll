@@ -206,7 +206,7 @@ export default function Header({ activeModule, onToggleSidebar, onLogout }: Head
         id:    `leave-${l.id}`,
         type:  'warning',
         title: 'Leave Request Pending',
-        text:  `${l.employeeName} applied for ${l.type} leave (${l.from} → ${l.to}): "${l.reason}"`,
+        text:  `${l.employeeName} applied for leave (${l.from} → ${l.to}): "${l.reason}"`,
         ts,
         module: 'attendance',
         subTab: 'leaves',

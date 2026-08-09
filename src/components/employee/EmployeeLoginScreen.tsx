@@ -345,7 +345,7 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
             {screen === 'success'
               ? 'Loading your dashboard...'
               : screen === 'otp'
-                ? `OTP sent to +91 ${maskPhone(phone)} ${maskedEmail ? `& email ${maskedEmail}` : ''}`
+                ? `OTP sent to ${maskedEmail ? `email ${maskedEmail}` : ''}`
                 : screen === 'changePin'
                   ? 'Your account is using the default PIN. Please set a new 4-digit PIN.'
                   : 'Enter your Phone Number and 4-digit PIN to sign in'}
@@ -591,7 +591,8 @@ export default function EmployeeLoginScreen({ onSuccess }: EmployeeLoginScreenPr
       </div>
 
       {/* Embedded CSS Animations for Login */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
