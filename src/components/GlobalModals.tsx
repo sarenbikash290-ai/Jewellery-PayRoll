@@ -691,6 +691,18 @@ export default function GlobalModals() {
 
     case 'viewEmployee': {
       const emp = (modal.data as Record<string, string>) || defaultEmployee;
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonthNum = now.getMonth() + 1;
+      const currentMonthStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+      const currentMonthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+
+      const empAttendanceThisMonth = attendanceRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(currentMonthStr));
+      const presentCount = empAttendanceThisMonth.filter(r => r.status === 'present' || r.status === 'overtime').length;
+      const lateCount = empAttendanceThisMonth.filter(r => r.status === 'late').length;
+      const absentCount = empAttendanceThisMonth.filter(r => r.status === 'absent').length;
+      const leaveCount = leaves.filter(l => l.employeeId === emp.id && l.status === 'approved' && (l.from.startsWith(currentMonthStr) || l.to.startsWith(currentMonthStr))).length;
+
       return (
         <Modal
           title="Employee Profile Card"
@@ -748,14 +760,14 @@ export default function GlobalModals() {
             {/* Quick history section */}
             <div style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px' }}>
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                June Attendance Summary
+                {currentMonthLabel} ATTENDANCE SUMMARY
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', textAlign: 'center' }}>
                 {[
-                  { label: 'Present', val: '18 Days', color: '#10B981' },
-                  { label: 'On Leave', val: '1 Day', color: '#4F8EF7' },
-                  { label: 'Absent', val: '0 Days', color: '#EF4444' },
-                  { label: 'Late In', val: '2 Days', color: '#F59E0B' },
+                  { label: 'Present', val: `${presentCount} Days`, color: '#10B981' },
+                  { label: 'On Leave', val: `${leaveCount} Days`, color: '#4F8EF7' },
+                  { label: 'Absent', val: `${absentCount} Days`, color: '#EF4444' },
+                  { label: 'Late In', val: `${lateCount} Days`, color: '#F59E0B' },
                 ].map((s, i) => (
                   <div key={i}>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: s.color }}>{s.val}</div>
