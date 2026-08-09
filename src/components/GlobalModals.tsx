@@ -1678,7 +1678,7 @@ export default function GlobalModals() {
             const totalSale = parseFloat(totalSaleInput || '5000') || 5000;
             const selectedDate = formData.date || new Date().toISOString().split('T')[0];
             const targetMonth = formData.month || selectedDate.slice(0, 7);
-            const statusVal = (formData.status as 'paid' | 'pending' | 'approved') || 'pending';
+            const statusVal = (formData.status as 'paid' | 'pending' | 'approved') || 'approved';
 
             if (isEdit) {
               const matchedEmp = employees.find(e => e.name === formData.employeeName);

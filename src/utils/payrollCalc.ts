@@ -227,13 +227,34 @@ export function calculateMonthlySalaryBreakdown(
   // Gross Earnings = Basic Salary Earned + Incentives + Overtime Payment
   const gross = earnedBasic + totalIncentives + overtimeAmount;
 
-  // Advance Deductions
+  // Advance Deductions: Supports multi-month installment recovery (e.g. ₹1,000/month for a ₹5,000 advance)
+  let advanceDeduction = 0;
   const empAdvances = advancePayments.filter(
-    adv => adv.employeeId === emp.id && 
-           adv.status === 'pending' &&
-           (adv.deductMonth === monthCode)
+    adv => adv.employeeId === emp.id && adv.status !== 'deducted'
   );
-  const advanceDeduction = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
+
+  for (const adv of empAdvances) {
+    if (adv.customSchedule && typeof adv.customSchedule === 'object' && adv.customSchedule[monthCode] !== undefined) {
+      advanceDeduction += Number(adv.customSchedule[monthCode]) || 0;
+    } else {
+      const instAmt = adv.monthlyDeduction && adv.monthlyDeduction > 0 ? adv.monthlyDeduction : adv.amount;
+      const startYear = parseInt(adv.deductMonth.split('-')[0], 10);
+      const startMonth = parseInt(adv.deductMonth.split('-')[1], 10);
+      const curYear = parseInt(monthCode.split('-')[0], 10);
+      const curMonth = parseInt(monthCode.split('-')[1], 10);
+
+      const monthsElapsed = (curYear - startYear) * 12 + (curMonth - startMonth);
+
+      if (monthsElapsed >= 0) {
+        const priorDeductions = Math.min(adv.amount, monthsElapsed * instAmt);
+        const remainingBalance = adv.amount - priorDeductions;
+        if (remainingBalance > 0) {
+          const monthDeduct = Math.min(remainingBalance, instAmt);
+          advanceDeduction += monthDeduct;
+        }
+      }
+    }
+  }
 
   // Total Deductions = Loss of Pay (LOP) + Salary Advance
   const totalDeductions = lopDeduction + advanceDeduction;

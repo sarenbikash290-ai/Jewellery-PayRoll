@@ -35,22 +35,75 @@ function AddAdvanceModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({
     employeeId: '',
     amount: '',
+    monthlyDeduction: '',
     givenOn: today,
     deductMonth: currentMonth,
     reason: '',
   });
+  const [deductionType, setDeductionType] = useState<'fixed' | 'custom'>('fixed');
+  const [customRows, setCustomRows] = useState<{ month: string; amount: string }[]>([
+    { month: currentMonth, amount: '1000' }
+  ]);
   const [loading, setLoading] = useState(false);
 
   const activeEmployees = employees.filter(e => e.status === 'active');
+
+  // Auto-generate initial custom schedule rows when amount or start month changes
+  const handleAmountOrMonthChange = (newAmt: string, newStartMonth: string) => {
+    const amt = parseFloat(newAmt) || 0;
+    if (amt <= 0) return;
+
+    // Helper to add months to a YYYY-MM string
+    const addMonths = (ym: string, count: number) => {
+      const [y, m] = ym.split('-').map(Number);
+      const d = new Date(y, m - 1 + count, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    const startM = newStartMonth || currentMonth;
+    // Default suggestion: ₹1,000 for month 1, ₹2,000 for month 2, remaining for month 3
+    if (amt === 5000) {
+      setCustomRows([
+        { month: startM, amount: '1000' },
+        { month: addMonths(startM, 1), amount: '2000' },
+        { month: addMonths(startM, 2), amount: '2000' },
+      ]);
+    } else {
+      const row1 = Math.min(1000, amt);
+      const rem = amt - row1;
+      const rows = [{ month: startM, amount: String(row1) }];
+      if (rem > 0) {
+        rows.push({ month: addMonths(startM, 1), amount: String(rem) });
+      }
+      setCustomRows(rows);
+    }
+  };
+
+  const totalCustomScheduled = customRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.employeeId || !form.amount || Number(form.amount) <= 0) return;
 
+    const totalAmt = Number(form.amount);
+    const monthlyAmt = form.monthlyDeduction ? Number(form.monthlyDeduction) : 1000;
+
+    let scheduleMap: Record<string, number> | undefined = undefined;
+    if (deductionType === 'custom') {
+      scheduleMap = {};
+      customRows.forEach(r => {
+        if (r.month && r.amount) {
+          scheduleMap![r.month] = Number(r.amount);
+        }
+      });
+    }
+
     setLoading(true);
     await addAdvancePayment({
       employeeId: form.employeeId,
-      amount: Number(form.amount),
+      amount: totalAmt,
+      monthlyDeduction: monthlyAmt,
+      customSchedule: scheduleMap,
       givenOn: form.givenOn,
       deductMonth: form.deductMonth,
       reason: form.reason,
@@ -74,22 +127,22 @@ function AddAdvanceModal({ onClose }: { onClose: () => void }) {
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: '520px',
+          width: '100%', maxWidth: '560px', maxHeight: '90vh',
           background: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)', boxShadow: '0 24px 64px rgba(0,0,0,0.3)',
-          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
         {/* Header */}
         <div style={{
           padding: '20px 24px', borderBottom: '1px solid var(--border)',
           background: 'linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0,
         }}>
           <div>
             <div style={{ fontSize: '17px', fontWeight: 700, color: '#fff' }}>Record Advance Payment</div>
             <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-              Advance will be auto-deducted in payslip for selected month
+              Customizable monthly deduction options per employee
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', padding: '6px', display: 'flex' }}>
@@ -98,7 +151,7 @@ function AddAdvanceModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
           {/* Employee Select */}
           <div>
             <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
@@ -127,26 +180,6 @@ function AddAdvanceModal({ onClose }: { onClose: () => void }) {
             )}
           </div>
 
-          {/* Amount */}
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
-              Advance Amount (₹) *
-            </label>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 700 }}>₹</span>
-              <input
-                type="number"
-                required
-                min={1}
-                value={form.amount}
-                onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
-                placeholder="e.g. 5000"
-                className="form-input"
-                style={{ paddingLeft: '28px', fontSize: '13px' }}
-              />
-            </div>
-          </div>
-
           {/* Date Given + Deduct Month */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
@@ -164,18 +197,186 @@ function AddAdvanceModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
-                Deduct From Month *
+                Starting Deduct Month *
               </label>
               <input
                 type="month"
                 required
                 value={form.deductMonth}
-                onChange={e => setForm(p => ({ ...p, deductMonth: e.target.value }))}
+                onChange={e => {
+                  const m = e.target.value;
+                  setForm(p => ({ ...p, deductMonth: m }));
+                  handleAmountOrMonthChange(form.amount, m);
+                }}
                 className="form-input"
                 style={{ fontSize: '13px' }}
               />
             </div>
           </div>
+
+          {/* Total Advance Amount */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+              Total Advance Amount (₹) *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 700 }}>₹</span>
+              <input
+                type="number"
+                required
+                min={1}
+                value={form.amount}
+                onChange={e => {
+                  const amt = e.target.value;
+                  setForm(p => ({
+                    ...p,
+                    amount: amt,
+                    monthlyDeduction: p.monthlyDeduction || (parseFloat(amt) >= 1000 ? '1000' : amt)
+                  }));
+                  handleAmountOrMonthChange(amt, form.deductMonth);
+                }}
+                placeholder="e.g. 5000"
+                className="form-input"
+                style={{ paddingLeft: '28px', fontSize: '13px' }}
+              />
+            </div>
+          </div>
+
+          {/* Deduction Mode Toggle */}
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+              Deduction Plan Options *
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+              <button
+                type="button"
+                onClick={() => setDeductionType('fixed')}
+                style={{
+                  padding: '8px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 700,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                  background: deductionType === 'fixed' ? 'var(--brand)' : 'transparent',
+                  color: deductionType === 'fixed' ? '#fff' : 'var(--text-secondary)',
+                }}
+              >
+                Fixed Monthly Cut
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeductionType('custom');
+                  if (form.amount) handleAmountOrMonthChange(form.amount, form.deductMonth);
+                }}
+                style={{
+                  padding: '8px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 700,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                  background: deductionType === 'custom' ? '#8B5CF6' : 'transparent',
+                  color: deductionType === 'custom' ? '#fff' : 'var(--text-secondary)',
+                }}
+              >
+                Custom Per-Month Schedule ✨
+              </button>
+            </div>
+          </div>
+
+          {/* Fixed Mode Input */}
+          {deductionType === 'fixed' && (
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+                Equal Monthly Cut (₹/Month) *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 700 }}>₹</span>
+                <input
+                  type="number"
+                  required={deductionType === 'fixed'}
+                  min={1}
+                  value={form.monthlyDeduction}
+                  onChange={e => setForm(p => ({ ...p, monthlyDeduction: e.target.value }))}
+                  placeholder="e.g. 1000"
+                  className="form-input"
+                  style={{ paddingLeft: '28px', fontSize: '13px' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Custom Mode Grid */}
+          {deductionType === 'custom' && (
+            <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '12px', padding: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#8B5CF6' }}>
+                  🗓️ Custom Month-by-Month Deduction Schedule
+                </div>
+                <div style={{
+                  fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '100px',
+                  background: totalCustomScheduled === Number(form.amount) ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                  color: totalCustomScheduled === Number(form.amount) ? '#10B981' : '#EF4444',
+                }}>
+                  {totalCustomScheduled === Number(form.amount) ? '✓ 100% Allocated' : `Allocated: ₹${fmt(totalCustomScheduled)} / ₹${fmt(Number(form.amount))}`}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                {customRows.map((row, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 32px', gap: '10px', alignItems: 'center' }}>
+                    <input
+                      type="month"
+                      value={row.month}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setCustomRows(prev => prev.map((r, i) => i === idx ? { ...r, month: val } : r));
+                      }}
+                      className="form-input"
+                      style={{ fontSize: '12.5px', padding: '6px 10px' }}
+                    />
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700 }}>₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={row.amount}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCustomRows(prev => prev.map((r, i) => i === idx ? { ...r, amount: val } : r));
+                        }}
+                        placeholder="Cut amount"
+                        className="form-input"
+                        style={{ paddingLeft: '24px', fontSize: '12.5px', paddingRight: '8px' }}
+                      />
+                    </div>
+                    {customRows.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setCustomRows(prev => prev.filter((_, i) => i !== idx))}
+                        style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: '6px', color: '#EF4444', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : <div />}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const lastMonth = customRows[customRows.length - 1]?.month || currentMonth;
+                  const [y, m] = lastMonth.split('-').map(Number);
+                  const nextD = new Date(y, m, 1);
+                  const nextM = `${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}`;
+                  const rem = Math.max(0, Number(form.amount) - totalCustomScheduled);
+                  setCustomRows(prev => [...prev, { month: nextM, amount: rem > 0 ? String(rem) : '1000' }]);
+                }}
+                style={{
+                  width: '100%', padding: '7px', background: 'rgba(139,92,246,0.12)', border: '1px dashed rgba(139,92,246,0.4)',
+                  borderRadius: '6px', color: '#8B5CF6', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
+              >
+                <Plus size={14} /> Add Month Deduction Row
+              </button>
+            </div>
+          )}
 
           {/* Reason */}
           <div>
@@ -194,23 +395,43 @@ function AddAdvanceModal({ onClose }: { onClose: () => void }) {
 
           {/* Live Preview */}
           {form.employeeId && form.amount && Number(form.amount) > 0 && (
-            <div style={{ background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '12px' }}>
-              <div style={{ fontWeight: 700, color: '#4F8EF7', marginBottom: '8px' }}>💳 Payslip Preview</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Advance deduction in payslip</span>
-                <span style={{ fontWeight: 700, color: '#EF4444' }}>−₹{fmt(Number(form.amount))}</span>
-              </div>
+            <div style={{ background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ fontWeight: 700, color: '#4F8EF7' }}>💳 Payslip Deduction Plan Preview</div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Will appear in</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {form.deductMonth ? new Date(form.deductMonth + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : '—'}
-                </span>
+                <span style={{ color: 'var(--text-muted)' }}>Total Advance Taken</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>₹{fmt(Number(form.amount))}</span>
               </div>
+              {deductionType === 'custom' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', borderTop: '1px solid rgba(79,142,247,0.2)', paddingTop: '6px' }}>
+                  <div style={{ fontWeight: 700, color: '#8B5CF6', fontSize: '11.5px' }}>Custom Monthly Schedule:</div>
+                  {customRows.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        {r.month ? new Date(r.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : '—'}
+                      </span>
+                      <span style={{ fontWeight: 700, color: '#EF4444' }}>−₹{fmt(Number(r.amount || 0))}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Monthly Payslip Deduction</span>
+                    <span style={{ fontWeight: 700, color: '#EF4444' }}>−₹{fmt(Number(form.monthlyDeduction || form.amount))}/month</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Recovery Period</span>
+                    <span style={{ fontWeight: 700, color: '#10B981' }}>
+                      {Math.ceil(Number(form.amount) / Math.max(1, Number(form.monthlyDeduction || form.amount)))} Month(s)
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
           {/* Buttons */}
-          <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexShrink: 0 }}>
             <button type="button" onClick={onClose} style={{
               flex: 1, padding: '11px', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
               borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
@@ -398,10 +619,12 @@ export default function AdvancePaymentPage() {
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{adv.empRole} · {adv.empDept}</div>
                   </div>
 
-                  {/* Amount */}
-                  <div style={{ flex: '1', minWidth: '100px' }}>
+                  {/* Amount & Monthly Cut */}
+                  <div style={{ flex: '1', minWidth: '120px' }}>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#EF4444' }}>₹{fmt(adv.amount)}</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>Advance</div>
+                    <div style={{ fontSize: '10px', color: '#10B981', marginTop: '2px', fontWeight: 700 }}>
+                      ₹{fmt(adv.monthlyDeduction || adv.amount)}/mo cut
+                    </div>
                   </div>
 
                   {/* Dates */}

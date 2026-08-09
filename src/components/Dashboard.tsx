@@ -269,7 +269,7 @@ export default function Dashboard() {
             points.push({ v: Number(sampleVal.toFixed(1)) });
           }
         } else if (type === 'pending') {
-          points.push({ v: i === 0 ? totalPending : 0 });
+          points.push({ v: i === 0 ? pendingLeaves : 0 });
         }
       } else {
         // Monthly view: 6 historical samples (5-day intervals)
@@ -299,7 +299,7 @@ export default function Dashboard() {
             }
           }
         } else if (type === 'pending') {
-          points.push({ v: i === 0 ? totalPending : 0 });
+          points.push({ v: i === 0 ? pendingLeaves : 0 });
         }
       }
     }
@@ -346,11 +346,11 @@ export default function Dashboard() {
     },
     {
       id: 'pending',
-      title: 'Pending Approvals',
-      value: totalPending.toString(),
-      change: `${pendingLeaves} leaves, ${pendingIncentives + pendingCommissions} finance`,
-      changeType: totalPending > 0 ? ('down' as const) : ('neutral' as const),
-      icon: AlertCircle,
+      title: 'Pending Leave Requests',
+      value: pendingLeaves.toString(),
+      change: pendingLeaves > 0 ? `${pendingLeaves} leave(s) awaiting approval` : '0 pending leave requests',
+      changeType: pendingLeaves > 0 ? ('down' as const) : ('neutral' as const),
+      icon: Clock,
       color: '#EF4444',
       bg: 'rgba(239,68,68,0.1)',
       sparkline: generateSparkline('pending'),

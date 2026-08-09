@@ -116,6 +116,8 @@ export interface AdvancePayment {
   id: string;
   employeeId: string;
   amount: number;
+  monthlyDeduction?: number;
+  customSchedule?: Record<string, number>; // e.g. { "2026-08": 1000, "2026-09": 2000 }
   givenOn: string;      // YYYY-MM-DD
   deductMonth: string;  // YYYY-MM e.g. "2026-06"
   reason: string;

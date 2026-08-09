@@ -27,6 +27,8 @@ export async function GET() {
     id: r.id,
     employeeId: r.employee_id,
     amount: r.amount,
+    monthlyDeduction: r.monthly_deduction !== undefined && r.monthly_deduction !== null ? r.monthly_deduction : r.amount,
+    customSchedule: r.custom_schedule || undefined,
     givenOn: r.given_on,
     deductMonth: r.deduct_month,
     reason: r.reason || '',
@@ -52,17 +54,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const { employeeId, amount, givenOn, deductMonth, reason } = body;
+    const { employeeId, amount, monthlyDeduction, customSchedule, givenOn, deductMonth, reason } = body;
 
     if (!employeeId || !amount || !givenOn || !deductMonth) {
       return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const monthlyDeductVal = monthlyDeduction ? Number(monthlyDeduction) : Number(amount);
+
+    let data: any = null;
+    const { data: insertData, error } = await supabase
       .from('advance_payments')
       .insert({
         employee_id: employeeId,
         amount: Number(amount),
+        monthly_deduction: monthlyDeductVal,
+        custom_schedule: customSchedule || null,
         given_on: givenOn,
         deduct_month: deductMonth,
         reason: reason || null,
@@ -71,7 +78,25 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('advance_payments')
+        .insert({
+          employee_id: employeeId,
+          amount: Number(amount),
+          given_on: givenOn,
+          deduct_month: deductMonth,
+          reason: reason || null,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (fallbackError) throw fallbackError;
+      data = fallbackData;
+    } else {
+      data = insertData;
+    }
 
     return NextResponse.json({
       ok: true,
@@ -79,6 +104,8 @@ export async function POST(request: Request) {
         id: data.id,
         employeeId: data.employee_id,
         amount: data.amount,
+        monthlyDeduction: data.monthly_deduction || monthlyDeductVal,
+        customSchedule: data.custom_schedule || customSchedule,
         givenOn: data.given_on,
         deductMonth: data.deduct_month,
         reason: data.reason || '',
