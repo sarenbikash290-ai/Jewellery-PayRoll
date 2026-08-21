@@ -5,7 +5,15 @@ import nodemailer from 'nodemailer';
 
 // In-memory OTP store for employee login validations
 // { token UUID -> { employeeId, otp, expiresAt } }
-const employeeOtpStore = new Map<string, { employeeId: string; otp: string; expiresAt: number }>();
+const globalForEmployeeOtp = globalThis as unknown as {
+  employeeOtpStore?: Map<string, { employeeId: string; otp: string; expiresAt: number }>;
+};
+
+const employeeOtpStore =
+  globalForEmployeeOtp.employeeOtpStore ||
+  new Map<string, { employeeId: string; otp: string; expiresAt: number }>();
+
+globalForEmployeeOtp.employeeOtpStore = employeeOtpStore;
 
 export async function POST(request: Request) {
   try {

@@ -24,7 +24,15 @@ function isRateLimited(ip: string): boolean {
 
 // ── In-memory OTP store (valid 10 minutes) ──────────────────────────────────
 // { token → { otp, expiresAt } }
-const otpStore = new Map<string, { otp: string; expiresAt: number }>();
+const globalForAdminOtp = globalThis as unknown as {
+  otpStore?: Map<string, { otp: string; expiresAt: number }>;
+};
+
+const otpStore =
+  globalForAdminOtp.otpStore ||
+  new Map<string, { otp: string; expiresAt: number }>();
+
+globalForAdminOtp.otpStore = otpStore;
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
