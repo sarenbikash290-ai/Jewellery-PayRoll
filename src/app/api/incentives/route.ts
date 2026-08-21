@@ -78,38 +78,65 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Missing required parameters' }, { status: 400 });
     }
 
-    // Determine the next Incentive ID INCxxx
-    const { data: allIncs, error: fetchErr } = await supabase
-      .from('incentives')
-      .select('id');
-    
-    if (fetchErr) throw fetchErr;
+    // Determine and insert with retry on primary key collision
+    let newInc = null;
+    let insertErr: any = null;
+    let attempts = 0;
 
-    const maxNum = (allIncs || []).reduce((max, i) => {
-      const num = parseInt(i.id.replace('INC', ''), 10);
-      return isNaN(num) ? max : Math.max(max, num);
-    }, 0);
-    const nextId = `INC${String(maxNum + 1).padStart(3, '0')}`;
+    while (attempts < 10) {
+      attempts++;
+      const { data: allIncs, error: fetchErr } = await supabase
+        .from('incentives')
+        .select('id');
+      
+      if (fetchErr) throw fetchErr;
 
-    const { data: newInc, error: insertErr } = await supabase
-      .from('incentives')
-      .insert({
-        id: nextId,
-        employee_id: employeeId.toUpperCase(),
-        employee_name: employeeName,
-        dept,
-        rule_type: ruleType,
-        amount,
-        target,
-        month,
-        status: status || 'pending'
-      })
-      .select()
-      .single();
+      const maxNum = (allIncs || []).reduce((max, i) => {
+        const num = parseInt(String(i.id).replace(/[^0-9]/g, ''), 10);
+        return isNaN(num) ? max : Math.max(max, num);
+      }, 0);
 
-    if (insertErr) {
+      const candidateId = `INC${String(maxNum + 1).padStart(3, '0')}`;
+
+      const res = await supabase
+        .from('incentives')
+        .insert({
+          id: candidateId,
+          employee_id: employeeId.toUpperCase(),
+          employee_name: employeeName,
+          dept,
+          rule_type: ruleType,
+          amount,
+          target,
+          month,
+          status: status || 'pending'
+        })
+        .select()
+        .single();
+
+      if (!res.error) {
+        newInc = res.data;
+        insertErr = null;
+        break;
+      }
+
+      insertErr = res.error;
+      const isDuplicate = 
+        res.error.code === '23505' || 
+        res.error.message?.includes('duplicate key') || 
+        res.error.message?.includes('unique constraint');
+
+      if (!isDuplicate) {
+        break;
+      }
+
+      // Small jitter delay before re-calculating next ID to prevent retry thundering herd
+      await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 50) + 10));
+    }
+
+    if (insertErr || !newInc) {
       console.error('Error inserting incentive:', insertErr);
-      return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: insertErr?.message || 'Failed to insert incentive' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, incentive: mapIncentiveToClient(newInc) });

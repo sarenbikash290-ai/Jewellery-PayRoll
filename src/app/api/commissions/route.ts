@@ -77,37 +77,63 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Missing required parameters' }, { status: 400 });
     }
 
-    // Determine the next Commission ID COMxxx
-    const { data: allComs, error: fetchErr } = await supabase
-      .from('commissions')
-      .select('id');
-    
-    if (fetchErr) throw fetchErr;
+    // Determine and insert with retry on primary key collision
+    let newCom = null;
+    let insertErr: any = null;
+    let attempts = 0;
 
-    const maxNum = (allComs || []).reduce((max, c) => {
-      const num = parseInt(c.id.replace('COM', ''), 10);
-      return isNaN(num) ? max : Math.max(max, num);
-    }, 0);
-    const nextId = `COM${String(maxNum + 1).padStart(3, '0')}`;
+    while (attempts < 10) {
+      attempts++;
+      const { data: allComs, error: fetchErr } = await supabase
+        .from('commissions')
+        .select('id');
+      
+      if (fetchErr) throw fetchErr;
 
-    const { data: newCom, error: insertErr } = await supabase
-      .from('commissions')
-      .insert({
-        id: nextId,
-        lead_id: leadId,
-        lead_name: leadName,
-        position,
-        amount,
-        performance,
-        month,
-        status: status || 'pending'
-      })
-      .select()
-      .single();
+      const maxNum = (allComs || []).reduce((max, c) => {
+        const num = parseInt(String(c.id).replace(/[^0-9]/g, ''), 10);
+        return isNaN(num) ? max : Math.max(max, num);
+      }, 0);
 
-    if (insertErr) {
+      const candidateId = `COM${String(maxNum + 1).padStart(3, '0')}`;
+
+      const res = await supabase
+        .from('commissions')
+        .insert({
+          id: candidateId,
+          lead_id: leadId,
+          lead_name: leadName,
+          position,
+          amount,
+          performance,
+          month,
+          status: status || 'pending'
+        })
+        .select()
+        .single();
+
+      if (!res.error) {
+        newCom = res.data;
+        insertErr = null;
+        break;
+      }
+
+      insertErr = res.error;
+      const isDuplicate = 
+        res.error.code === '23505' || 
+        res.error.message?.includes('duplicate key') || 
+        res.error.message?.includes('unique constraint');
+
+      if (!isDuplicate) {
+        break;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 50) + 10));
+    }
+
+    if (insertErr || !newCom) {
       console.error('Error inserting commission:', insertErr);
-      return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: insertErr?.message || 'Failed to insert commission' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, commission: mapCommissionToClient(newCom) });
