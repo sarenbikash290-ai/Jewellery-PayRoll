@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { supabase } from '@/utils/supabase';
 
 // ── Rate limiter (max 3 OTP sends per 10 minutes per IP) ────────────────────
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
@@ -75,7 +76,18 @@ export async function POST(request: Request) {
 
     const otp   = generateOTP();
     const token = crypto.randomUUID();
-    otpStore.set(token, { otp, expiresAt: Date.now() + 10 * 60 * 1000 }); // 10 min
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 min
+    otpStore.set(token, { otp, expiresAt });
+
+    // Persist to Supabase app_config for serverless environments (e.g. Vercel)
+    try {
+      await supabase.from('app_config').upsert({
+        key: `admin_otp_${token}`,
+        value: JSON.stringify({ otp, expiresAt })
+      });
+    } catch (err) {
+      console.error('Failed to persist admin OTP to Supabase app_config:', err);
+    }
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -137,13 +149,30 @@ export async function POST(request: Request) {
   // ── VERIFY OTP ────────────────────────────────────────────────────────────
   if (action === 'verify') {
     const { token, otp } = body as { token: string; otp: string };
-    const entry = otpStore.get(token);
+    let entry = otpStore.get(token);
+
+    if (!entry) {
+      // Fallback to Supabase app_config (for Vercel serverless functions)
+      try {
+        const { data: dbOtp } = await supabase
+          .from('app_config')
+          .select('value')
+          .eq('key', `admin_otp_${token}`)
+          .maybeSingle();
+        if (dbOtp?.value) {
+          entry = JSON.parse(dbOtp.value);
+        }
+      } catch (err) {
+        console.error('Failed to read admin OTP from Supabase app_config:', err);
+      }
+    }
 
     if (!entry) {
       return Response.json({ ok: false, error: 'OTP expired or invalid. Please request a new one.' }, { status: 400 });
     }
     if (Date.now() > entry.expiresAt) {
       otpStore.delete(token);
+      await supabase.from('app_config').delete().eq('key', `admin_otp_${token}`);
       return Response.json({ ok: false, error: 'OTP has expired. Please request a new one.' }, { status: 400 });
     }
     if (otp !== entry.otp) {
@@ -151,6 +180,7 @@ export async function POST(request: Request) {
     }
 
     otpStore.delete(token); // one-time use
+    await supabase.from('app_config').delete().eq('key', `admin_otp_${token}`);
     const expectedPassword = process.env.ADMIN_PASSWORD || 'Bikash@123';
     return Response.json({ ok: true, password: expectedPassword });
   }

@@ -81,13 +81,24 @@ export async function POST(request: Request) {
       // Generate OTP Code
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       const token = crypto.randomUUID();
+      const expiresAt = Date.now() + 10 * 60 * 1000;
 
       // Store in memory (expires in 10 minutes)
       employeeOtpStore.set(token, {
         employeeId: matchedEmp.id,
         otp: otpCode,
-        expiresAt: Date.now() + 10 * 60 * 1000
+        expiresAt
       });
+
+      // Persist to Supabase app_config for serverless environments (e.g. Vercel)
+      try {
+        await supabase.from('app_config').upsert({
+          key: `emp_otp_${token}`,
+          value: JSON.stringify({ employeeId: matchedEmp.id, otp: otpCode, expiresAt })
+        });
+      } catch (err) {
+        console.error('Failed to persist OTP to Supabase app_config:', err);
+      }
 
       // Attempt SMTP send
       const gmailUser = process.env.GMAIL_USER;
@@ -176,13 +187,30 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'Verification token and OTP are required' }, { status: 400 });
       }
 
-      const entry = employeeOtpStore.get(token);
+      let entry = employeeOtpStore.get(token);
+      if (!entry) {
+        // Fallback to Supabase app_config (for Vercel serverless functions)
+        try {
+          const { data: dbOtp } = await supabase
+            .from('app_config')
+            .select('value')
+            .eq('key', `emp_otp_${token}`)
+            .maybeSingle();
+          if (dbOtp?.value) {
+            entry = JSON.parse(dbOtp.value);
+          }
+        } catch (err) {
+          console.error('Failed to read OTP from Supabase app_config:', err);
+        }
+      }
+
       if (!entry) {
         return NextResponse.json({ ok: false, error: 'OTP session expired or invalid. Please try again.' }, { status: 400 });
       }
 
       if (Date.now() > entry.expiresAt) {
         employeeOtpStore.delete(token);
+        await supabase.from('app_config').delete().eq('key', `emp_otp_${token}`);
         return NextResponse.json({ ok: false, error: 'OTP has expired. Please request a new one.' }, { status: 400 });
       }
 
@@ -192,6 +220,7 @@ export async function POST(request: Request) {
 
       const employeeId = entry.employeeId;
       employeeOtpStore.delete(token);
+      await supabase.from('app_config').delete().eq('key', `emp_otp_${token}`);
 
       // Fetch employee details
       const { data: empDetails, error: empErr } = await supabase
