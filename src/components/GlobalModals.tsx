@@ -1673,7 +1673,7 @@ export default function GlobalModals() {
           subtitle={isEdit ? 'Update incentive details' : 'Enter daily sale amount to distribute incentive shares across job title categories'}
           size="md"
         >
-          <form onSubmit={(e) => {
+          <form onSubmit={async (e) => {
             e.preventDefault();
             const totalSale = parseFloat(totalSaleInput || '5000') || 5000;
             const selectedDate = formData.date || new Date().toISOString().split('T')[0];
@@ -1705,13 +1705,13 @@ export default function GlobalModals() {
               // Distribute incentive shares to all employees by Job Title & Housekeeping role
               let addedCount = 0;
 
-              employees.forEach(emp => {
+              for (const emp of employees) {
                 const empRole = emp.role || (emp.dept === 'Housekeeping' ? 'Housekeeping' : 'Gold-01');
                 const roleKey = empRole.includes('Housekeeping') ? 'Housekeeping' : empRole;
                 const pct = categoryIncentivePcts[roleKey] !== undefined ? categoryIncentivePcts[roleKey] : (roleKey === 'Housekeeping' ? 2 : 5);
                 const empAmt = Math.round((totalSale * pct) / 100);
 
-                addIncentive({
+                await addIncentive({
                   employeeId: emp.id,
                   employeeName: emp.name,
                   dept: emp.dept || 'Sales',
@@ -1724,7 +1724,7 @@ export default function GlobalModals() {
                   updatedAt: selectedDate,
                 });
                 addedCount++;
-              });
+              }
 
               toast('success', 'Daily Incentive Distributed', `₹${totalSale.toLocaleString('en-IN')} sale incentive distributed across ${addedCount} employees (Gold-01, Gold-02, Silver-01, Silver-02, Housekeeping)!`);
             }

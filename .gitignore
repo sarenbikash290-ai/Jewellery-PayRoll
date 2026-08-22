@@ -43,3 +43,9 @@ next-env.d.ts
 # ppt
 /pptx/*
 SAI_Jewellers_HR_Payroll.pptx
+
+# Supabase local/temp files
+supabase/.temp/
+
+# Local production schema dump
+production_schema.sql
