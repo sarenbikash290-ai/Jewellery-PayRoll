@@ -1667,10 +1667,37 @@ export default function GlobalModals() {
     case 'editIncentive': {
       const isEdit = modal.open === 'editIncentive';
 
+      const getCategoryKey = (role?: string, dept?: string): string => {
+        const r = (role || '').trim();
+        const d = (dept || '').trim();
+        if (r.includes('Housekeeping') || d === 'Housekeeping') return 'Housekeeping';
+        if (['Gold-01', 'Gold-02', 'Silver-01', 'Silver-02'].includes(r)) return r;
+        if (d === 'Sales') return 'Gold-01';
+        return r || 'Gold-01';
+      };
+
+      const categoriesList = ['Gold-01', 'Gold-02', 'Silver-01', 'Silver-02', 'Housekeeping'];
+
+      const categoryEmployeeCounts: Record<string, number> = {
+        'Gold-01': 0,
+        'Gold-02': 0,
+        'Silver-01': 0,
+        'Silver-02': 0,
+        'Housekeeping': 0,
+      };
+      employees.forEach(emp => {
+        const key = getCategoryKey(emp.role, emp.dept);
+        if (categoryEmployeeCounts[key] !== undefined) {
+          categoryEmployeeCounts[key]++;
+        } else {
+          categoryEmployeeCounts[key] = (categoryEmployeeCounts[key] || 0) + 1;
+        }
+      });
+
       return (
         <Modal
           title={isEdit ? 'Edit Incentive Record' : 'Add Shop Daily Sale Incentive'}
-          subtitle={isEdit ? 'Update incentive details' : 'Enter daily sale amount to distribute incentive shares across job title categories'}
+          subtitle={isEdit ? 'Update incentive details' : 'Enter daily sale amount to distribute category pool incentives equally among employees in each category'}
           size="md"
         >
           <form onSubmit={async (e) => {
@@ -1682,16 +1709,18 @@ export default function GlobalModals() {
 
             if (isEdit) {
               const matchedEmp = employees.find(e => e.name === formData.employeeName);
-              const empRole = matchedEmp?.role || 'Gold-01';
-              const roleKey = empRole.includes('Housekeeping') ? 'Housekeeping' : empRole;
+              const roleKey = getCategoryKey(matchedEmp?.role || formData.role, matchedEmp?.dept || formData.dept);
+              const catEmps = employees.filter(e => getCategoryKey(e.role, e.dept) === roleKey);
+              const empCount = catEmps.length || 1;
               const pct = categoryIncentivePcts[roleKey] !== undefined ? categoryIncentivePcts[roleKey] : 5;
-              const calcAmt = Math.round((totalSale * pct) / 100);
+              const catPool = (totalSale * pct) / 100;
+              const calcAmt = Math.round(catPool / empCount);
 
               const incentiveData = {
                 employeeId: matchedEmp?.id || formData.employeeId || 'EMP001',
                 employeeName: formData.employeeName || 'Employee',
                 dept: matchedEmp?.dept || formData.dept || 'Sales',
-                ruleType: `Daily Sale Incentive (${roleKey} - ${pct}%)`,
+                ruleType: `Daily Sale Incentive (${roleKey} - ${pct}% pool ÷ ${empCount} staff)`,
                 amount: calcAmt,
                 target: totalSale,
                 month: targetMonth,
@@ -1702,31 +1731,36 @@ export default function GlobalModals() {
               updateIncentive({ ...incentiveData, id: (modal.data as Record<string, string>).id });
               toast('success', 'Incentive Updated', `Incentive record updated.`);
             } else {
-              // Distribute incentive shares to all employees by Job Title & Housekeeping role
+              // Distribute incentive shares to each category, divided equally among staff in that category
               let addedCount = 0;
 
-              for (const emp of employees) {
-                const empRole = emp.role || (emp.dept === 'Housekeeping' ? 'Housekeeping' : 'Gold-01');
-                const roleKey = empRole.includes('Housekeeping') ? 'Housekeeping' : empRole;
-                const pct = categoryIncentivePcts[roleKey] !== undefined ? categoryIncentivePcts[roleKey] : (roleKey === 'Housekeeping' ? 2 : 5);
-                const empAmt = Math.round((totalSale * pct) / 100);
+              for (const cat of categoriesList) {
+                const catEmps = employees.filter(e => getCategoryKey(e.role, e.dept) === cat);
+                if (catEmps.length === 0) continue;
 
-                await addIncentive({
-                  employeeId: emp.id,
-                  employeeName: emp.name,
-                  dept: emp.dept || 'Sales',
-                  ruleType: `Daily Sale Incentive (${roleKey} - ${pct}%)`,
-                  amount: empAmt,
-                  target: totalSale,
-                  month: targetMonth,
-                  status: statusVal,
-                  createdAt: selectedDate,
-                  updatedAt: selectedDate,
-                });
-                addedCount++;
+                const defaultPct = cat === 'Gold-01' ? 20 : cat === 'Gold-02' ? 10 : cat === 'Housekeeping' ? 2 : 5;
+                const pct = categoryIncentivePcts[cat] !== undefined ? categoryIncentivePcts[cat] : defaultPct;
+                const catPool = (totalSale * pct) / 100;
+                const perEmpAmt = Math.round(catPool / catEmps.length);
+
+                for (const emp of catEmps) {
+                  await addIncentive({
+                    employeeId: emp.id,
+                    employeeName: emp.name,
+                    dept: emp.dept || (cat === 'Housekeeping' ? 'Housekeeping' : 'Sales'),
+                    ruleType: `Daily Sale Incentive (${cat} - ${pct}% pool ÷ ${catEmps.length} staff)`,
+                    amount: perEmpAmt,
+                    target: totalSale,
+                    month: targetMonth,
+                    status: statusVal,
+                    createdAt: selectedDate,
+                    updatedAt: selectedDate,
+                  });
+                  addedCount++;
+                }
               }
 
-              toast('success', 'Daily Incentive Distributed', `₹${totalSale.toLocaleString('en-IN')} sale incentive distributed across ${addedCount} employees (Gold-01, Gold-02, Silver-01, Silver-02, Housekeeping)!`);
+              toast('success', 'Daily Incentive Distributed', `₹${totalSale.toLocaleString('en-IN')} sale incentive divided equally across ${addedCount} employees within their respective categories!`);
             }
             closeModal();
           }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1742,7 +1776,7 @@ export default function GlobalModals() {
                 className="form-input"
               />
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                Enter total shop daily sale (e.g. ₹5,000) to automatically calculate category percentage shares below.
+                Enter total shop daily sale (e.g. ₹5,000) to calculate category pools and divide them equally among staff in each category.
               </span>
             </div>
 
@@ -1750,24 +1784,38 @@ export default function GlobalModals() {
             <div style={{ background: 'var(--bg-elevated, #f8fafc)', border: '1px solid var(--border, #cbd5e0)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Customizable Job Title Incentive (%) Shares
+                  Customizable Job Title Incentive (%) Shares & Distribution
                 </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Auto-Calculated per Category</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Divided Equally Per Category</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                {['Gold-01', 'Gold-02', 'Silver-01', 'Silver-02', 'Housekeeping'].map(cat => {
+                {categoriesList.map(cat => {
                   const defaultPct = cat === 'Gold-01' ? 20 : cat === 'Gold-02' ? 10 : cat === 'Housekeeping' ? 2 : 5;
                   const pctVal = categoryIncentivePcts[cat] !== undefined ? categoryIncentivePcts[cat] : defaultPct;
                   const saleNum = parseFloat(totalSaleInput || '0');
-                  const calcAmt = saleNum > 0 ? Math.round((saleNum * pctVal) / 100) : 0;
+                  const catPool = saleNum > 0 ? Math.round((saleNum * pctVal) / 100) : 0;
+                  const empCount = categoryEmployeeCounts[cat] || 0;
+                  const perEmpAmt = empCount > 0 ? Math.round(catPool / empCount) : 0;
 
                   return (
                     <div key={cat} style={{ background: 'var(--bg-card, #fff)', border: '1px solid var(--border, #e2e8f0)', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{cat}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{cat}</span>
+                          <span style={{ fontSize: '10px', background: 'var(--bg-elevated, #f1f5f9)', color: 'var(--text-secondary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                            {empCount} staff
+                          </span>
+                        </div>
                         {saleNum > 0 && (
-                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#10B981' }}>+₹{calcAmt.toLocaleString('en-IN')}</span>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 800, color: '#10B981', display: 'block' }}>
+                              ₹{perEmpAmt.toLocaleString('en-IN')}<span style={{ fontSize: '9.5px', fontWeight: 600, color: 'var(--text-muted)' }}>/emp</span>
+                            </span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>
+                              Pool: ₹{catPool.toLocaleString('en-IN')}
+                            </span>
+                          </div>
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1793,40 +1841,26 @@ export default function GlobalModals() {
               </div>
             </div>
 
-            {/* Sale Date & Status */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Daily Sale Date</label>
-                <input
-                  type="date"
-                  required
-                  value={formData.date || new Date().toISOString().split('T')[0]}
-                  onChange={e => {
-                    const val = e.target.value;
-                    handleInputChange('date', val);
-                    if (val) {
-                      handleInputChange('month', val.slice(0, 7));
-                    }
-                  }}
-                  className="form-input"
-                />
-              </div>
-              <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Status</label>
-                <select
-                  value={formData.status || 'pending'}
-                  onChange={e => handleInputChange('status', e.target.value)}
-                  className="form-input"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="paid">Paid</option>
-                </select>
-              </div>
+            {/* Daily Sale Date */}
+            <div className="form-group">
+              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Daily Sale Date</label>
+              <input
+                type="date"
+                required
+                value={formData.date || new Date().toISOString().split('T')[0]}
+                onChange={e => {
+                  const val = e.target.value;
+                  handleInputChange('date', val);
+                  if (val) {
+                    handleInputChange('month', val.slice(0, 7));
+                  }
+                }}
+                className="form-input"
+              />
             </div>
 
             <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#10B981' }}>
-              <strong>✓ Real-time Update:</strong> Once saved, this incentive will be immediately distributed across workforce categories in real-time.
+              <strong>✓ Equal Category Pool Distribution:</strong> The incentive pool for each category is calculated by percentage, and then divided equally among all employees assigned to that category.
             </div>
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
