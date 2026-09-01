@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Eye, EyeOff, Lock, User, ShieldCheck, AlertCircle,
   ArrowLeft, Mail, RefreshCw, CheckCircle2, KeyRound, Sparkles, HelpCircle,
+  X, FileText, ScrollText
 } from 'lucide-react';
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -63,6 +64,9 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
   // Reveal
   const [showReveal, setShowReveal] = useState(false);
 
+  // Terms and Services Modal
+  const [showTerms, setShowTerms] = useState(false);
+
   const pwRef = useRef<HTMLInputElement>(null);
   const otpRefs = [
     useRef<HTMLInputElement>(null),
@@ -82,6 +86,17 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
     const id = setInterval(() => setTimer(t => { if (t <= 1) { clearInterval(id); return 0; } return t - 1; }), 1000);
     return () => clearInterval(id);
   }, [screen, otpToken]);
+
+  // Escape key to close Terms modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showTerms) {
+        setShowTerms(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showTerms]);
 
   useEffect(() => { if (screen === 'otp') setTimeout(() => otpRefs[0].current?.focus(), 150); }, [screen]);
 
@@ -309,7 +324,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
                   <rect x="0" y="0" width="180" height="135" rx="14" fill="#ffffff" filter="drop-shadow(0px 14px 28px rgba(27, 61, 50, 0.18))" />
                   <rect x="0" y="0" width="180" height="26" rx="14" fill="#1b3d32" />
                   <rect x="0" y="14" width="180" height="12" fill="#1b3d32" />
-                  
+
                   {/* Window Controls */}
                   <circle cx="16" cy="13" r="3.5" fill="#ef4444" />
                   <circle cx="28" cy="13" r="3.5" fill="#f59e0b" />
@@ -546,10 +561,34 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
 
             {/* Bottom Right Links */}
             <div style={{ marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
-              <a href="#terms" style={{ color: 'rgba(255, 255, 255, 0.5)', textDecoration: 'underline' }}>Terms and Services</a>
+              <button
+                type="button"
+                onClick={() => setShowTerms(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.65)',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  padding: '2px 6px',
+                  transition: 'all 0.2s',
+                  borderRadius: '4px',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = '#86e4d7';
+                  e.currentTarget.style.textDecoration = 'none';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.65)';
+                  e.currentTarget.style.textDecoration = 'underline';
+                }}
+              >
+                Terms and Services
+              </button>
               <div>
                 Have a problem? Contact us at{' '}
-                <a href="mailto:support@saisjewellers.com" style={{ color: '#5ec4b6', textDecoration: 'underline' }}>support@saisjewellers.com</a>
+                <a href="mailto:hrpulse0@gmail.com" style={{ color: '#5ec4b6', textDecoration: 'underline' }}>hrpulse0@gmail.com</a>
               </div>
             </div>
           </>)}
@@ -731,7 +770,257 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
         </div>
       </div>
 
+      {/* ══ TERMS AND SERVICES MODAL ══ */}
+      {showTerms && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="terms-modal-title"
+          onClick={() => setShowTerms(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(5, 18, 16, 0.78)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '680px',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'linear-gradient(165deg, #112923 0%, #0d201c 100%)',
+              border: '1px solid rgba(94, 196, 182, 0.25)',
+              borderRadius: '24px',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(74, 163, 154, 0.15)',
+              overflow: 'hidden',
+              animation: 'modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '24px 28px 18px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '16px',
+              background: 'rgba(255, 255, 255, 0.02)'
+            }}>
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'rgba(94, 196, 182, 0.12)',
+                  border: '1px solid rgba(94, 196, 182, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#5ec4b6',
+                  flexShrink: 0
+                }}>
+                  <ScrollText size={22} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h2 id="terms-modal-title" style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', margin: 0, letterSpacing: '-0.02em' }}>
+                      Terms of Service & Usage Policy
+                    </h2>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      background: 'rgba(94, 196, 182, 0.15)',
+                      color: '#86e4d7',
+                      border: '1px solid rgba(94, 196, 182, 0.3)'
+                    }}>
+                      HRPulse Enterprise
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.55)', margin: '4px 0 0 0' }}>
+                    Shri Sai Jewellers • Internal HR, Attendance & Payroll Management Portal
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTerms(false)}
+                aria-label="Close Terms"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div style={{
+              padding: '24px 28px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '13px',
+              lineHeight: 1.65
+            }}>
+              <div style={{
+                padding: '12px 16px',
+                background: 'rgba(94, 196, 182, 0.08)',
+                border: '1px solid rgba(94, 196, 182, 0.2)',
+                borderRadius: '12px',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'center'
+              }}>
+                <ShieldCheck size={18} color="#5ec4b6" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '12px', color: '#a5ede4' }}>
+                  By logging into HRPulse, you acknowledge that you are an authorized administrator of Shri Sai Jewellers and agree to abide by these terms.
+                </span>
+              </div>
+
+              {/* Section 1 */}
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  1. Authorized Access & Authentication
+                </h3>
+                <p style={{ margin: 0, color: 'rgba(255, 255, 255, 0.7)' }}>
+                  This application is strictly restricted to authorized administrative personnel and management of Shri Sai Jewellers. Sharing credentials, bypassing authentication, or disseminating one-time passwords (OTP) to unauthorized third parties is strictly prohibited.
+                </p>
+              </div>
+
+              {/* Section 2 */}
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', margin: '0 0 6px 0' }}>
+                  2. Employee Data Privacy & Confidentiality
+                </h3>
+                <p style={{ margin: 0, color: 'rgba(255, 255, 255, 0.7)' }}>
+                  All employee personal information, including full names, contact details, identity records (Aadhaar, PAN), bank account numbers, biometric attendance records, salary structures, advances, and payroll slips, are confidential assets. You must process this data solely for legitimate business operations in compliance with applicable data protection laws.
+                </p>
+              </div>
+
+              {/* Section 3 */}
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', margin: '0 0 6px 0' }}>
+                  3. Payroll & Disbursement Integrity
+                </h3>
+                <p style={{ margin: 0, color: 'rgba(255, 255, 255, 0.7)' }}>
+                  Administrators are responsible for verifying the accuracy of wage calculations, bonus allowances, deductions, and loan repayments before final disbursement approval. Any fraudulent modification of records or unauthorized payout generation will result in administrative disciplinary actions and legal remediation.
+                </p>
+              </div>
+
+              {/* Section 4 */}
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', margin: '0 0 6px 0' }}>
+                  4. Audit Logging & Session Monitoring
+                </h3>
+                <p style={{ margin: 0, color: 'rgba(255, 255, 255, 0.7)' }}>
+                  To maintain system security and compliance, all login attempts, password recovery triggers, OTP verifications, employee modifications, and payroll finalizations are logged with timestamp and network audit trails.
+                </p>
+              </div>
+
+              {/* Section 5 */}
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff', margin: '0 0 6px 0' }}>
+                  5. System Availability & Support
+                </h3>
+                <p style={{ margin: 0, color: 'rgba(255, 255, 255, 0.7)' }}>
+                  HRPulse is maintained with encrypted cloud synchronization and scheduled backups. For technical assistance, credential resets, or bug reporting, contact the administrative support team at <a href="mailto:support@saisjewellers.com" style={{ color: '#5ec4b6', textDecoration: 'underline' }}>hrpulse0@gmail.com
+                  </a>.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '16px 28px 20px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(0, 0, 0, 0.25)',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                Effective Date: August 2026 • Shri Sai Jewellers
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowTerms(false)}
+                style={{
+                  padding: '10px 22px',
+                  background: 'linear-gradient(135deg, #4aa39a 0%, #358077 100%)',
+                  border: 'none',
+                  borderRadius: '20px',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(74, 163, 154, 0.35)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(74, 163, 154, 0.45)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(74, 163, 154, 0.35)';
+                }}
+              >
+                I Understand & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes modalPop {
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
         @keyframes orbFloat {
           0%, 100% { transform: translate(0, 0) scale(1); }
           50% { transform: translate(25px, -20px) scale(1.05); }
