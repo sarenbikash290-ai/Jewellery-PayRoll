@@ -1,72 +1,39 @@
-const CACHE_NAME = 'hrpulse-cache-v1';
-const ASSETS = [
-  '/employee',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/window.svg',
-  '/file.svg'
-];
+// ============================================================================
+// HRPulse Cleanup Service Worker (Self-Destructing)
+// Purpose: Purge old Cache Storage (hrpulse-cache-v1), unregister the worker,
+// and return the browser to direct network/Vercel communication.
+// ============================================================================
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
-  );
+self.addEventListener('install', (event) => {
+  // Force the new cleanup worker to skip the 'waiting' state and activate immediately
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      // 1. Delete all existing Cache Storage caches (including hrpulse-cache-v1)
+      const cacheKeys = await caches.keys();
+      await Promise.all(
+        cacheKeys.map((key) => {
+          console.log('[Cleanup SW] Deleting cache bucket:', key);
+          return caches.delete(key);
         })
       );
-    })
-  );
-  self.clients.claim();
-});
 
-self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
+      // 2. Take control of open tabs immediately while active
+      await self.clients.claim();
+      console.log('[Cleanup SW] Controlled clients claimed.');
 
-  // Skip non-GET requests or requests to Next.js development APIs, ngrok, or dynamic route APIs
-  if (
-    e.request.method !== 'GET' ||
-    url.pathname.startsWith('/api') ||
-    url.pathname.startsWith('/_next') ||
-    url.hostname.includes('ngrok')
-  ) {
-    return;
-  }
-
-  e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(e.request)
-        .then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, responseToCache);
-          });
-
-          return response;
-        })
-        .catch(() => {
-          // offline fallback could go here
-        });
-    })
+      // 3. Unregister this service worker registration so it stops running
+      console.log('[Cleanup SW] Unregistering service worker...');
+      await self.registration.unregister();
+      console.log('[Cleanup SW] Cleanup completed successfully. Service worker unregistered.');
+    })()
   );
 });
+
+// Do NOT define a 'fetch' handler.
+// Without a fetch event listener, the browser automatically passes 100% of
+// network requests directly to Vercel/network, completely bypassing Cache Storage.
+

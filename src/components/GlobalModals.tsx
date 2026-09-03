@@ -1682,6 +1682,11 @@ export default function GlobalModals() {
 
       // Check if employee is eligible for daily incentive based on attendance on the selected date
       const getEmployeeEligibility = (empId: string, dateStr: string): { eligible: boolean; statusLabel?: string } => {
+        const emp = employees.find(e => e.id === empId);
+        if (emp && emp.status !== 'active') {
+          return { eligible: false, statusLabel: 'Inactive' };
+        }
+
         const rec = attendanceRecords.find(r => r.employeeId === empId && r.date === dateStr);
         if (rec) {
           if (rec.status === 'absent') return { eligible: false, statusLabel: 'Absent' };
@@ -1703,18 +1708,8 @@ export default function GlobalModals() {
           return { eligible: true, statusLabel: 'WFH' };
         }
 
-        // If attendance was logged for anyone on this date and this employee has no record, they are absent
-        const anyRecordsForDay = attendanceRecords.some(r => r.date === dateStr);
-        if (anyRecordsForDay) {
-          return { eligible: false, statusLabel: 'Not Checked In' };
-        }
-
-        // If no records logged at all yet for this date, default active employees as eligible
-        const emp = employees.find(e => e.id === empId);
-        if (emp && emp.status !== 'active') {
-          return { eligible: false, statusLabel: 'Inactive' };
-        }
-        return { eligible: true, statusLabel: 'Active' };
+        // Strictly require attendance check-in: if no record exists for this date, employee is not checked in
+        return { eligible: false, statusLabel: 'Not Checked In' };
       };
 
       const categoryStaffBreakdown: Record<string, { total: number; eligible: Employee[]; ineligible: { emp: Employee; reason?: string }[] }> = {};
