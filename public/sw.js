@@ -21,13 +21,14 @@ self.addEventListener('activate', (event) => {
         })
       );
 
-      // 2. Unregister this service worker registration so it stops running
+      // 2. Take control of open tabs immediately while active
+      await self.clients.claim();
+      console.log('[Cleanup SW] Controlled clients claimed.');
+
+      // 3. Unregister this service worker registration so it stops running
       console.log('[Cleanup SW] Unregistering service worker...');
       await self.registration.unregister();
-
-      // 3. Take control of open tabs immediately so no stale cache is served
-      await self.clients.claim();
-      console.log('[Cleanup SW] Cleanup completed successfully. Controlled clients claimed.');
+      console.log('[Cleanup SW] Cleanup completed successfully. Service worker unregistered.');
     })()
   );
 });
