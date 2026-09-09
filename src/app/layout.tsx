@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import PWARegistration from "@/components/PWARegistration";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
@@ -28,7 +27,6 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         {children}
-        <PWARegistration />
         <Analytics />
       </body>
     </html>
