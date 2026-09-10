@@ -1,15 +1,33 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useApp, Employee } from '../AppContext';
-import { FileText, Download, CheckCircle, AlertCircle, Banknote } from 'lucide-react';
+import { FileText, Download, CheckCircle, AlertCircle, Banknote, Clock, Calendar, Sparkles } from 'lucide-react';
 import { generatePayslip } from '../../lib/generatePayslip';
+import { calculateMonthlySalaryBreakdown, calculateMonthlySalaryProgress } from '@/utils/payrollCalc';
 
 interface EmpPayslipsProps {
   employee: Employee;
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default function EmpPayslips({ employee }: EmpPayslipsProps) {
-  const { toast, payrollLocks, payslips } = useApp();
+  const {
+    toast,
+    payrollLocks,
+    payslips,
+    attendanceRecords,
+    leaves,
+    incentives,
+    commissions,
+    advancePayments,
+    overtimeRate,
+    holidays
+  } = useApp();
+
   const [downloading, setDownloading] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -20,19 +38,13 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  const parsedSalary = (salStr: string) => {
-    const clean = salStr.replace(/[^\d]/g, '');
-    const val = parseInt(clean, 10);
-    return isNaN(val) ? 50000 : val;
-  };
-
-  const salaryComponents = useMemo(() => {
-    const salaryVal = parsedSalary(employee.salary);
-    return { gross: salaryVal, deductions: 0, net: salaryVal };
-  }, [employee]);
-
   const parseJoinedDate = (joinedStr: string) => {
     if (!joinedStr) return new Date(2000, 0, 1);
+    // Check ISO format YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(joinedStr.trim())) {
+      const [y, m, d] = joinedStr.trim().split('-');
+      return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+    }
     const parsed = Date.parse(joinedStr);
     if (!isNaN(parsed)) return new Date(parsed);
 
@@ -57,80 +69,146 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
     return new Date(2000, 0, 1);
   };
 
-  const parsePayslipMonth = (monthStr: string) => {
-    const parts = monthStr.trim().split(/\s+/);
-    if (parts.length === 2) {
-      const monthsLong = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-      const monthsShort = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      const mStr = parts[0].toLowerCase();
-      let monthIdx = monthsLong.indexOf(mStr);
-      if (monthIdx === -1) {
-        monthIdx = monthsShort.indexOf(mStr);
+  const payslipCards = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthNum = now.getMonth() + 1;
+    const currentDay = now.getDate();
+
+    const joinedDate = parseJoinedDate(employee.joined);
+    const startYear = joinedDate.getFullYear();
+    const startMonth = joinedDate.getMonth() + 1;
+
+    // Collect all month codes from employee's joining date up to the current month
+    const monthCodeSet = new Set<string>();
+
+    let y = startYear;
+    let m = startMonth;
+    let safetyCounter = 0;
+    while ((y < currentYear || (y === currentYear && m <= currentMonthNum)) && safetyCounter < 60) {
+      monthCodeSet.add(`${y}-${String(m).padStart(2, '0')}`);
+      m++;
+      if (m > 12) {
+        m = 1;
+        y++;
       }
-      if (monthIdx === -1 && mStr.length >= 3) {
-        monthIdx = monthsShort.indexOf(mStr.substring(0, 3));
-      }
-      const year = parseInt(parts[1], 10);
-      if (monthIdx > -1 && !isNaN(year)) {
-        return new Date(year, monthIdx, 1);
-      }
+      safetyCounter++;
     }
-    return new Date(2000, 0, 1);
-  };
 
-  const filteredPayslips = useMemo(() => {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-    // Convert locks to payslip format
-    const map = new Map<string, any>();
+    // Also include any months where a lock exists or saved payslips exist
     payrollLocks.forEach(lock => {
-      const label = `${months[lock.month - 1]} ${lock.year}`;
-      map.set(label, { month: label, monthCode: `${lock.year}-${String(lock.month).padStart(2, '0')}` });
+      monthCodeSet.add(`${lock.year}-${String(lock.month).padStart(2, '0')}`);
     });
 
-    // Add saved payslips from Supabase for this employee
     payslips.filter(p => p.employee_id === employee.id).forEach(p => {
-      const label = p.month_label || p.month;
-      map.set(label, {
-        month: label,
-        monthCode: p.month,
-        gross: Number(p.gross_salary) + Number(p.incentives || 0),
-        deductions: Number(p.total_deductions),
-        net: Number(p.net_pay)
-      });
+      if (p.month && /^\d{4}-\d{2}$/.test(p.month)) {
+        monthCodeSet.add(p.month);
+      }
     });
 
-    const list = Array.from(map.values());
+    // Sort descending (latest month first)
+    const sortedCodes = Array.from(monthCodeSet).sort((a, b) => b.localeCompare(a));
 
-    // Filter by join date eligibility
-    const eligible = list.filter(slip => {
-      const payslipDate = parsePayslipMonth(slip.month);
-      const joinedDate = parseJoinedDate(employee.joined);
-      return (
-        payslipDate.getFullYear() > joinedDate.getFullYear() ||
-        (payslipDate.getFullYear() === joinedDate.getFullYear() &&
-          payslipDate.getMonth() >= joinedDate.getMonth())
+    return sortedCodes.map(code => {
+      const [yPart, mPart] = code.split('-');
+      const year = parseInt(yPart, 10);
+      const monthNum = parseInt(mPart, 10);
+      const monthLabel = `${MONTH_NAMES[monthNum - 1]} ${year}`;
+      const isPastMonth = year < currentYear || (year === currentYear && monthNum < currentMonthNum);
+      const isCurrentMonth = year === currentYear && monthNum === currentMonthNum;
+      const daysInMonth = new Date(year, monthNum, 0).getDate();
+      const isCurrentMonthEnded = isCurrentMonth && currentDay >= daysInMonth;
+      const isLocked = payrollLocks.some(l => l.year === year && l.month === monthNum);
+
+      // Check if a saved payslip exists in Supabase
+      const saved = payslips.find(
+        p => p.employee_id === employee.id && (p.month === code || p.slip_id === `PSL-${code}-${employee.id}`)
       );
-    });
 
-    // Sort by date descending
-    return eligible.sort((a, b) => {
-      return parsePayslipMonth(b.month).getTime() - parsePayslipMonth(a.month).getTime();
-    });
-  }, [payrollLocks, payslips, employee.id, employee.joined]);
+      // Compute salary breakdown using standard engine
+      const breakdown = calculateMonthlySalaryBreakdown(
+        employee,
+        code,
+        attendanceRecords,
+        leaves,
+        incentives,
+        commissions,
+        advancePayments,
+        overtimeRate,
+        holidays
+      );
 
-  const handleDownload = (month: string) => {
-    setDownloading(month);
+      // Available automatically right at month ending, or if saved, or if locked
+      const isAvailable = Boolean(saved || isLocked || isPastMonth || isCurrentMonthEnded);
+
+      const gross = saved ? (Number(saved.gross_salary) + Number(saved.incentives || 0)) : breakdown.gross;
+      const deductions = saved ? Number(saved.total_deductions) : breakdown.totalDeductions;
+      const net = saved ? Number(saved.net_pay) : breakdown.netPay;
+
+      const progress = isCurrentMonth ? calculateMonthlySalaryProgress(
+        employee,
+        now,
+        attendanceRecords,
+        holidays,
+        overtimeRate
+      ) : null;
+
+      const effectiveBreakdown = saved ? {
+        basic: Number(saved.basic_salary),
+        gross: Number(saved.gross_salary),
+        incentives: Number(saved.incentives || 0),
+        overtimeAmount: Number(saved.overtime_amount || 0),
+        overtimeHours: Number(saved.overtime_hours || 0),
+        lopDeduction: Number(saved.lop_deduction),
+        advanceDeduction: Number(saved.advance_deduction),
+        totalDeductions: Number(saved.total_deductions),
+        netPay: Number(saved.net_pay),
+        overtimeRemarks: saved.overtime_remarks || ''
+      } : breakdown;
+
+      return {
+        monthCode: code,
+        monthLabel,
+        year,
+        monthNum,
+        isPastMonth,
+        isCurrentMonth,
+        isAvailable,
+        isLocked,
+        hasSaved: Boolean(saved),
+        gross,
+        deductions,
+        net,
+        breakdown: effectiveBreakdown,
+        progress,
+        daysInMonth
+      };
+    });
+  }, [
+    employee,
+    payrollLocks,
+    payslips,
+    attendanceRecords,
+    leaves,
+    incentives,
+    commissions,
+    advancePayments,
+    overtimeRate,
+    holidays
+  ]);
+
+  const handleDownload = (monthLabel: string, monthCode: string, breakdownData?: any) => {
+    setDownloading(monthCode);
     setTimeout(() => {
       try {
-        generatePayslip(employee, month);
-        toast('success', 'Payslip Downloaded', `Generated PDF payslip for ${month}.`);
+        generatePayslip(employee, monthLabel, monthCode, breakdownData);
+        toast('success', 'Payslip Downloaded', `Generated PDF payslip for ${monthLabel}.`);
       } catch (err) {
         console.error(err);
         toast('error', 'Download Failed', 'Failed to generate PDF. Try again.');
       }
       setDownloading(null);
-    }, 800);
+    }, 600);
   };
 
   const fmt = (n: number) => `₹ ${n.toLocaleString('en-IN')}`;
@@ -144,49 +222,109 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
           My Payslips
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px' }}>
-          Download printable monthly salary slips with full breakdown.
+          Monthly salary slips are automatically compiled and delivered right at month ending.
         </p>
       </div>
 
+
       {/* Payslips Cards List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '16px' }}>
-        {filteredPayslips.length === 0 ? (
+        {payslipCards.length === 0 ? (
           <div className="glass-card" style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-secondary)', background: '#FFFFFF', borderRadius: '16px', border: '1px solid rgba(15,23,42,0.06)' }}>
             No payslips available. Payslips are generated at the end of each working month starting from your joined month ({employee.joined}).
           </div>
         ) : (
-          filteredPayslips.map((slip, i) => (
-            <div key={i} className="glass-card" style={{
-              flexDirection: 'column',
-              alignItems: 'stretch',
-              gap: '16px',
-              padding: '20px',
-              borderRadius: '16px',
-              display: 'flex',
-              background: '#FFFFFF'
-            }}
+          payslipCards.map((slip) => (
+            <div
+              key={slip.monthCode}
+              className="glass-card"
+              style={{
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: '16px',
+                padding: '20px',
+                borderRadius: '16px',
+                display: 'flex',
+                background: '#FFFFFF',
+                border: slip.isCurrentMonth && !slip.isAvailable ? '1px dashed rgba(79,142,247,0.4)' : '1px solid rgba(15,23,42,0.06)',
+                position: 'relative'
+              }}
             >
               {/* Header Block */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: '#EFF6FF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Banknote size={18} color="#2563EB" />
-                </div>
-                <div>
-                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{slip.month}</div>
-                  <div style={{ fontSize: '10.5px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2.5px', fontWeight: 600 }}>
-                    <CheckCircle size={11} /> Salary Transferred
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: slip.isAvailable ? '#EFF6FF' : 'rgba(245,158,11,0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {slip.isAvailable ? (
+                      <Banknote size={19} color="#2563EB" />
+                    ) : (
+                      <Clock size={19} color="#D97706" />
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {slip.monthLabel}
+                    </div>
+                    {slip.isAvailable ? (
+                      <div style={{ fontSize: '11px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2.5px', fontWeight: 600 }}>
+                        <CheckCircle size={12} /> {slip.hasSaved ? 'Salary Published & Transferred' : 'Auto-Finalized at Month End'}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#D97706', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2.5px', fontWeight: 600 }}>
+                        <Clock size={12} /> Current Working Month · In Progress
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Status Pill */}
+                {slip.isAvailable ? (
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    background: 'rgba(16,185,129,0.1)',
+                    color: '#059669',
+                    border: '1px solid rgba(16,185,129,0.2)'
+                  }}>
+                    Ready to Download
+                  </span>
+                ) : (
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    background: 'rgba(245,158,11,0.1)',
+                    color: '#D97706',
+                    border: '1px solid rgba(245,158,11,0.2)'
+                  }}>
+                    Available {slip.daysInMonth} {slip.monthLabel.split(' ')[0]}
+                  </span>
+                )}
               </div>
+
+              {/* Ongoing Month Progress Bar */}
+              {!slip.isAvailable && slip.progress && (
+                <div style={{ background: 'rgba(79,142,247,0.04)', border: '1px solid rgba(79,142,247,0.12)', borderRadius: '10px', padding: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                    <span>Working Days: {slip.progress.elapsedWorkingDays}/{slip.progress.payableWorkingDays} elapsed</span>
+                    <span style={{ color: 'var(--brand)' }}>Accumulated: ₹{slip.progress.earnedSalarySoFar.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div style={{ height: '6px', width: '100%', background: 'rgba(15,23,42,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${slip.progress.progressPercent}%`, background: 'linear-gradient(90deg, #4F8EF7, #10B981)', borderRadius: '3px' }} />
+                  </div>
+                </div>
+              )}
 
               {/* Figures Block */}
               <div style={{
@@ -199,55 +337,75 @@ export default function EmpPayslips({ employee }: EmpPayslipsProps) {
                 <div>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Gross</span>
                   <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    {fmt(slip.gross ?? salaryComponents.gross)}
+                    {fmt(slip.gross)}
                   </div>
                 </div>
                 <div>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Deductions</span>
                   <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#EF4444', marginTop: '4px' }}>
-                    {fmt(slip.deductions ?? salaryComponents.deductions)}
+                    {fmt(slip.deductions)}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>Net Take-Home</span>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#854D0E', marginTop: '4px' }}>
-                    {fmt(slip.net ?? salaryComponents.net)}
+                    {fmt(slip.net)}
                   </div>
                 </div>
               </div>
 
-              {/* Download Action */}
-              <button
-                onClick={() => handleDownload(slip.month)}
-                disabled={downloading === slip.month}
-                style={{
-                  display: 'inline-flex',
+              {/* Action Button */}
+              {slip.isAvailable ? (
+                <button
+                  onClick={() => handleDownload(slip.monthLabel, slip.monthCode, slip.breakdown)}
+                  disabled={downloading === slip.monthCode}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '11px 16px',
+                    borderRadius: '10px',
+                    background: downloading === slip.monthCode ? '#E2E8F0' : '#854D0E',
+                    border: 'none',
+                    color: '#FFFFFF',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: downloading === slip.monthCode ? 'default' : 'pointer',
+                    transition: 'all 0.2s ease',
+                    width: '100%',
+                    boxShadow: downloading === slip.monthCode ? 'none' : '0 4px 12px rgba(133,77,14,0.18)',
+                  }}
+                >
+                  <Download size={14} />
+                  {downloading === slip.monthCode ? 'Generating PDF...' : 'Download PDF'}
+                </button>
+              ) : (
+                <div style={{
+                  display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
-                  padding: '11px 16px',
+                  gap: '6px',
+                  padding: '10px',
                   borderRadius: '10px',
-                  background: downloading === slip.month ? '#E2E8F0' : '#854D0E',
-                  border: 'none',
-                  color: '#FFFFFF',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  cursor: downloading === slip.month ? 'default' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  width: '100%',
-                  boxShadow: downloading === slip.month ? 'none' : '0 4px 12px rgba(133,77,14,0.18)',
-                }}
-              >
-                <Download size={14} />
-                {downloading === slip.month ? 'Generating...' : 'Download PDF'}
-              </button>
+                  background: 'rgba(245,158,11,0.06)',
+                  border: '1px solid rgba(245,158,11,0.2)',
+                  color: '#D97706',
+                  fontSize: '12px',
+                  fontWeight: 600
+                }}>
+                  <Clock size={13} /> Official slip releases on {slip.daysInMonth} {slip.monthLabel.split(' ')[0]} at 23:59
+                </div>
+              )}
             </div>
-          )))}
+          ))
+        )}
       </div>
 
+      {/* Footer Support Info */}
       <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', background: 'rgba(217,119,6,0.05)', border: '1px solid rgba(217,119,6,0.12)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '11px', alignItems: 'center' }}>
         <AlertCircle size={14} color="#D97706" style={{ flexShrink: 0 }} />
-        <span>For help with payslips, contact support@shrisaijewels.com.</span>
+        <span>For discrepancies or questions regarding your payslips, contact support@shrisaijewels.com or visit the HR desk.</span>
       </div>
     </div>
   );

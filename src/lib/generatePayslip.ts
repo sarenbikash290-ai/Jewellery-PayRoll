@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { Employee } from '../components/AppContext';
 import { calculateMonthlySalaryBreakdown } from '@/utils/payrollCalc';
 
-export function generatePayslip(employee: Employee, monthLabel: string, monthCode?: string) {
+export function generatePayslip(employee: Employee, monthLabel: string, monthCode?: string, customBreakdown?: any) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -23,7 +23,7 @@ export function generatePayslip(employee: Employee, monthLabel: string, monthCod
     if (!code) code = '2026-03';
   }
 
-  const breakdown = calculateMonthlySalaryBreakdown(
+  const breakdown = customBreakdown || calculateMonthlySalaryBreakdown(
     employee,
     code,
     [],
@@ -35,14 +35,14 @@ export function generatePayslip(employee: Employee, monthLabel: string, monthCod
     []
   );
 
-  const basic = breakdown.basic;
-  const incentives = breakdown.incentives;
-  const overtimeAmount = breakdown.overtimeAmount;
-  const gross = breakdown.gross;
-  const lop = breakdown.lopDeduction;
-  const advance = breakdown.advanceDeduction;
-  const totalDeductions = breakdown.totalDeductions;
-  const net = breakdown.netPay;
+  const basic = breakdown.basic ?? breakdown.basic_salary ?? 0;
+  const incentives = breakdown.incentives ?? 0;
+  const overtimeAmount = breakdown.overtimeAmount ?? breakdown.overtime_amount ?? 0;
+  const gross = breakdown.gross ?? breakdown.gross_salary ?? 0;
+  const lop = breakdown.lopDeduction ?? breakdown.lop_deduction ?? 0;
+  const advance = breakdown.advanceDeduction ?? breakdown.advance_deduction ?? 0;
+  const totalDeductions = breakdown.totalDeductions ?? breakdown.total_deductions ?? 0;
+  const net = breakdown.netPay ?? breakdown.net_pay ?? 0;
 
   const fmt = (n: number) => `INR ${n.toLocaleString('en-IN')}`;
 
@@ -105,8 +105,10 @@ export function generatePayslip(employee: Employee, monthLabel: string, monthCod
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   doc.setFont('Helvetica', 'bold');
 
-  const bankAcc = employee.bank_account_no ? `${employee.bank_account_no}${employee.bank_name ? ` (${employee.bank_name})` : ''}` : `XXXX XXXX ${employee.id ? employee.id.replace('EMP', '89') : '8901'}`;
-  const ifsc = employee.ifsc_code ? employee.ifsc_code : 'UTIB0000129';
+  const bankAcc = employee.bank_account_no?.trim() 
+    ? `${employee.bank_account_no.trim()}${employee.bank_name?.trim() ? ` (${employee.bank_name.trim()})` : ''}` 
+    : '';
+  const ifsc = employee.ifsc_code?.trim() ? employee.ifsc_code.trim() : '';
 
   doc.text(bankAcc, 142, 58);
   doc.text(ifsc, 142, 64);

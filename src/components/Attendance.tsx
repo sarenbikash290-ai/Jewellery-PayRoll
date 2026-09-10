@@ -92,7 +92,8 @@ const compareValues = (valA: unknown, valB: unknown, order: 'asc' | 'desc') => {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState<'today' | 'calendar' | 'leaves' | 'audit'>('today');
-  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords, editAttendance, isDateEditable, isMonthLocked, auditLogs, fetchAuditLogs, clearAuditLogs, pendingSubTab } = useApp();
+  const { employees, toast, leaves, updateLeave, openModal, attendanceRecords, editAttendance, isDateEditable, isMonthLocked, auditLogs, fetchAuditLogs, clearAuditLogs, pendingSubTab, logManualAttendance } = useApp();
+  const [updatingEmpId, setUpdatingEmpId] = useState<string | null>(null);
 
   // Auto-switch to a specific tab when navigated with a sub-tab request
   useEffect(() => {
@@ -102,6 +103,36 @@ export default function Attendance() {
   }, [pendingSubTab]);
 
   const currentDate = useMemo(() => new Date(), []);
+
+  const handleQuickStatusChange = async (employeeId: string, newStatus: 'present' | 'absent' | 'half_day') => {
+    try {
+      setUpdatingEmpId(employeeId);
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
+      const existing = attendanceRecords.find(r => r.employeeId === employeeId && r.date === todayStr);
+
+      let checkIn: string | null = null;
+      let checkOut: string | null = null;
+
+      if (newStatus === 'present') {
+        checkIn = existing?.checkIn || '10:00 AM';
+        checkOut = existing?.checkOut || '08:00 PM';
+      } else if (newStatus === 'half_day') {
+        checkIn = existing?.checkIn || '10:00 AM';
+        checkOut = '02:00 PM';
+      } else {
+        checkIn = null;
+        checkOut = null;
+      }
+
+      await logManualAttendance(employeeId, todayStr, checkIn, checkOut, newStatus);
+    } finally {
+      setUpdatingEmpId(null);
+    }
+  };
 
   // --- Sorting & Filtering States ---
   // Today's Log
@@ -206,6 +237,12 @@ export default function Attendance() {
   const [editError, setEditError] = useState('');
 
   const openEditModal = useCallback((employeeId: string, employeeName: string, date: string, currentStatus: string, currentCheckIn: string | null, currentCheckOut: string | null) => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (date > todayStr) {
+      toast('warning', 'Future Date', 'Cannot edit or log attendance for future dates.');
+      return;
+    }
     setEditStatus((currentStatus as 'present' | 'late' | 'absent' | 'wfh') || 'present');
     setEditCheckIn(currentCheckIn || '');
     setEditCheckOut(currentCheckOut || '');
@@ -214,7 +251,7 @@ export default function Attendance() {
     setEditModal({
       open: true, employeeId, employeeName, date, currentStatus, currentCheckIn, currentCheckOut, step: 'form'
     });
-  }, []);
+  }, [toast]);
 
   const handleEditSubmit = useCallback(async () => {
     if (!editModal) return;
@@ -742,10 +779,88 @@ export default function Attendance() {
                             </span>
                           ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                         </td>
-                        <td style={{ padding: '14px 20px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: statusColors[emp.status].bg, color: statusColors[emp.status].text }}>
-                            {statusColors[emp.status].label}
-                          </span>
+                        <td style={{ padding: '12px 20px', minWidth: '220px' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '3px 10px',
+                                borderRadius: '100px',
+                                background: statusColors[emp.status]?.bg || 'rgba(100,116,139,0.12)',
+                                color: statusColors[emp.status]?.text || '#64748B',
+                                display: 'inline-block'
+                              }}>
+                                {statusColors[emp.status]?.label || emp.status}
+                              </span>
+                              {updatingEmpId === emp.id && (
+                                <span style={{ fontSize: '10px', color: 'var(--brand)', fontWeight: 600 }}>Saving...</span>
+                              )}
+                            </div>
+
+                            {/* Quick Attendance Checkbox Options */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'nowrap' }}>
+                              <label style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                fontWeight: emp.status === 'present' ? 700 : 500,
+                                color: emp.status === 'present' ? '#10B981' : 'var(--text-secondary)',
+                                cursor: updatingEmpId === emp.id ? 'wait' : 'pointer',
+                                userSelect: 'none'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  disabled={updatingEmpId === emp.id}
+                                  checked={emp.status === 'present'}
+                                  onChange={() => handleQuickStatusChange(emp.id, 'present')}
+                                  style={{ cursor: 'pointer', accentColor: '#10B981', width: '13px', height: '13px' }}
+                                />
+                                Present
+                              </label>
+
+                              <label style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                fontWeight: emp.status === 'absent' ? 700 : 500,
+                                color: emp.status === 'absent' ? '#EF4444' : 'var(--text-secondary)',
+                                cursor: updatingEmpId === emp.id ? 'wait' : 'pointer',
+                                userSelect: 'none'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  disabled={updatingEmpId === emp.id}
+                                  checked={emp.status === 'absent'}
+                                  onChange={() => handleQuickStatusChange(emp.id, 'absent')}
+                                  style={{ cursor: 'pointer', accentColor: '#EF4444', width: '13px', height: '13px' }}
+                                />
+                                Absent
+                              </label>
+
+                              <label style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                fontWeight: emp.status === 'half_day' ? 700 : 500,
+                                color: emp.status === 'half_day' ? '#D97706' : 'var(--text-secondary)',
+                                cursor: updatingEmpId === emp.id ? 'wait' : 'pointer',
+                                userSelect: 'none'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  disabled={updatingEmpId === emp.id}
+                                  checked={emp.status === 'half_day'}
+                                  onChange={() => handleQuickStatusChange(emp.id, 'half_day')}
+                                  style={{ cursor: 'pointer', accentColor: '#D97706', width: '13px', height: '13px' }}
+                                />
+                                Half-day
+                              </label>
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     );

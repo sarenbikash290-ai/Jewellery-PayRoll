@@ -72,16 +72,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const { employeeId, employeeName, dept, ruleType, amount, target, month, status } = body;
+    const { employeeId, employeeName, dept, ruleType, amount, target, month, status, createdAt, adminPassword } = body;
 
     if (!employeeId || !employeeName || !dept || !ruleType || amount === undefined || target === undefined || !month) {
       return NextResponse.json({ ok: false, error: 'Missing required parameters' }, { status: 400 });
+    }
+
+    // Verify same-day duplicate incentive rule:
+    // If an incentive was already added for this employee on this date, admin password is required
+    const targetDateStr = createdAt ? createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const { data: existingForEmp } = await supabase
+      .from('incentives')
+      .select('id, employee_id, created_at')
+      .eq('employee_id', employeeId.toUpperCase())
+      .gte('created_at', `${targetDateStr}T00:00:00.000Z`)
+      .lte('created_at', `${targetDateStr}T23:59:59.999Z`);
+
+    if (existingForEmp && existingForEmp.length > 0) {
+      const expectedPassword = process.env.ADMIN_PASSWORD || 'Bikash@123';
+      if (adminPassword !== expectedPassword) {
+        return NextResponse.json({
+          ok: false,
+          error: 'An incentive has already been recorded for this employee today. Admin password is required to add again.'
+        }, { status: 403 });
+      }
     }
 
     // Determine and insert with retry on primary key collision
     let newInc = null;
     let insertErr: any = null;
     let attempts = 0;
+
+    const formattedCreatedAt = createdAt
+      ? new Date(createdAt.length === 10 ? `${createdAt}T12:00:00.000Z` : createdAt).toISOString()
+      : new Date().toISOString();
 
     while (attempts < 10) {
       attempts++;
@@ -109,7 +133,8 @@ export async function POST(request: Request) {
           amount,
           target,
           month,
-          status: status || 'pending'
+          status: status || 'pending',
+          created_at: formattedCreatedAt
         })
         .select()
         .single();

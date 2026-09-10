@@ -1,7 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from './AppContext';
-import { IndianRupee, Download, Play, CheckCircle, Clock, Users, FileText, AlertCircle } from 'lucide-react';
+import { IndianRupee, Download, Play, CheckCircle, Clock, Users, FileText, AlertCircle, Calendar } from 'lucide-react';
 import { calculateMonthlySalaryBreakdown, calculateMonthlySalaryProgress } from '@/utils/payrollCalc';
 
 const avatarColors = ['#4F8EF7', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#EF4444'];
@@ -11,22 +11,83 @@ const Card = ({ children, style = {} }: CardProps) => (
   <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', ...style }}>{children}</div>
 );
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+function formatMonthLabel(monthIso: string): string {
+  if (!monthIso) return '';
+  const [y, m] = monthIso.split('-');
+  const monthNum = parseInt(m, 10);
+  if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
+    return `${MONTH_NAMES[monthNum - 1]} ${y}`;
+  }
+  return monthIso;
+}
+
 export default function Payroll() {
   const [step, setStep] = useState(1);
   const [processing, setProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
-  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth, savePayslips, overtimeRate, holidays } = useApp();
+  const { employees, openModal, toast, leaves, attendanceRecords, incentives, commissions, advancePayments, lockPayrollMonth, savePayslips, overtimeRate, holidays, payrollLocks } = useApp();
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonthNum = now.getMonth() + 1;
-  const currentMonthCode = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
-  const currentMonthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const now = useMemo(() => new Date(), []);
+  const currentMonthIso = useMemo(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`, [now]);
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthIso);
+
+  // Available month options gathered from current, past 6 months, and payrollLocks/incentives
+  const availableMonthOptions = useMemo(() => {
+    const monthSet = new Set<string>();
+
+    // Current month and previous 5 months
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthSet.add(iso);
+    }
+
+    // Include any locked payroll months
+    payrollLocks.forEach(l => {
+      const iso = `${l.year}-${String(l.month).padStart(2, '0')}`;
+      monthSet.add(iso);
+    });
+
+    // Include months from attendance records
+    attendanceRecords.forEach(ar => {
+      if (ar.date && ar.date.length >= 7) {
+        const iso = ar.date.substring(0, 7);
+        if (/^\d{4}-\d{2}$/.test(iso)) monthSet.add(iso);
+      }
+    });
+
+    const sortedMonths = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+    return sortedMonths.map(m => ({
+      value: m,
+      label: `${formatMonthLabel(m)}${m === currentMonthIso ? ' (Current)' : ''}`,
+    }));
+  }, [now, currentMonthIso, payrollLocks, attendanceRecords]);
+
+  const [selectedYear, selectedMonthNum] = useMemo(() => {
+    const [y, m] = selectedMonth.split('-');
+    return [parseInt(y, 10), parseInt(m, 10)];
+  }, [selectedMonth]);
+
+  const selectedMonthLabel = useMemo(() => formatMonthLabel(selectedMonth), [selectedMonth]);
+
+  // Reference date for progress computation: if viewing past month, evaluate up to end of that month
+  const evaluationDate = useMemo(() => {
+    if (selectedMonth === currentMonthIso) {
+      return now;
+    }
+    // Last day of that selected month
+    return new Date(selectedYear, selectedMonthNum, 0);
+  }, [selectedMonth, currentMonthIso, now, selectedYear, selectedMonthNum]);
 
   const payrollEmployees = employees.map(emp => {
     const breakdown = calculateMonthlySalaryBreakdown(
       emp,
-      currentMonthCode,
+      selectedMonth,
       attendanceRecords,
       leaves,
       incentives,
@@ -38,7 +99,7 @@ export default function Payroll() {
 
     const progress = calculateMonthlySalaryProgress(
       emp,
-      now,
+      evaluationDate,
       attendanceRecords,
       holidays,
       overtimeRate
@@ -79,23 +140,17 @@ export default function Payroll() {
 
   const runPayroll = async () => {
     setProcessing(true);
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonthNum = now.getMonth() + 1;
-    const monthCode = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
-    const monthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-    const result = await lockPayrollMonth(currentYear, currentMonthNum, `${monthLabel} payroll run finalized`);
+    const result = await lockPayrollMonth(selectedYear, selectedMonthNum, `${selectedMonthLabel} payroll run finalized`);
 
     if (result.ok) {
       const payslipRecords = payrollEmployees.map(pe => ({
-        slip_id: `PSL-${monthCode}-${pe.id}`,
+        slip_id: `PSL-${selectedMonth}-${pe.id}`,
         employee_id: pe.id,
         employee_name: pe.name,
         department: pe.dept,
         role: pe.role || (pe.dept === 'Sales' ? 'Gold-01' : pe.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff'),
-        month: monthCode,
-        month_label: monthLabel,
+        month: selectedMonth,
+        month_label: selectedMonthLabel,
         basic_salary: pe.basic,
         gross_salary: pe.gross,
         incentives: pe.incentives,
@@ -166,7 +221,7 @@ export default function Payroll() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `HRPulse_Payroll_Summary_${currentMonthLabel.replace(/\s+/g, '_')}.csv`);
+    link.setAttribute('download', `HRPulse_Payroll_Summary_${selectedMonthLabel.replace(/\s+/g, '_')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -177,16 +232,49 @@ export default function Payroll() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
             Payroll Processing
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Manage monthly salary calculation, attendance deductions & payslips for {currentMonthLabel}
+            Manage monthly salary calculation, attendance deductions & payslips for {selectedMonthLabel}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* Month Selector Dropdown */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: '8px', padding: '7px 14px', boxShadow: 'var(--shadow-sm)'
+          }}>
+            <Calendar size={15} color="var(--brand)" />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Month:</span>
+            <select
+              value={selectedMonth}
+              onChange={e => {
+                setSelectedMonth(e.target.value);
+                setStep(1);
+                setProcessed(false);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              {availableMonthOptions.map(opt => (
+                <option key={opt.value} value={opt.value} style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={downloadPayrollCSV}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)' }}
@@ -199,7 +287,7 @@ export default function Payroll() {
       {/* Process Wizard Header */}
       <Card>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>Monthly Payroll Run — {currentMonthLabel}</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>Monthly Payroll Run — {selectedMonthLabel}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>3-step process: Review → Approve → Process</div>
         </div>
 
@@ -230,7 +318,7 @@ export default function Payroll() {
         <div style={{ padding: '0 24px 24px' }}>
           {step === 1 && (
             <div>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Review the computed payslips for all {employees.length} employees. Scroll to review all.</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Review the computed payslips for all {employees.length} employees for {selectedMonthLabel}. Scroll to review all.</p>
               <button onClick={() => setStep(2)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px', background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--shadow-brand)' }}>
                 Approve & Proceed <Play size={14} />
               </button>
@@ -242,7 +330,7 @@ export default function Payroll() {
                 <AlertCircle size={18} color="#F59E0B" style={{ flexShrink: 0 }} />
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#F59E0B' }}>Final Approval Required</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>You're about to process <strong style={{ color: 'var(--text-primary)' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> in net payroll for {employees.length} employees. This action will lock the payroll records for this month.</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>You're about to process <strong style={{ color: 'var(--text-primary)' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> in net payroll for {employees.length} employees for {selectedMonthLabel}. This action will lock the payroll records for this month.</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -259,7 +347,7 @@ export default function Payroll() {
                 <CheckCircle size={28} color="#10B981" />
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Payroll Processed! 🎉</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>{currentMonthLabel} payroll of <strong style={{ color: '#10B981' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> has been processed. Payslips are now available for employees to view and download.</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>{selectedMonthLabel} payroll of <strong style={{ color: '#10B981' }}>₹ {totalNet.toLocaleString('en-IN')}</strong> has been processed. Payslips are now available for employees to view and download.</div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                 <button
                   onClick={downloadPayrollCSV}
@@ -277,22 +365,17 @@ export default function Payroll() {
       {/* Payroll Table */}
       <Card>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '14px', fontWeight: 600 }}>Salary Breakup — {currentMonthLabel}</span>
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>Salary Breakup — {selectedMonthLabel}</span>
           <button
             onClick={async () => {
-              const now = new Date();
-              const currentYear = now.getFullYear();
-              const currentMonthNum = now.getMonth() + 1;
-              const monthCode = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
-
               const payslipRecords = payrollEmployees.map(pe => ({
-                slip_id: `PSL-${monthCode}-${pe.id}`,
+                slip_id: `PSL-${selectedMonth}-${pe.id}`,
                 employee_id: pe.id,
                 employee_name: pe.name,
                 department: pe.dept,
                 role: pe.dept === 'Sales' ? 'Senior Sales Executive' : pe.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff',
-                month: monthCode,
-                month_label: currentMonthLabel,
+                month: selectedMonth,
+                month_label: selectedMonthLabel,
                 basic_salary: pe.basic,
                 gross_salary: pe.gross,
                 incentives: pe.incentives,
@@ -304,8 +387,8 @@ export default function Payroll() {
               }));
 
               await savePayslips(payslipRecords);
-              await lockPayrollMonth(currentYear, currentMonthNum, `${currentMonthLabel} payslips generated & published`);
-              toast('success', 'Payslips Published', `Compiled and published ${currentMonthLabel} payslips to all employee portals.`);
+              await lockPayrollMonth(selectedYear, selectedMonthNum, `${selectedMonthLabel} payslips generated & published`);
+              toast('success', 'Payslips Published', `Compiled and published ${selectedMonthLabel} payslips to all employee portals.`);
             }}
             style={{ fontSize: '12px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: 'transparent', border: 'none' }}
           >
@@ -366,7 +449,8 @@ export default function Payroll() {
                         id: emp.id,
                         name: emp.name,
                         dept: emp.dept,
-                        role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff'
+                        role: emp.dept === 'Sales' ? 'Senior Sales Executive' : emp.dept === 'Housekeeping' ? 'Housekeeping Staff' : 'Helper Staff',
+                        month: selectedMonth
                       })}
                       style={{ fontSize: '11px', color: 'var(--brand)', background: 'rgba(79,142,247,0.1)', padding: '5px 12px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', border: 'none' }}
                     >

@@ -34,6 +34,7 @@ export interface Incentive {
   status: 'paid' | 'pending' | 'approved';
   createdAt: string;
   updatedAt: string;
+  adminPassword?: string;
 }
 
 export interface Commission {
@@ -412,12 +413,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (data.ok && data.incentive) {
         setIncentives(prev => [...prev, data.incentive]);
-        toast('success', 'Incentive Logged', `Incentive of ₹${inc.amount} logged for ${inc.employeeName}.`);
+        return data.incentive;
       } else {
         throw new Error(data.error || 'Server error');
       }
     } catch (err: any) {
       toast('error', 'Add Incentive Failed', err.message || 'Could not log incentive.');
+      throw err;
     }
   }, [toast]);
 
@@ -1023,6 +1025,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     overtimeHours?: number,
     overtimeReason?: string
   ) => {
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (date > todayStr) {
+      toast('error', 'Invalid Date', 'Cannot log attendance for future dates.');
+      return;
+    }
     try {
       const res = await fetch('/api/attendance', {
         method: 'POST',
