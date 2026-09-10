@@ -1025,6 +1025,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     overtimeHours?: number,
     overtimeReason?: string
   ) => {
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (date > todayStr) {
+      toast('error', 'Invalid Date', 'Cannot log attendance for future dates.');
+      return;
+    }
     try {
       const res = await fetch('/api/attendance', {
         method: 'POST',

@@ -242,6 +242,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'Missing parameters' }, { status: 400 });
       }
 
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (date > todayStr) {
+        return NextResponse.json({ ok: false, error: 'Cannot log attendance for future dates.' }, { status: 400 });
+      }
+
       const upperEmpId = employeeId.toUpperCase();
 
       let { data, error } = await supabase

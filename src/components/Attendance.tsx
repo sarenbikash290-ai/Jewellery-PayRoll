@@ -237,6 +237,12 @@ export default function Attendance() {
   const [editError, setEditError] = useState('');
 
   const openEditModal = useCallback((employeeId: string, employeeName: string, date: string, currentStatus: string, currentCheckIn: string | null, currentCheckOut: string | null) => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (date > todayStr) {
+      toast('warning', 'Future Date', 'Cannot edit or log attendance for future dates.');
+      return;
+    }
     setEditStatus((currentStatus as 'present' | 'late' | 'absent' | 'wfh') || 'present');
     setEditCheckIn(currentCheckIn || '');
     setEditCheckOut(currentCheckOut || '');
@@ -245,7 +251,7 @@ export default function Attendance() {
     setEditModal({
       open: true, employeeId, employeeName, date, currentStatus, currentCheckIn, currentCheckOut, step: 'form'
     });
-  }, []);
+  }, [toast]);
 
   const handleEditSubmit = useCallback(async () => {
     if (!editModal) return;

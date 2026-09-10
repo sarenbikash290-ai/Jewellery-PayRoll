@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp } from './AppContext';
 import Modal from './Modal';
 import DatePicker from 'react-datepicker';
@@ -28,6 +28,13 @@ export default function GlobalModals() {
 
   // Manual attendance states
   const [showManualForm, setShowManualForm] = useState(false);
+  const todayMaxDate = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
   const [manualDate, setManualDate] = useState(() => {
     const d = new Date();
     const year = d.getFullYear();
@@ -815,8 +822,17 @@ export default function GlobalModals() {
                     <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Date</label>
                     <input
                       type="date"
+                      max={todayMaxDate}
                       value={manualDate}
-                      onChange={e => setManualDate(e.target.value)}
+                      onChange={e => {
+                        const selected = e.target.value;
+                        if (selected > todayMaxDate) {
+                          toast('warning', 'Future Date Not Allowed', 'Cannot select future dates for attendance.');
+                          setManualDate(todayMaxDate);
+                        } else {
+                          setManualDate(selected);
+                        }
+                      }}
                       style={{
                         padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
                         border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-1)'
@@ -887,6 +903,10 @@ export default function GlobalModals() {
                   <button
                     type="button"
                     onClick={async () => {
+                      if (manualDate > todayMaxDate) {
+                        toast('error', 'Invalid Date', 'Cannot log attendance for future dates. Please select today or an earlier date.');
+                        return;
+                      }
                       await logManualAttendance(
                         emp.id,
                         manualDate,
