@@ -26,6 +26,15 @@ export async function POST(request: Request) {
       }
     }
 
+    if (action === 'verify') {
+      const { password } = body;
+      const expectedPassword = process.env.ADMIN_PASSWORD || 'Bikash@123';
+      if (password === expectedPassword) {
+        return NextResponse.json({ ok: true });
+      }
+      return NextResponse.json({ ok: false, error: 'Incorrect password' }, { status: 401 });
+    }
+
     if (action === 'check') {
       const session = cookieStore.get('hrpulse_admin_session');
       if (session && session.value === 'granted') {

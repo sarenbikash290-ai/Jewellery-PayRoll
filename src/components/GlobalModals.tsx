@@ -6,7 +6,8 @@ import DatePicker from 'react-datepicker';
 import { generatePayslip } from '@/lib/generatePayslip';
 import {
   User, Mail, Phone, MapPin, IndianRupee, Calendar, Clock, Briefcase,
-  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil, Plus
+  CheckCircle, FileText, Settings as SettingsIcon, Printer, Shield, Trash2, Pencil, Plus,
+  Lock, Eye, EyeOff
 } from 'lucide-react';
 import { calculateMonthlySalaryBreakdown, calculateMonthlySalaryProgress } from '@/utils/payrollCalc';
 
@@ -21,6 +22,9 @@ export default function GlobalModals() {
   const [newHolidayName, setNewHolidayName] = useState('');
   const [totalSaleInput, setTotalSaleInput] = useState('');
   const [showRatesEditor, setShowRatesEditor] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   // Manual attendance states
   const [showManualForm, setShowManualForm] = useState(false);
@@ -63,6 +67,9 @@ export default function GlobalModals() {
     setManualCheckIn('09:00 AM');
     setManualCheckOut('06:00 PM');
     setManualStatus('present');
+    setAdminPasswordInput('');
+    setShowAdminPassword(false);
+    setPasswordError('');
   }, [modal.open, modal.data, authorizedWifiIp]);
 
   if (!modal.open) return null;
@@ -1680,6 +1687,13 @@ export default function GlobalModals() {
 
       const selectedDate = formData.date || new Date().toISOString().split('T')[0];
 
+      // Check if incentives have already been recorded for this selectedDate
+      const existingIncentivesForDate = incentives.filter(inc => {
+        if (!inc.createdAt) return false;
+        return inc.createdAt.slice(0, 10) === selectedDate;
+      });
+      const alreadyExistsForDate = existingIncentivesForDate.length > 0;
+
       // Check if employee is eligible for daily incentive based on attendance on the selected date
       const getEmployeeEligibility = (empId: string, dateStr: string): { eligible: boolean; statusLabel?: string } => {
         const emp = employees.find(e => e.id === empId);
@@ -1769,7 +1783,35 @@ export default function GlobalModals() {
               };
               updateIncentive({ ...incentiveData, id: (modal.data as Record<string, string>).id });
               toast('success', 'Incentive Updated', `Incentive record updated.`);
+              closeModal();
             } else {
+              // Same-day duplicate incentive rule: require admin password if already added for this day
+              if (alreadyExistsForDate) {
+                if (!adminPasswordInput.trim()) {
+                  setPasswordError('Admin password is required to add incentives on this date again.');
+                  toast('error', 'Admin Password Required', 'Incentives have already been added for this day. Please enter your Admin Password to authorize.');
+                  return;
+                }
+
+                try {
+                  const authRes = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'verify', password: adminPasswordInput.trim() })
+                  });
+                  const authData = await authRes.json();
+                  if (!authData.ok) {
+                    setPasswordError('Incorrect Admin Password. You cannot add duplicate incentives for this day.');
+                    toast('error', 'Authorization Failed', 'Incorrect Admin Password.');
+                    return;
+                  }
+                } catch (err) {
+                  setPasswordError('Could not verify admin password.');
+                  toast('error', 'Verification Failed', 'Could not verify admin password.');
+                  return;
+                }
+              }
+
               // Distribute incentive shares to each category, divided equally ONLY among eligible (present) staff
               let addedCount = 0;
               let skippedCount = 0;
@@ -1798,6 +1840,7 @@ export default function GlobalModals() {
                     status: statusVal,
                     createdAt: selectedDate,
                     updatedAt: selectedDate,
+                    adminPassword: adminPasswordInput.trim() || undefined,
                   });
                   addedCount++;
                 }
@@ -1805,8 +1848,10 @@ export default function GlobalModals() {
               }
 
               toast('success', 'Daily Incentive Distributed', `₹${totalSale.toLocaleString('en-IN')} sale incentive distributed across ${addedCount} eligible staff (${skippedCount} absent/half-day staff excluded).`);
+              setAdminPasswordInput('');
+              setPasswordError('');
+              closeModal();
             }
-            closeModal();
           }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
             {/* Daily Sale Date */}
@@ -1819,6 +1864,7 @@ export default function GlobalModals() {
                 onChange={e => {
                   const val = e.target.value;
                   handleInputChange('date', val);
+                  setPasswordError('');
                   if (val) {
                     handleInputChange('month', val.slice(0, 7));
                   }
@@ -1927,6 +1973,76 @@ export default function GlobalModals() {
                 })}
               </div>
             </div>
+
+            {/* Same-day duplicate warning & password requirement */}
+            {!isEdit && alreadyExistsForDate && (
+              <div style={{
+                padding: '14px 16px',
+                background: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Lock size={16} color="#F59E0B" />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#D97706' }}>
+                    Admin Password Required (Already Added Today)
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.45' }}>
+                  Incentives have <strong>already been added</strong> for <strong>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong> ({existingIncentivesForDate.length} staff record{existingIncentivesForDate.length !== 1 ? 's' : ''} recorded).
+                  To add additional incentives on this same day, enter your <strong>Admin Login Password</strong>.
+                </p>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '5px', display: 'block' }}>
+                    Admin Password <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showAdminPassword ? 'text' : 'password'}
+                      value={adminPasswordInput}
+                      onChange={e => {
+                        setAdminPasswordInput(e.target.value);
+                        setPasswordError('');
+                      }}
+                      placeholder="Enter admin password used to log into HRPulse"
+                      className="form-input"
+                      style={{
+                        paddingRight: '38px',
+                        borderColor: passwordError ? '#EF4444' : undefined,
+                        background: 'var(--bg-card)'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPassword(prev => !prev)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px'
+                      }}
+                    >
+                      {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {passwordError && (
+                    <div style={{ fontSize: '11px', color: '#EF4444', marginTop: '4px', fontWeight: 600 }}>
+                      ⚠️ {passwordError}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
               <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '13px' }}>Cancel</button>

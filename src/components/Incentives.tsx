@@ -38,8 +38,43 @@ const PRODUCTS = [
   'Emerald Set', 'Sapphire Ring'
 ];
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 function fmt(n: number) {
   return n.toLocaleString('en-IN');
+}
+
+function formatMonthLabel(monthIso: string): string {
+  if (!monthIso || monthIso === 'all') return 'All Months';
+  const [y, m] = monthIso.split('-');
+  const monthNum = parseInt(m, 10);
+  if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
+    return `${MONTH_NAMES[monthNum - 1]} ${y}`;
+  }
+  return monthIso;
+}
+
+function matchesMonth(recordMonthStr: string | undefined | null, targetMonthIso: string): boolean {
+  if (!recordMonthStr) return false;
+  if (targetMonthIso === 'all') return true;
+  const clean = recordMonthStr.trim();
+  if (clean.startsWith(targetMonthIso) || clean === targetMonthIso) return true;
+
+  const [yearStr, monthNumStr] = targetMonthIso.split('-');
+  const year = parseInt(yearStr, 10);
+  const monthNum = parseInt(monthNumStr, 10);
+  if (!isNaN(year) && !isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
+    const monthNameShort = MONTH_NAMES[monthNum - 1].slice(0, 3).toLowerCase();
+    const monthNameFull = MONTH_NAMES[monthNum - 1].toLowerCase();
+    const lower = clean.toLowerCase();
+    if (lower.includes(yearStr) && (lower.includes(monthNameShort) || lower.includes(monthNameFull))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function CardBox({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -53,9 +88,11 @@ function CardBox({ children, style = {} }: { children: React.ReactNode; style?: 
 // ─── Employee Detail Panel ────────────────────────────────────────────────────
 function EmployeeDetailPanel({
   emp,
+  selectedMonth,
   onClose,
 }: {
   emp: EmpRow;
+  selectedMonth: string;
   onClose: () => void;
 }) {
   const { employeeSales, addSale, toast, incentives } = useApp();
@@ -83,13 +120,14 @@ function EmployeeDetailPanel({
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0])).map(([, v]) => v);
   }, [mySales]);
 
-  // Current month sales — detect the latest month from actual data so it works regardless of year
-  const latestSaleDate = mySales.length > 0 ? mySales[0].date : new Date().toISOString().split('T')[0];
-  const currentMonthKey = latestSaleDate.substring(0, 7); // e.g. '2025-06'
-  const currentMonthSales = mySales.filter(s => s.date.startsWith(currentMonthKey));
+  // Selected or current month sales
+  const targetMonthKey = selectedMonth !== 'all' 
+    ? selectedMonth 
+    : (mySales.length > 0 ? mySales[0].date.substring(0, 7) : new Date().toISOString().split('T')[0].substring(0, 7));
+  const currentMonthSales = mySales.filter(s => s.date.startsWith(targetMonthKey));
   const currentMonthTotal = currentMonthSales.reduce((sum, s) => sum + s.amount, 0);
 
-  // Product-wise for current month
+  // Product-wise for selected month
   const productBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
     currentMonthSales.forEach(s => {
@@ -101,6 +139,14 @@ function EmployeeDetailPanel({
   const achievement = emp.target > 0 ? Math.min((currentMonthTotal / emp.target) * 100, 200) : 0;
   const empIncentives = useMemo(() => incentives.filter(i => i.employeeId === emp.empId), [incentives, emp.empId]);
   const totalIncentiveAmount = useMemo(() => empIncentives.reduce((sum, i) => sum + i.amount, 0), [empIncentives]);
+  const selectedMonthIncentives = useMemo(
+    () => selectedMonth === 'all' ? empIncentives : empIncentives.filter(i => matchesMonth(i.month, selectedMonth)),
+    [empIncentives, selectedMonth]
+  );
+  const selectedMonthIncentiveAmount = useMemo(
+    () => selectedMonthIncentives.reduce((sum, i) => sum + i.amount, 0),
+    [selectedMonthIncentives]
+  );
 
   const handleAddSale = (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,8 +222,8 @@ function EmployeeDetailPanel({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '16px' }}>
             {[
               { label: 'Salary', value: `₹${(emp.salary / 1000).toFixed(0)}K`, color: '#4F8EF7' },
-              { label: 'This Month Sales', value: `₹${(currentMonthTotal / 1000).toFixed(0)}K`, color: '#10B981' },
-              { label: 'Incentive', value: `₹${fmt(emp.incentive)}`, color: '#F59E0B' },
+              { label: `${formatMonthLabel(selectedMonth)} Sales`, value: `₹${(currentMonthTotal / 1000).toFixed(0)}K`, color: '#10B981' },
+              { label: `${formatMonthLabel(selectedMonth)} Incentive`, value: `₹${fmt(emp.incentive)}`, color: '#F59E0B' },
             ].map((s, i) => (
               <div key={i} style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '8px', padding: '10px 12px' }}>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: s.color }}>{s.value}</div>
@@ -237,12 +283,23 @@ function EmployeeDetailPanel({
               {/* Incentive Info */}
               {empIncentives.length > 0 && (
                 <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#10B981' }}>🎯 Total Accumulated Incentives</div>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#10B981' }}>₹{fmt(totalIncentiveAmount)}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#10B981' }}>
+                        🎯 {selectedMonth === 'all' ? 'Total Lifetime Incentives' : `${formatMonthLabel(selectedMonth)} Incentives`}
+                      </div>
+                      {selectedMonth !== 'all' && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          Lifetime total: ₹{fmt(totalIncentiveAmount)} ({empIncentives.length} records across all months)
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: '#10B981' }}>
+                      ₹{fmt(selectedMonth === 'all' ? totalIncentiveAmount : selectedMonthIncentiveAmount)}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11.5px' }}>
-                    {empIncentives.map((inc, i) => (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11.5px', maxHeight: '180px', overflowY: 'auto' }}>
+                    {(selectedMonth === 'all' ? empIncentives : selectedMonthIncentives).map((inc, i) => (
                       <div key={inc.id || i} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                         <div>
                           <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{inc.ruleType}</span>
@@ -251,6 +308,11 @@ function EmployeeDetailPanel({
                         <div style={{ fontWeight: 700, color: '#10B981' }}>+₹{fmt(inc.amount)}</div>
                       </div>
                     ))}
+                    {selectedMonth !== 'all' && selectedMonthIncentives.length === 0 && (
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', padding: '6px 0', textAlign: 'center' }}>
+                        No incentives recorded for {formatMonthLabel(selectedMonth)}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -500,14 +562,76 @@ export default function Incentives() {
   const [selectedEmp, setSelectedEmp] = useState<EmpRow | null>(null);
   const { openModal, incentives, commissions, deleteCommission, employees, employeeSales } = useApp();
 
+  const now = useMemo(() => new Date(), []);
+  const currentMonthIso = useMemo(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`, [now]);
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthIso);
+
+  // Available month options gathered from data + recent months
+  const availableMonthOptions = useMemo(() => {
+    const monthSet = new Set<string>();
+
+    // Current month and previous 5 months
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthSet.add(iso);
+    }
+
+    // Add months from existing incentives
+    incentives.forEach(inc => {
+      if (inc.month && inc.month.length >= 7) {
+        const match = inc.month.match(/^(\d{4})-(\d{2})/);
+        if (match) monthSet.add(`${match[1]}-${match[2]}`);
+      }
+    });
+
+    // Add months from existing commissions
+    commissions.forEach(com => {
+      if (com.month && com.month.length >= 7) {
+        const match = com.month.match(/^(\d{4})-(\d{2})/);
+        if (match) monthSet.add(`${match[1]}-${match[2]}`);
+      }
+    });
+
+    // Add months from existing sales
+    employeeSales.forEach(s => {
+      if (s.date && s.date.length >= 7) {
+        const iso = s.date.substring(0, 7);
+        if (/^\d{4}-\d{2}$/.test(iso)) monthSet.add(iso);
+      }
+    });
+
+    const sortedMonths = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+    return sortedMonths.map(m => ({
+      value: m,
+      label: `${formatMonthLabel(m)}${m === currentMonthIso ? ' (Current)' : ''}`,
+    }));
+  }, [now, currentMonthIso, incentives, commissions, employeeSales]);
+
+  // Filter datasets according to selectedMonth
+  const filteredIncentives = useMemo(() => {
+    if (selectedMonth === 'all') return incentives;
+    return incentives.filter(i => matchesMonth(i.month, selectedMonth));
+  }, [incentives, selectedMonth]);
+
+  const filteredCommissions = useMemo(() => {
+    if (selectedMonth === 'all') return commissions;
+    return commissions.filter(c => matchesMonth(c.month, selectedMonth));
+  }, [commissions, selectedMonth]);
+
+  const filteredSales = useMemo(() => {
+    if (selectedMonth === 'all') return employeeSales;
+    return employeeSales.filter(s => s.date?.startsWith(selectedMonth));
+  }, [employeeSales, selectedMonth]);
+
   const employeeData: EmpRow[] = employees.map(emp => {
-    const monthlySales = employeeSales.filter(s => s.employeeId === emp.id).reduce((sum, s) => sum + s.amount, 0);
-    const empIncentiveRecords = incentives.filter(i => i.employeeId === emp.id);
+    const monthlySales = filteredSales.filter(s => s.employeeId === emp.id).reduce((sum, s) => sum + s.amount, 0);
+    const empIncentiveRecords = filteredIncentives.filter(i => i.employeeId === emp.id);
     const incentive = empIncentiveRecords.reduce((sum, i) => sum + i.amount, 0);
     const salaryStr = typeof emp.salary === 'string' ? emp.salary : (typeof emp.salary === 'number' ? String(emp.salary) : '0');
     const salary = Number(salaryStr.replace(/[₹,\s]/g, '')) || 0;
     const target = empIncentiveRecords[0]?.target || 0;
-    const performance = target > 0 && monthlySales >= target ? 'Exceeding' : 'On-track';
+    const performance = target > 0 && monthlySales >= target ? 'Exceeding' : (target > 0 && monthlySales < target * 0.5 ? 'At-risk' : 'On-track');
     const incStatus = empIncentiveRecords.some(i => i.status === 'paid') ? 'paid' : empIncentiveRecords.some(i => i.status === 'approved') ? 'approved' : (empIncentiveRecords.length > 0 ? empIncentiveRecords[0].status : 'pending');
     return {
       empId: emp.id,
@@ -539,9 +663,9 @@ export default function Incentives() {
   const totalSalary = employeeData.reduce((sum, e) => sum + e.salary, 0);
   const onTrackCount = employeeData.filter(e => e.performance === 'On-track' || e.performance === 'Exceeding').length;
   const atRiskCount = employeeData.filter(e => e.performance === 'At-risk').length;
-  const totalCommissions = commissions.reduce((sum, c) => sum + c.amount, 0);
-  const paidCommissions = commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
-  const pendingCommissions = commissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
+  const totalCommissions = filteredCommissions.reduce((sum, c) => sum + c.amount, 0);
+  const paidCommissions = filteredCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+  const pendingCommissions = filteredCommissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
 
   // When employee detail updates (via context), keep selectedEmp in sync
   const selectedEmpLive = selectedEmp ? employeeData.find(e => e.empId === selectedEmp.empId) || null : null;
@@ -549,14 +673,44 @@ export default function Incentives() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px' }}>Incentives & Commissions</h1>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             Employee Benefits & Lead Rewards
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* Month Filter Selector */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: '8px', padding: '6px 12px', boxShadow: 'var(--shadow-sm)'
+          }}>
+            <Calendar size={15} color="var(--brand)" />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Month:</span>
+            <select
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              {availableMonthOptions.map(opt => (
+                <option key={opt.value} value={opt.value} style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+                  {opt.label}
+                </option>
+              ))}
+              <option value="all" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>All Months (Lifetime Total)</option>
+            </select>
+          </div>
+
           {tab === 'incentives' && (
             <button onClick={() => openModal('addIncentive')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 20px', background: 'var(--brand)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: 'var(--shadow-brand)' }}>
               <Plus size={15} /> Add Incentive
@@ -574,8 +728,8 @@ export default function Incentives() {
       {tab === 'incentives' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
           {[
-            { label: 'Total Incentives', value: `₹${(totalIncentives / 100000).toFixed(2)}L`, sub: `${employeeData.length} employees`, color: '#10B981', icon: Gift },
-            { label: 'Total Sales', value: `₹${(totalSales / 100000).toFixed(2)}L`, sub: 'All employees', color: '#4F8EF7', icon: TrendingUp },
+            { label: 'Total Incentives', value: `₹${(totalIncentives / 100000).toFixed(2)}L`, sub: `${formatMonthLabel(selectedMonth)} · ${employeeData.length} emps`, color: '#10B981', icon: Gift },
+            { label: 'Total Sales', value: `₹${(totalSales / 100000).toFixed(2)}L`, sub: `${formatMonthLabel(selectedMonth)}`, color: '#4F8EF7', icon: TrendingUp },
             { label: 'On-Track', value: `${onTrackCount}/${employeeData.length}`, sub: 'Good performers', color: '#8B5CF6', icon: Award },
             { label: 'At-Risk', value: String(atRiskCount), sub: 'Need support', color: '#F59E0B', icon: AlertCircle },
             { label: 'Monthly Payroll', value: `₹${(totalSalary / 100000).toFixed(2)}L`, sub: 'All salaries', color: '#06B6D4', icon: IndianRupee },
@@ -598,10 +752,10 @@ export default function Incentives() {
       {tab === 'commissions' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
           {[
-            { label: 'Total Commissions', value: `₹${(totalCommissions / 1000).toFixed(1)}K`, sub: `${commissions.length} leads`, color: '#FF6B6B', icon: Crown },
-            { label: 'Paid Out', value: `₹${(paidCommissions / 1000).toFixed(1)}K`, sub: `${commissions.filter(c => c.status === 'paid').length} processed`, color: '#4ECDC4', icon: Award },
-            { label: 'Pending', value: `₹${(pendingCommissions / 1000).toFixed(1)}K`, sub: `${commissions.filter(c => c.status === 'pending').length} waiting`, color: '#F59E0B', icon: Clock },
-            { label: 'Avg per Lead', value: `₹${commissions.length > 0 ? fmt(Math.round(totalCommissions / commissions.length)) : 0}`, sub: 'Monthly average', color: '#4F8EF7', icon: TrendingUp },
+            { label: 'Total Commissions', value: `₹${(totalCommissions / 1000).toFixed(1)}K`, sub: `${filteredCommissions.length} leads (${formatMonthLabel(selectedMonth)})`, color: '#FF6B6B', icon: Crown },
+            { label: 'Paid Out', value: `₹${(paidCommissions / 1000).toFixed(1)}K`, sub: `${filteredCommissions.filter(c => c.status === 'paid').length} processed`, color: '#4ECDC4', icon: Award },
+            { label: 'Pending', value: `₹${(pendingCommissions / 1000).toFixed(1)}K`, sub: `${filteredCommissions.filter(c => c.status === 'pending').length} waiting`, color: '#F59E0B', icon: Clock },
+            { label: 'Avg per Lead', value: `₹${filteredCommissions.length > 0 ? fmt(Math.round(totalCommissions / filteredCommissions.length)) : 0}`, sub: 'Monthly average', color: '#4F8EF7', icon: TrendingUp },
           ].map((s, i) => {
             const Icon = s.icon;
             return (
@@ -636,9 +790,15 @@ export default function Incentives() {
       {tab === 'incentives' && (
         <>
           <CardBox>
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600 }}>Employee Incentives & Sales Performance
-                <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px' }}>Click any row to view details</span>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>
+                Employee Incentives & Sales Performance
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand)', marginLeft: '8px' }}>
+                  ({formatMonthLabel(selectedMonth)})
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px' }}>
+                  Click any row to view details
+                </span>
               </div>
               <select value={sortBy} onChange={e => setSortBy(e.target.value as 'sales' | 'incentive' | 'salary')} style={{ fontSize: '12px', padding: '6px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 <option value="sales">Sort by Sales ↓</option>
@@ -650,7 +810,7 @@ export default function Incentives() {
             <div>
               {sortedData.map((emp, idx) => {
                 const achievement = emp.target > 0 ? (emp.monthlySales / emp.target) * 100 : 0;
-                const perfColor = emp.performance === 'Exceeding' ? '#10B981' : '#F59E0B';
+                const perfColor = emp.performance === 'Exceeding' ? '#10B981' : emp.performance === 'At-risk' ? '#EF4444' : '#F59E0B';
                 const isSelected = selectedEmp?.empId === emp.empId;
 
                 return (
@@ -743,15 +903,15 @@ export default function Incentives() {
       {tab === 'commissions' && (
         <CardBox>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600 }}>Lead Commissions — LIVE</div>
+            <div style={{ fontSize: '14px', fontWeight: 600 }}>Lead Commissions — {formatMonthLabel(selectedMonth)}</div>
           </div>
           <div>
-            {commissions.length === 0 ? (
+            {filteredCommissions.length === 0 ? (
               <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <p>No commissions added yet</p>
+                <p>No commissions recorded for {formatMonthLabel(selectedMonth)}</p>
               </div>
-            ) : commissions.map((com, i) => (
-              <div key={com.id} style={{ padding: '18px 24px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', borderBottom: i < commissions.length - 1 ? '1px solid var(--border)' : 'none' }}>
+            ) : filteredCommissions.map((com, i) => (
+              <div key={com.id} style={{ padding: '18px 24px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', borderBottom: i < filteredCommissions.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flex: 1 }}>
                   <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg,#FF6B6B,#FF8E72)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>👑</div>
                   <div>
@@ -794,7 +954,7 @@ export default function Incentives() {
       {/* Employee Detail Side Panel */}
       {selectedEmpLive && (
         <>
-          <EmployeeDetailPanel emp={selectedEmpLive} onClose={() => setSelectedEmp(null)} />
+          <EmployeeDetailPanel emp={selectedEmpLive} selectedMonth={selectedMonth} onClose={() => setSelectedEmp(null)} />
         </>
       )}
     </div>
