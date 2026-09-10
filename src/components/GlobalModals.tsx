@@ -1186,8 +1186,8 @@ export default function GlobalModals() {
                   <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Department:</span> <span style={{ color: '#0d131f' }}>{emp.dept}</span></div>
                 </div>
                 <div>
-                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Bank Account No:</span> <span style={{ color: '#0d131f', fontWeight: 700 }}>{emp.bank_account_no ? `${emp.bank_account_no}${emp.bank_name ? ` (${emp.bank_name})` : ''}` : `XXXX XXXX ${emp.id ? emp.id.replace('EMP', '89') : '8901'}`}</span></div>
-                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>IFSC Code:</span> <span style={{ color: '#0d131f' }}>{emp.ifsc_code ? emp.ifsc_code : 'UTIB0000129'}</span></div>
+                  <div style={{ display: 'flex', marginBottom: '6px' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>Bank Account No:</span> <span style={{ color: '#0d131f', fontWeight: 700 }}>{emp.bank_account_no?.trim() ? `${emp.bank_account_no.trim()}${emp.bank_name?.trim() ? ` (${emp.bank_name.trim()})` : ''}` : ''}</span></div>
+                  <div style={{ display: 'flex' }}><span style={{ width: '120px', fontWeight: 600, color: '#4a5568' }}>IFSC Code:</span> <span style={{ color: '#0d131f' }}>{emp.ifsc_code?.trim() ? emp.ifsc_code.trim() : ''}</span></div>
                 </div>
               </div>
 

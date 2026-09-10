@@ -105,8 +105,10 @@ export function generatePayslip(employee: Employee, monthLabel: string, monthCod
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   doc.setFont('Helvetica', 'bold');
 
-  const bankAcc = employee.bank_account_no ? `${employee.bank_account_no}${employee.bank_name ? ` (${employee.bank_name})` : ''}` : `XXXX XXXX ${employee.id ? employee.id.replace('EMP', '89') : '8901'}`;
-  const ifsc = employee.ifsc_code ? employee.ifsc_code : 'UTIB0000129';
+  const bankAcc = employee.bank_account_no?.trim() 
+    ? `${employee.bank_account_no.trim()}${employee.bank_name?.trim() ? ` (${employee.bank_name.trim()})` : ''}` 
+    : '';
+  const ifsc = employee.ifsc_code?.trim() ? employee.ifsc_code.trim() : '';
 
   doc.text(bankAcc, 142, 58);
   doc.text(ifsc, 142, 64);
