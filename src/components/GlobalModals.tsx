@@ -59,6 +59,15 @@ export default function GlobalModals() {
     if (modal.open === 'editEmployee' && modal.data) {
       const emp = modal.data as Record<string, string>;
       setFormData(emp);
+    } else if (modal.open === 'addEmployee') {
+      const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      setFormData({
+        joined: todayFormatted,
+        status: 'active',
+        type: 'Full-time',
+        dept: 'Sales',
+        role: 'Gold-01'
+      });
     } else {
       setFormData({});
     }

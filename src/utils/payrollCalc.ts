@@ -1,4 +1,5 @@
 import { AttendanceRecord, LeaveApplication, Incentive, Commission, AdvancePayment, PublicHoliday, Employee } from '@/components/AppContext';
+import { parseJoinedDate } from '@/utils/time';
 
 export interface SalaryBreakdown {
   employeeId: string;
@@ -121,13 +122,22 @@ export function calculateMonthlySalaryBreakdown(
   const extraDayHourlyRate = dailyRate / 8;
   let overtimeAmount = 0;
 
+  const empJoined = parseJoinedDate(emp.joined);
+  empJoined.setHours(0, 0, 0, 0);
+
   for (let day = 1; day <= calendarDays; day++) {
     const dayStr = `${monthPrefix}-${String(day).padStart(2, '0')}`;
     const dateObj = new Date(year, month - 1, day);
+    dateObj.setHours(0, 0, 0, 0);
     const isThursday = dateObj.getDay() === 4;
     const isHoliday = nonThuHolidays.some(h => h.date === dayStr);
 
     const rec = recordMap.get(dayStr);
+
+    // Skip unrecorded days that occur prior to the employee's joining date
+    if (dateObj.getTime() < empJoined.getTime() && !rec) {
+      continue;
+    }
 
     if (rec) {
       if (rec.status === 'present' || rec.status === 'late' || rec.status === 'wfh') {
