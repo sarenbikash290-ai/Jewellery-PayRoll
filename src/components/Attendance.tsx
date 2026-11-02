@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from './AppContext';
-import { parseTimeToMinutes } from '@/utils/time';
+import { parseTimeToMinutes, parseJoinedDate, isEmployeeActiveOnDate } from '@/utils/time';
 import { Clock, UserCheck, UserX, AlertCircle, Calendar, ChevronLeft, ChevronRight, Fingerprint, MapPin, Monitor, Eye, X, BarChart2, TrendingUp, Bell, Lock, Edit3, ShieldAlert, CheckCircle, ClipboardList, ChevronDown, AlertTriangle, Search, FileText, Trash2 } from 'lucide-react';
 import type { AttendanceAuditLog } from './AppContext';
 
@@ -345,7 +345,16 @@ export default function Attendance() {
   const selectedDaySummary = useMemo(() => {
     if (selectedDay === null) return null;
     const selDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
-    const statuses = employees.map((emp, idx) => {
+
+    // Filter employees: only include employees who had already joined on or before this date,
+    // OR who have an explicit attendance record on this date.
+    const activeEmployeesOnDate = employees.filter(emp => {
+      const hasRecord = attendanceRecords.some(r => r.employeeId === emp.id && r.date === selDateStr);
+      if (hasRecord) return true;
+      return isEmployeeActiveOnDate(emp, selDateStr);
+    });
+
+    const statuses = activeEmployeesOnDate.map((emp, idx) => {
       // 1. Check for real attendance record
       const realRecord = attendanceRecords.find(r => r.employeeId === emp.id && r.date === selDateStr);
       if (realRecord) {
@@ -382,84 +391,92 @@ export default function Attendance() {
     const absentCount = statuses.filter(s => s.status === 'absent').length;
     const wfhCount = statuses.filter(s => s.status === 'wfh').length;
     const isWeekend = false;
-    return { statuses, presentCount, lateCount, absentCount, wfhCount, isWeekend };
+    return { statuses, presentCount, lateCount, absentCount, wfhCount, isWeekend, totalActive: activeEmployeesOnDate.length };
   }, [selectedDay, calMonth, calYear, employees, attendanceRecords, leaves, currentDate]);
 
   // Is current calendar on the current month?
   const isCurrentMonth = calYear === todayDate.year && calMonth === todayDate.month;
 
   // Memoized attendance data (prioritizes real server records, falls back to absent)
-  const attendanceData = useMemo(() => employees.map((emp, index) => {
-    // 1. Get today's local date string
+  const attendanceData = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     const day = String(currentDate.getDate()).padStart(2, '0');
     const todayStr = `${year}-${month}-${day}`;
 
-    // Check for real today's attendance record
-    const realRecord = attendanceRecords.find(r => r.employeeId === emp.id && r.date === todayStr);
+    // Filter employees: only include employees who joined on or before today, or have a record today
+    const activeEmployeesToday = employees.filter(emp => {
+      const hasRecord = attendanceRecords.some(r => r.employeeId === emp.id && r.date === todayStr);
+      if (hasRecord) return true;
+      return isEmployeeActiveOnDate(emp, currentDate);
+    });
 
-    // 2. Check for today's approved leave
-    const todayLeave = leaves.find(l =>
-      l.employeeId === emp.id &&
-      l.status === 'approved' &&
-      todayStr >= l.from &&
-      todayStr <= l.to
-    );
+    return activeEmployeesToday.map((emp, index) => {
+      // Check for real today's attendance record
+      const realRecord = attendanceRecords.find(r => r.employeeId === emp.id && r.date === todayStr);
 
-    // If there is a real server record for today, use it!
-    if (realRecord) {
-      // Calculate hours if both checkIn and checkOut exist
-      let hours: number | null = null;
-      if (realRecord.checkIn && realRecord.checkOut) {
-        try {
-          const diff = parseTimeToMinutes(realRecord.checkOut) - parseTimeToMinutes(realRecord.checkIn);
-          if (diff > 0) {
-            hours = parseFloat((diff / 60).toFixed(1));
-          }
-        } catch { }
+      // 2. Check for today's approved leave
+      const todayLeave = leaves.find(l =>
+        l.employeeId === emp.id &&
+        l.status === 'approved' &&
+        todayStr >= l.from &&
+        todayStr <= l.to
+      );
+
+      // If there is a real server record for today, use it!
+      if (realRecord) {
+        // Calculate hours if both checkIn and checkOut exist
+        let hours: number | null = null;
+        if (realRecord.checkIn && realRecord.checkOut) {
+          try {
+            const diff = parseTimeToMinutes(realRecord.checkOut) - parseTimeToMinutes(realRecord.checkIn);
+            if (diff > 0) {
+              hours = parseFloat((diff / 60).toFixed(1));
+            }
+          } catch { }
+        }
+
+        const isManual = auditLogs.some(log => log.employeeId === emp.id && log.attendanceDate === todayStr);
+
+        return {
+          id: emp.id,
+          name: emp.name,
+          dept: emp.dept,
+          checkIn: realRecord.checkIn ? realRecord.checkIn.replace(' AM', '').replace(' PM', '') : null,
+          checkOut: realRecord.checkOut ? realRecord.checkOut.replace(' AM', '').replace(' PM', '') : null,
+          status: realRecord.status,
+          hours,
+          leave: todayLeave ? todayLeave.type : null,
+          source: isManual ? 'Manual' : 'Mobile App',
+          icon: isManual ? Edit3 : MapPin,
+          color: isManual ? '#F59E0B' : '#4F8EF7'
+        };
       }
 
-      const isManual = auditLogs.some(log => log.employeeId === emp.id && log.attendanceDate === todayStr);
+      // If there's an approved leave, override status to absent or wfh and show leave type
+      if (todayLeave) {
+        const isWFH = todayLeave.type === 'WFH';
+        return {
+          id: emp.id, name: emp.name, dept: emp.dept,
+          checkIn: null, checkOut: null,
+          status: isWFH ? 'wfh' : 'absent',
+          hours: 0,
+          leave: todayLeave.type,
+          source: '—',
+          icon: null,
+          color: 'transparent'
+        };
+      }
 
-      return {
-        id: emp.id,
-        name: emp.name,
-        dept: emp.dept,
-        checkIn: realRecord.checkIn ? realRecord.checkIn.replace(' AM', '').replace(' PM', '') : null,
-        checkOut: realRecord.checkOut ? realRecord.checkOut.replace(' AM', '').replace(' PM', '') : null,
-        status: realRecord.status,
-        hours,
-        leave: todayLeave ? todayLeave.type : null,
-        source: isManual ? 'Manual' : 'Mobile App',
-        icon: isManual ? Edit3 : MapPin,
-        color: isManual ? '#F59E0B' : '#4F8EF7'
-      };
-    }
-
-    // If there's an approved leave, override status to absent or wfh and show leave type
-    if (todayLeave) {
-      const isWFH = todayLeave.type === 'WFH';
+      // Otherwise, they start fresh (refreshed every day) as absent/not checked in
       return {
         id: emp.id, name: emp.name, dept: emp.dept,
         checkIn: null, checkOut: null,
-        status: isWFH ? 'wfh' : 'absent',
-        hours: 0,
-        leave: todayLeave.type,
-        source: '—',
-        icon: null,
-        color: 'transparent'
+        status: 'absent', hours: null, leave: null,
+        source: '—', icon: null, color: 'transparent'
       };
-    }
-
-    // Otherwise, they start fresh (refreshed every day) as absent/not checked in
-    return {
-      id: emp.id, name: emp.name, dept: emp.dept,
-      checkIn: null, checkOut: null,
-      status: 'absent', hours: null, leave: null,
-      source: '—', icon: null, color: 'transparent'
-    };
-  }), [employees, attendanceRecords, leaves, currentDate]);
+    });
+  }, [employees, attendanceRecords, leaves, currentDate, auditLogs]);
 
   const presentCount = attendanceData.filter(e => e.status === 'present').length;
   const lateCount = attendanceData.filter(e => e.status === 'late').length;
@@ -577,9 +594,6 @@ export default function Attendance() {
   // ── Monthly report: per-employee stats for current month ───────────────────
   const monthlyReport = useMemo(() => {
     const daysInMonth = getDaysInMonth(todayDate.year, todayDate.month);
-    const workingDaysSoFar = Array.from({ length: Math.min(todayDate.day, daysInMonth) }, (_, i) => i + 1)
-      .filter(d => new Date(todayDate.year, todayDate.month, d).getDay() !== 4).length;
-
     const monthStr = `${todayDate.year}-${String(todayDate.month + 1).padStart(2, '0')}`;
 
     return employees.map((emp) => {
@@ -588,15 +602,28 @@ export default function Attendance() {
       const late = records.filter(r => r.status === 'late').length;
       const wfh = records.filter(r => r.status === 'wfh').length;
 
-      // Calculate absent days: working days so far minus days with check-ins or approved leaves
+      const empJoined = parseJoinedDate(emp.joined);
+      empJoined.setHours(0, 0, 0, 0);
+
+      // Calculate working days for this employee so far (only days on or after their joining date)
+      let empWorkingDaysSoFar = 0;
       const recordedDays = new Set(records.map(r => parseInt(r.date.split('-')[2], 10)));
       let absentCount = records.filter(r => r.status === 'absent').length;
 
       for (let d = 1; d <= Math.min(todayDate.day, daysInMonth); d++) {
         const dateObj = new Date(todayDate.year, todayDate.month, d);
-        if (dateObj.getDay() === 4) continue; // skip Thursday off
+        dateObj.setHours(0, 0, 0, 0);
 
-        if (!recordedDays.has(d)) {
+        const hasRecord = recordedDays.has(d);
+        // If the date is before this employee's joining date and no attendance was explicitly logged, skip
+        if (dateObj.getTime() < empJoined.getTime() && !hasRecord) {
+          continue;
+        }
+
+        if (dateObj.getDay() === 4) continue; // skip Thursday off
+        empWorkingDaysSoFar++;
+
+        if (!hasRecord) {
           const dateStr = `${todayDate.year}-${String(todayDate.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const hasLeave = leaves.some(l => l.employeeId === emp.id && l.status === 'approved' && dateStr >= l.from && dateStr <= l.to);
           if (!hasLeave) {
@@ -605,8 +632,8 @@ export default function Attendance() {
         }
       }
 
-      const attendancePct = workingDaysSoFar > 0
-        ? Math.round(((present + late + wfh) / workingDaysSoFar) * 100) : 0;
+      const attendancePct = empWorkingDaysSoFar > 0
+        ? Math.round(((present + late + wfh) / empWorkingDaysSoFar) * 100) : 0;
       return { id: emp.id, name: emp.name, dept: emp.dept, present, late, absent: absentCount, wfh, attendancePct };
     });
   }, [employees, todayDate, attendanceRecords, leaves]);
@@ -1115,12 +1142,17 @@ export default function Attendance() {
 
                     {/* Employee List */}
                     <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '8px 0' }}>
-                      {selectedDaySummary.statuses.map((emp, idx) => {
-                        const isEmpWorkedThu = isThursday && emp.status !== 'weekend' && emp.status !== 'absent';
-                        const sc = isEmpWorkedThu
-                          ? { bg: 'rgba(139,92,246,0.15)', text: '#8B5CF6', label: 'Worked Thursday OT' }
-                          : statusColors[emp.status];
-                        const fullEmp = employees.find(e => e.id === emp.id);
+                      {selectedDaySummary.statuses.length === 0 ? (
+                        <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                          No active employees registered on this date.
+                        </div>
+                      ) : (
+                        selectedDaySummary.statuses.map((emp, idx) => {
+                          const isEmpWorkedThu = isThursday && emp.status !== 'weekend' && emp.status !== 'absent';
+                          const sc = isEmpWorkedThu
+                            ? { bg: 'rgba(139,92,246,0.15)', text: '#8B5CF6', label: 'Worked Thursday OT' }
+                            : statusColors[emp.status];
+                          const fullEmp = employees.find(e => e.id === emp.id);
                         return (
                           <div key={idx} style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1196,7 +1228,7 @@ export default function Attendance() {
                           </div>
                         </div>
                       );
-                    })}
+                    }))}
                   </div>
                 </>
               );
