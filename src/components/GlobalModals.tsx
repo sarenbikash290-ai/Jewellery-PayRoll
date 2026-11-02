@@ -44,7 +44,7 @@ export default function GlobalModals() {
   });
   const [manualCheckIn, setManualCheckIn] = useState('09:00 AM');
   const [manualCheckOut, setManualCheckOut] = useState('06:00 PM');
-  const [manualStatus, setManualStatus] = useState<'present' | 'late' | 'absent' | 'wfh'>('present');
+  const [manualStatus, setManualStatus] = useState<'present' | 'absent' | 'half_day'>('present');
 
   // Reset tab/form state when modal changes
   useEffect(() => {
@@ -852,16 +852,23 @@ export default function GlobalModals() {
                     <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)' }}>Status</label>
                     <select
                       value={manualStatus}
-                      onChange={e => setManualStatus(e.target.value as any)}
+                      onChange={e => {
+                        const val = e.target.value as 'present' | 'absent' | 'half_day';
+                        setManualStatus(val);
+                        if (val === 'half_day' && manualCheckOut === '06:00 PM') {
+                          setManualCheckOut('02:00 PM');
+                        } else if (val === 'present' && manualCheckOut === '02:00 PM') {
+                          setManualCheckOut('06:00 PM');
+                        }
+                      }}
                       style={{
                         padding: '6px 10px', fontSize: '12.5px', borderRadius: '6px',
                         border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-1)'
                       }}
                     >
                       <option value="present">Present</option>
-                      <option value="late">Late</option>
-                      <option value="wfh">WFH</option>
                       <option value="absent">Absent</option>
+                      <option value="half_day">Half day</option>
                     </select>
                   </div>
                 </div>
