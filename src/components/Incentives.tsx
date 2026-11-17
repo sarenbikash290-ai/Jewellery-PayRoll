@@ -57,6 +57,27 @@ function formatMonthLabel(monthIso: string): string {
   return monthIso;
 }
 
+function formatIncentiveDate(createdAt?: string): string | null {
+  if (!createdAt) return null;
+  try {
+    const match = createdAt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, y, m, d] = match;
+      const monthNum = parseInt(m, 10);
+      const dayNum = parseInt(d, 10);
+      if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12 && !isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
+        const monthShort = MONTH_NAMES[monthNum - 1]?.slice(0, 3) || m;
+        return `${String(dayNum).padStart(2, '0')} ${monthShort} ${y}`;
+      }
+    }
+    const parsed = new Date(createdAt);
+    if (!isNaN(parsed.getTime()) && createdAt.length >= 10) {
+      return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+  } catch {}
+  return null;
+}
+
 function matchesMonth(recordMonthStr: string | undefined | null, targetMonthIso: string): boolean {
   if (!recordMonthStr) return false;
   if (targetMonthIso === 'all') return true;
@@ -137,7 +158,15 @@ function EmployeeDetailPanel({
   }, [currentMonthSales]);
 
   const achievement = emp.target > 0 ? Math.min((currentMonthTotal / emp.target) * 100, 200) : 0;
-  const empIncentives = useMemo(() => incentives.filter(i => i.employeeId === emp.empId), [incentives, emp.empId]);
+  const empIncentives = useMemo(() => {
+    return incentives
+      .filter(i => i.employeeId === emp.empId)
+      .sort((a, b) => {
+        const dateA = a.createdAt || a.month || '';
+        const dateB = b.createdAt || b.month || '';
+        return dateB.localeCompare(dateA);
+      });
+  }, [incentives, emp.empId]);
   const totalIncentiveAmount = useMemo(() => empIncentives.reduce((sum, i) => sum + i.amount, 0), [empIncentives]);
   const selectedMonthIncentives = useMemo(
     () => selectedMonth === 'all' ? empIncentives : empIncentives.filter(i => matchesMonth(i.month, selectedMonth)),
@@ -298,16 +327,45 @@ function EmployeeDetailPanel({
                       ₹{fmt(selectedMonth === 'all' ? totalIncentiveAmount : selectedMonthIncentiveAmount)}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11.5px', maxHeight: '180px', overflowY: 'auto' }}>
-                    {(selectedMonth === 'all' ? empIncentives : selectedMonthIncentives).map((inc, i) => (
-                      <div key={inc.id || i} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                        <div>
-                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{inc.ruleType}</span>
-                          <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>({inc.month})</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11.5px', maxHeight: '220px', overflowY: 'auto' }}>
+                    {(selectedMonth === 'all' ? empIncentives : selectedMonthIncentives).map((inc, i) => {
+                      const dateStr = formatIncentiveDate(inc.createdAt);
+                      return (
+                        <div
+                          key={inc.id || i}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: 'var(--bg-secondary)',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border)',
+                            gap: '8px'
+                          }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '12px', lineHeight: '1.35' }}>
+                              {inc.ruleType}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '3px', flexWrap: 'wrap' }}>
+                              {dateStr ? (
+                                <>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>📅 {dateStr}</span>
+                                  <span style={{ opacity: 0.5 }}>•</span>
+                                  <span>Month: {inc.month}</span>
+                                </>
+                              ) : (
+                                <span>📅 Month: {inc.month}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ fontWeight: 700, color: '#10B981', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            +₹{fmt(inc.amount)}
+                          </div>
                         </div>
-                        <div style={{ fontWeight: 700, color: '#10B981' }}>+₹{fmt(inc.amount)}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {selectedMonth !== 'all' && selectedMonthIncentives.length === 0 && (
                       <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', padding: '6px 0', textAlign: 'center' }}>
                         No incentives recorded for {formatMonthLabel(selectedMonth)}
@@ -922,7 +980,9 @@ export default function Incentives() {
                 <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#FF6B6B' }}>₹{fmt(com.amount)}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{com.month}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {formatIncentiveDate(com.createdAt) ? `📅 ${formatIncentiveDate(com.createdAt)} (${com.month})` : com.month}
+                    </div>
                   </div>
                   <span style={{ fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', whiteSpace: 'nowrap', background: com.status === 'paid' ? 'rgba(16,185,129,0.12)' : com.status === 'approved' ? 'rgba(79,142,247,0.12)' : 'rgba(245,158,11,0.12)', color: com.status === 'paid' ? '#10B981' : com.status === 'approved' ? '#4F8EF7' : '#F59E0B' }}>
                     {com.status === 'paid' ? '✓ Paid' : com.status === 'approved' ? '✓ Approved' : '⏳ Pending'}
